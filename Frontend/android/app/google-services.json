@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "299649646704",
+    "project_id": "homefix-live",
+    "storage_bucket": "homefix-live.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:299649646704:android:a3d43695262f40edb6b4b5",
+        "android_client_info": {
+          "package_name": "com.homefixlive.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBCOMKYqH0f44oMieGbRljGewoZbXWLO_Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:299649646704:android:c55aa0e209775eb3b6b4b5",
+        "android_client_info": {
+          "package_name": "com.homefixlive.homefix_live"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBCOMKYqH0f44oMieGbRljGewoZbXWLO_Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

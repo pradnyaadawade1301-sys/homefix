@@ -1,0 +1,111 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: homefix_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: homefix
+      POSTGRES_PASSWORD: homefix_pass
+      POSTGRES_DB: homefix
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U homefix -d homefix"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: homefix_redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # S3-compatible object storage. Not yet wired into the app (technician KYC
+  # uploads still use local disk — see internal/handler/upload_handler.go's doc
+  # comment for the swap-in point); included so a production deploy has a real
+  # bucket ready to point PUBLIC_BASE_URL/UPLOAD_DIR-equivalent config at.
+  minio:
+    image: minio/minio:latest
+    container_name: homefix_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: homefix
+      MINIO_ROOT_PASSWORD: homefix_pass
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: homefix_app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://homefix:homefix_pass@postgres:5432/homefix?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8090:8080"
+    volumes:
+      - ./secrets:/app/secrets:ro
+      - uploads_data:/app/uploads
+
+  # TURN/STUN relay for the peer-to-peer WebRTC video call. Needed whenever both
+  # call participants are behind a NAT that a plain STUN server can't traverse (the
+  # common case on real mobile networks) — coturn then relays the encrypted media
+  # between them. The app authenticates with a short-lived credential minted by the
+  # backend per-call (see internal/utils/turn_credentials.go), not a static password.
+  coturn:
+    image: coturn/coturn:4.6.2
+    container_name: homefix_coturn
+    restart: unless-stopped
+    command:
+      - "-n"
+      - "--log-file=stdout"
+      - "--listening-port=3478"
+      - "--tls-listening-port=5349"
+      - "--min-port=49160"
+      - "--max-port=49200"
+      - "--use-auth-secret"
+      - "--static-auth-secret=${TURN_SECRET}"
+      - "--realm=${TURN_REALM}"
+      - "--no-cli"
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "5349:5349/tcp"
+      - "5349:5349/udp"
+      - "49160-49200:49160-49200/udp"
+
+volumes:
+  pgdata:
+  uploads_data:
+  redisdata:
+  miniodata:

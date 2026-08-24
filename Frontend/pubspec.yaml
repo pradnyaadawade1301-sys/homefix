@@ -1,0 +1,115 @@
+name: homefix_live
+description: HomeFix Live - Live Consultation, Smart Diagnosis, Verified Technicians, Instant Fix.
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # HTTP & Networking
+  dio: ^5.3.0
+  web_socket_channel: ^2.4.0 # WebRTC signaling transport (ws/call/:id) — see services/webrtc_signaling_service.dart
+
+  # State Management
+  provider: ^6.0.0
+
+  # Authentication & Security
+  flutter_secure_storage: ^10.3.1
+  jwt_decoder: ^2.0.1
+
+  # WebRTC & Calling
+  # True peer-to-peer video call for Live Consultation (lib/screens/consultation/):
+  # no third-party media relay (Agora/Twilio/etc) sits in the call — the backend
+  # only relays the small SDP/ICE signaling handshake (GET /ws/call/:id, see
+  # internal/handler/call_handler.go), and STUN/TURN (see docker-compose.yml
+  # `coturn` service) only helps the two devices find/traverse each other's NAT.
+  flutter_webrtc: ^1.5.2
+  permission_handler: ^12.0.3
+
+  # Firebase & Notifications — FCM push notifications
+  firebase_core: ^3.6.0
+  firebase_messaging: ^15.1.3
+  flutter_local_notifications: ^18.0.1
+
+  # Maps
+  google_maps_flutter: ^2.18.0
+  google_maps_flutter_web: ^0.6.3
+  location: ^8.0.1
+  geocoding: ^2.1.0
+  # OpenStreetMap — free, no API key/billing. Used by NearbyTechniciansScreen
+  # for the live nearby-technicians map instead of Google Maps tiles.
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
+  # UI & Material
+  flutter_localizations:
+    sdk: flutter
+  google_fonts: ^6.1.0
+
+  # Date & Time
+  intl: ^0.20.2
+
+  # JSON Serialization
+  json_annotation: ^4.8.0
+
+  # Payment — Google Pay / UPI intent only (no Razorpay Checkout). The actual
+  # launch-and-capture-result flow is a small platform channel we own (see
+  # lib/services/upi_channel_service.dart + android MainActivity.kt) rather than
+  # a third-party plugin — `upi_india` was tried first but is unmaintained and
+  # its Android build.gradle doesn't build under this project's Gradle/AGP version.
+  url_launcher: ^6.2.0
+
+  # Image & Media
+  image_picker: ^1.0.4
+  cached_network_image: ^3.3.0
+
+  # Audio recording — "Record voice description" on Issue Details screen,
+  # transcribed via Groq Whisper on the backend (POST /ai/transcribe).
+  record: ^6.0.0
+  path_provider: ^2.1.0
+
+  # Utilities
+  uuid: ^4.0.0
+  shared_preferences: ^2.2.0
+  connectivity_plus: ^7.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+  json_serializable: ^6.7.0
+  build_runner: ^2.4.0
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.3.10
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/logo.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: assets/images/logo.png
+  android_12:
+    color: "#FFFFFF"
+    image: assets/images/logo.png
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/animations/
+  # Custom GoogleSans font files were never included in this project (only
+  # assets/images/logo.png exists). The app already uses the `google_fonts`
+  # package (see lib/core/theme.dart) for typography, so no bundled font
+  # files are needed. Add a `fonts:` section back here if you drop real
+  # .ttf files into assets/fonts/ later.

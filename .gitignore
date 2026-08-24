@@ -1,0 +1,10 @@
+﻿Backend/.env
+Backend/secrets/*
+!Backend/secrets/.gitkeep
+Backend/*.exe
+Frontend/.dart_tool/
+Frontend/build/
+Frontend/.idea/
+Frontend/android/.gradle/
+Frontend/ios/Pods/
+.DS_Store
