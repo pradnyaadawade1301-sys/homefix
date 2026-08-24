@@ -5,9 +5,7 @@ class ApiConfig {
   // Running on a REAL Android device over Wi-Fi: phone and PC must be on the same
   // network. Update the IP below any time your PC's Wi-Fi IP changes (check via
   // `ipconfig` -> IPv4 Address under your active Wi-Fi adapter).
-  static const String baseUrl = 'http://192.168.1.6:8090/api/v1'; // Real device via LAN Wi-Fi
-  // static const String baseUrl = 'http://10.0.2.2:8090/api/v1'; // Android emulator
-  // static const String baseUrl = 'https://api.homefixlive.com/api/v1'; // Production
+static const String baseUrl = 'http://192.168.1.8:8090/api/v1';  // static const String baseUrl = 'https://api.homefixlive.com/api/v1'; // Production
 
   // Auth endpoints (backend: internal/router/router.go -> auth group)
   static const String authSignup = '/auth/signup';
