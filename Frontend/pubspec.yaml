@@ -40,8 +40,7 @@ dependencies:
   google_maps_flutter: ^2.18.0
   google_maps_flutter_web: ^0.6.3
   location: ^8.0.1
-  geocoding: ^2.1.0
-  # OpenStreetMap — free, no API key/billing. Used by NearbyTechniciansScreen
+  geocoding: ^4.0.0  # OpenStreetMap — free, no API key/billing. Used by NearbyTechniciansScreen
   # for the live nearby-technicians map instead of Google Maps tiles.
   flutter_map: ^7.0.2
   latlong2: ^0.9.1

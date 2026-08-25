@@ -12,10 +12,8 @@ import '../profile/profile_screen.dart';
 import 'categories_screen.dart';
 import 'technician_detail_screen.dart';
 import 'technician_list_screen.dart';
+import '../payment/transaction_history_screen.dart';
 
-/// Top-level Home screen — hosts the bottom nav and swaps between the four
-/// tabs (Home / Bookings / Notifications / Profile) via IndexedStack so each
-/// tab keeps its own scroll position and state.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
@@ -27,18 +25,18 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
   static const _tabs = [
-    _HomeTab(),
-    BookingsScreen(),
-    NotificationsScreen(),
-    ProfileScreen(),
-  ];
+  _HomeTab(),
+  BookingsScreen(),
+  TransactionHistoryScreen(),
+  ProfileScreen(),
+];
 
-  static const _navItems = [
-    _NavItemData(icon: Icons.home_rounded, label: 'Home'),
-    _NavItemData(icon: Icons.calendar_today_rounded, label: 'Bookings'),
-    _NavItemData(icon: Icons.notifications_rounded, label: 'Alerts'),
-    _NavItemData(icon: Icons.person_rounded, label: 'Profile'),
-  ];
+ static const _navItems = [
+  _NavItemData(icon: Icons.home_rounded, label: 'Home'),
+  _NavItemData(icon: Icons.history_rounded, label: 'History'),
+  _NavItemData(icon: Icons.receipt_long_rounded, label: 'Transactions'),
+  _NavItemData(icon: Icons.person_rounded, label: 'Profile'),
+];
 
   @override
   Widget build(BuildContext context) {
@@ -119,7 +117,6 @@ class _HomeTabState extends State<_HomeTab> {
   void _loadData() {
     context.read<CategoryProvider>().fetchCategories();
     context.read<TechnicianProvider>().fetchTechnicians();
-    // Resolve user's current location on home tab load
     context.read<LocationProvider>().resolveLocation();
   }
 
@@ -392,31 +389,17 @@ class _HomeTabState extends State<_HomeTab> {
     'Home Cleaning': Icons.cleaning_services_rounded,
   };
 
-  // Bordered-card look (light fill + saturated border, matching the reference
-  // grid design) cycled per category tile.
-  static const List<Color> _categoryBackgrounds = [
-    Color(0xFFFFF7EC),
-    Color(0xFFFDEFF3),
-    Color(0xFFEAFBF0),
-    Color(0xFFEFF6FF),
-    Color(0xFFFFF9E8),
-    Color(0xFFFDEEEE),
-    Color(0xFFEFF0FE),
-    Color(0xFFEAFAF9),
-    Color(0xFFF6EEFE),
-  ];
-
-  static const List<Color> _categoryBorders = [
-    Color(0xFFF0A93B),
-    Color(0xFFE0668E),
-    Color(0xFF3FAE6A),
-    Color(0xFF4E8FE0),
-    Color(0xFFDDBA2E),
-    Color(0xFFE0645E),
-    Color(0xFF6D6FE0),
-    Color(0xFF2FA79A),
-    Color(0xFF9A5CE0),
-  ];
+  static const Map<String, String> _categoryImages = {
+    'Electrician': 'assets/images/electrician.png',
+    'Plumber': 'assets/images/plumber.png',
+    'AC Repair': 'assets/images/AC repair.png',
+    'Appliance Repair': 'assets/images/appliance repair.png',
+    'Carpenter': 'assets/images/carpentr.png',
+    'Painter': 'assets/images/painter.png',
+    'RO Service': 'assets/images/RO-service.png',
+    'CCTV': 'assets/images/cctv repair.png',
+    'Home Cleaning': 'assets/images/home cleaning.png',
+  };
 
   Widget _buildCategoriesRow() {
     return Consumer<CategoryProvider>(
@@ -439,57 +422,68 @@ class _HomeTabState extends State<_HomeTab> {
             ),
           );
         }
-        // "Most Booked" shows a curated top set (3x3); the rest are one tap
-        // away via "View all" -> CategoriesScreen.
         final shown = categories.take(9).toList();
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: shown.length,
+        return SizedBox(
+          height: 230,
+          child: GridView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: shown.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1.05,
-          ),
-          itemBuilder: (context, i) {
-            final cat = shown[i];
-            final icon = _categoryIcons[cat.name] ?? Icons.build_rounded;
-            final bg = _categoryBackgrounds[i % _categoryBackgrounds.length];
-            final border = _categoryBorders[i % _categoryBorders.length];
-            return InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: () {
-                // Selecting a category starts the AI-diagnosis flow (Issue
-                // Details -> AI Diagnosis -> Live Video / Book Technician).
-                Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => IssueDetailsScreen(categoryId: cat.id, categoryName: cat.name),
-                ));
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-                decoration: BoxDecoration(
-                  color: bg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: border, width: 1.4),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(icon, color: border, size: 26),
-                    const SizedBox(height: 8),
-                    Text(
-                      cat.name,
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF1A1F36)),
+  crossAxisCount: 2,
+  mainAxisSpacing: 10,
+  crossAxisSpacing: 2,
+  childAspectRatio: 0.95,
+),
+itemBuilder: (context, i) {
+  final cat = shown[i];
+  final icon = _categoryIcons[cat.name] ?? Icons.build_rounded;
+  final imagePath = _categoryImages[cat.name];
+  return InkWell(
+    borderRadius: BorderRadius.circular(18),
+    splashColor: Colors.transparent,
+    highlightColor: Colors.transparent,
+    onTap: () {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => IssueDetailsScreen(categoryId: cat.id, categoryName: cat.name),
+      ));
+    },
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: SizedBox(
+            width: double.infinity,
+            height: 90,
+            child: imagePath != null
+                ? Image.asset(
+                    imagePath,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: Colors.grey[200],
+                      child: Icon(icon, color: Colors.grey[500], size: 30),
                     ),
-                  ],
-                ),
-              ),
-            );
-          },
+                  )
+                : Container(
+                    color: Colors.grey[200],
+                    child: Icon(icon, color: Colors.grey[500], size: 30),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          cat.name,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF1A1F36)),
+        ),
+      ],
+    ),
+  );
+},
+          ),
         );
       },
     );
@@ -519,7 +513,7 @@ class _HomeTabState extends State<_HomeTab> {
           );
         }
         return Column(
-          children: techs.take(5).map((t) => _TechnicianCard(technician: t)).toList(),
+          children: techs.take(5).map<Widget>((t) => _TechnicianCard(technician: t)).toList(),
         );
       },
     );
