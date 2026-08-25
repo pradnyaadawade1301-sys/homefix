@@ -128,14 +128,77 @@ class _TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
       ),
     );
   }
+Widget _buildGreetingHeader() {
+  return Consumer<BookingProvider>(
+    builder: (context, provider, _) {
+      final activeCount = provider.bookings
+          .where((b) => b.status == 'accepted' || b.status == 'in_progress')
+          .length;
+      final completedCount = provider.bookings.where((b) => b.status == 'completed').length;
+      return Container(
+        margin: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: AppTheme.primaryColor.withValues(alpha: 0.25), blurRadius: 14, offset: const Offset(0, 6))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Welcome back 👋', style: TextStyle(color: Colors.white70, fontSize: 13)),
+            const SizedBox(height: 4),
+            const Text('Here\'s your work overview', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: _statPill('Active', activeCount.toString(), Icons.pending_actions_rounded)),
+                const SizedBox(width: 10),
+                Expanded(child: _statPill('Completed', completedCount.toString(), Icons.check_circle_outline_rounded)),
+              ],
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
 
-  Widget _buildJobsBody() {
-    return Column(
+Widget _statPill(String label, String value, IconData icon) {
+  return Container(
+    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.15),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Row(
       children: [
-        if (_pendingRequests.isNotEmpty) _buildConsultationBanner(),
+        Icon(icon, color: Colors.white, size: 20),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildJobsBody() {
+  return Column(
+    children: [
+      _buildGreetingHeader(),
+      const SizedBox(height: 4),
+      if (_pendingRequests.isNotEmpty) _buildConsultationBanner(),
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-          child: Row(
+padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),          child: Row(
             children: [
               _FilterChip(label: 'Active', selected: _tabIndex == 0, onTap: () => setState(() => _tabIndex = 0)),
               const SizedBox(width: 8),

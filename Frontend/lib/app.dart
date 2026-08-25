@@ -23,6 +23,7 @@ import 'services/booking_service.dart';
 import 'services/consultation_service.dart';
 import 'services/location_service.dart';
 import 'services/service_locator.dart';
+import 'screens/technician/technician_jobs_screen.dart';
 import 'main.dart' as app; // for fcmNotificationService
 
 /// Sends the current FCM token to the backend via the authenticated endpoint.
@@ -163,6 +164,7 @@ class _MyAppState extends State<MyApp> {
           '/home': (context) => const HomeScreen(),
           '/technician-kyc': (context) => const TechnicianKycScreen(),
           '/technician-status': (context) => const TechnicianStatusScreen(),
+          '/technician-home': (context) => const TechnicianJobsScreen(),
           '/consultation-requests': (context) => const IncomingConsultationScreen(),
         },
       ),
