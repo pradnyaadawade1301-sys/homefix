@@ -2,9 +2,58 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/category_provider.dart';
+import '../../models/user_model.dart';
+import '../booking/bookings_screen.dart';
+import '../notifications/notifications_screen.dart';
+import '../technician/technician_jobs_screen.dart';
+import '../technician/technician_settlement_screen.dart';
+import '../technician/technician_status_screen.dart';
+import '../personal_info_screen.dart';
+import '../saved_addresses_screen.dart';
+import '../legal_screens.dart';
+import '../change_password_screen.dart';
+import '../service_history_screen.dart';
+import '../payment_methods_screen.dart';
+import '../transaction_history_screen.dart';
+import '../privacy_security_screen.dart';
+import '../help_center_screen.dart';
+import '../report_issue_screen.dart';
+import '../contact_support_screen.dart';
+import '../availability_toggle_screen.dart';
+import '../service_radius_screen.dart';
+import '../working_hours_screen.dart';
+import '../pricing_settings_screen.dart';
+import '../performance_screen.dart';
+import '../certificates_screen.dart';
+import '../license_screen.dart';
+import '../bank_details_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final userProvider = context.read<UserProvider>();
+      await userProvider.fetchProfile();
+      if (!mounted) return;
+
+      if (userProvider.user?.isTechnician == true) {
+        context.read<TechnicianKycProvider>().loadMyProfile();
+      }
+      final categoryProvider = context.read<CategoryProvider>();
+      if (categoryProvider.categories.isEmpty) {
+        categoryProvider.fetchCategories();
+      }
+    });
+  }
 
   Future<void> _confirmLogout(BuildContext context) async {
     final confirm = await showDialog<bool>(
@@ -28,67 +77,89 @@ class ProfileScreen extends StatelessWidget {
     Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
   }
 
+  Future<void> _confirmDeleteAccount(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete account?'),
+        content: const Text(
+            'This will permanently delete your account and all associated data. This action cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(color: AppTheme.errorColor)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !context.mounted) return;
+    _openPlaceholder(context, 'Delete Account', Icons.delete_outline_rounded);
+  }
+
+  void _openPlaceholder(BuildContext context, String title, IconData icon) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => _PlaceholderScreen(title: title, icon: icon)),
+    );
+  }
+
+  void _openScreen(BuildContext context, Widget screen) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => screen),
+    );
+  }
+
+  void _openChangePassword(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF7F8FA),
       appBar: AppBar(title: const Text('Profile')),
-      body: Consumer<AuthProvider>(
-        builder: (context, authProvider, _) {
-          final user = authProvider.currentUser;
-          return ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              Center(
-                child: CircleAvatar(
-                  radius: 44,
-                  backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
-                  child: Text(
-                    (user?.name.isNotEmpty ?? false) ? user!.name[0].toUpperCase() : '?',
-                    style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Center(
-                child: Text(
-                  user?.name ?? 'Guest',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Center(
-                child: Text(
-                  user?.isTechnician == true ? 'Technician' : 'Customer',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                ),
-              ),
-              const SizedBox(height: 28),
-              _InfoTile(icon: Icons.phone_outlined, label: 'Phone', value: user?.phone ?? '-'),
-              _InfoTile(icon: Icons.email_outlined, label: 'Email', value: user?.email ?? 'Not added'),
-              if (user?.isTechnician == true) ...[
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton.icon(
-                    onPressed: () => Navigator.of(context).pushNamed('/consultation-requests'),
-                    icon: const Icon(Icons.videocam_rounded),
-                    label: const Text('Live Consultation Requests'),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
+      body: Consumer<UserProvider>(
+        builder: (context, userProvider, _) {
+          final user = userProvider.user;
+          if (userProvider.isLoading && user == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (user == null) {
+            return Center(
+              child: SizedBox(
+                width: 220,
                 height: 52,
-                child: OutlinedButton.icon(
-                  onPressed: () => _confirmLogout(context),
-                  icon: const Icon(Icons.logout_rounded, color: AppTheme.errorColor),
-                  label: const Text('Log Out', style: TextStyle(color: AppTheme.errorColor)),
-                  style: OutlinedButton.styleFrom(side: const BorderSide(color: AppTheme.errorColor)),
+                child: ElevatedButton.icon(
+                  onPressed: () =>
+                      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false),
+                  icon: const Icon(Icons.login_rounded),
+                  label: const Text('Log In'),
                 ),
               ),
-            ],
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: userProvider.fetchProfile,
+            child: user.isTechnician
+                ? _TechnicianProfileBody(
+                    user: user,
+                    onLogout: () => _confirmLogout(context),
+                    onDelete: () => _confirmDeleteAccount(context),
+                    openPlaceholder: (t, i) => _openPlaceholder(context, t, i),
+                    openChangePassword: () => _openChangePassword(context),
+                    openScreen: (w) => _openScreen(context, w),
+                  )
+                : _CustomerProfileBody(
+                    user: user,
+                    onLogout: () => _confirmLogout(context),
+                    onDelete: () => _confirmDeleteAccount(context),
+                    openPlaceholder: (t, i) => _openPlaceholder(context, t, i),
+                    openChangePassword: () => _openChangePassword(context),
+                    openScreen: (w) => _openScreen(context, w),
+                  ),
           );
         },
       ),
@@ -96,35 +167,781 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-class _InfoTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  const _InfoTile({required this.icon, required this.label, required this.value});
+typedef _OpenPlaceholder = void Function(String title, IconData icon);
+
+// ============================================================================
+// CUSTOMER PROFILE
+// ============================================================================
+
+class _CustomerProfileBody extends StatelessWidget {
+  final User user;
+  final VoidCallback onLogout;
+  final VoidCallback onDelete;
+  final _OpenPlaceholder openPlaceholder;
+  final VoidCallback openChangePassword;
+  final void Function(Widget) openScreen;
+
+  const _CustomerProfileBody({
+    required this.user,
+    required this.onLogout,
+    required this.onDelete,
+    required this.openPlaceholder,
+    required this.openChangePassword,
+    required this.openScreen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+      children: [
+        _ProfileHeader(
+          name: user.name.isNotEmpty ? user.name : 'Guest',
+          subtitle: user.phone,
+          roleLabel: 'Customer',
+          photoUrl: null,
+          verifiedBadge: user.phoneVerified,
+        ),
+        const SizedBox(height: 16),
+        _SectionCard(
+          title: 'Account',
+          children: [
+            _ActionTile(
+              icon: Icons.person_outline_rounded,
+              label: 'Personal Information',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
+              ),
+            ),
+            _ActionTile(
+              icon: Icons.location_on_outlined,
+              label: 'Saved Addresses',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SavedAddressesScreen()),
+              ),
+            ),
+            _ActionTile(
+              icon: Icons.history_rounded,
+              label: 'Service History',
+              onTap: () => openScreen(const ServiceHistoryScreen()),
+            ),
+            _ActionTile(
+              icon: Icons.calendar_month_outlined,
+              label: 'Bookings',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const BookingsScreen()),
+              ),
+            ),
+            _ActionTile(
+              icon: Icons.payment_outlined,
+              label: 'Payment Methods',
+              onTap: () => openScreen(const PaymentMethodsScreen()),
+            ),
+            _ActionTile(
+              icon: Icons.receipt_long_outlined,
+              label: 'Transaction History',
+              onTap: () => openScreen(const TransactionHistoryScreen()),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _SectionCard(
+          title: 'App Settings',
+          children: [
+            _ActionTile(
+              icon: Icons.notifications_outlined,
+              label: 'Notifications',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _SectionCard(
+          title: 'Support',
+          children: [
+            _ActionTile(
+              icon: Icons.help_outline_rounded,
+              label: 'Help Center',
+              onTap: () => openScreen(const HelpCenterScreen()),
+            ),
+            _ActionTile(
+              icon: Icons.report_gmailerrorred_outlined,
+              label: 'Report an Issue',
+              onTap: () => openScreen(const ReportIssueScreen()),
+            ),
+            _ActionTile(
+              icon: Icons.support_agent_outlined,
+              label: 'Contact Support',
+              onTap: () => openScreen(const ContactSupportScreen()),
+            ),
+            _ActionTile(
+              icon: Icons.description_outlined,
+              label: 'Terms & Conditions',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const TermsScreen()),
+              ),
+            ),
+            _ActionTile(
+              icon: Icons.shield_outlined,
+              label: 'Privacy Policy',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: OutlinedButton.icon(
+            onPressed: onLogout,
+            icon: const Icon(Icons.logout_rounded, color: AppTheme.errorColor),
+            label: const Text('Log Out', style: TextStyle(color: AppTheme.errorColor)),
+            style: OutlinedButton.styleFrom(side: const BorderSide(color: AppTheme.errorColor)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextButton(
+          onPressed: onDelete,
+          child: const Text('Delete Account', style: TextStyle(color: Colors.grey)),
+        ),
+      ],
+    );
+  }
+}
+
+// ============================================================================
+// TECHNICIAN PROFILE
+// ============================================================================
+
+class _TechnicianProfileBody extends StatelessWidget {
+  final User user;
+  final VoidCallback onLogout;
+  final VoidCallback onDelete;
+  final _OpenPlaceholder openPlaceholder;
+  final VoidCallback openChangePassword;
+  final void Function(Widget) openScreen;
+
+  const _TechnicianProfileBody({
+    required this.user,
+    required this.onLogout,
+    required this.onDelete,
+    required this.openPlaceholder,
+    required this.openChangePassword,
+    required this.openScreen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer2<TechnicianKycProvider, CategoryProvider>(
+      builder: (context, kycProvider, categoryProvider, _) {
+        final profile = kycProvider.profile;
+
+        if (kycProvider.isLoading && profile == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (profile == null) {
+          return ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              _ProfileHeader(
+                name: user.name.isNotEmpty ? user.name : 'Technician',
+                subtitle: user.phone,
+                roleLabel: 'Technician',
+                photoUrl: null,
+                verifiedBadge: user.phoneVerified,
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(Icons.badge_outlined, size: 40, color: Colors.grey),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'You haven\'t completed technician registration yet.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(context).pushNamed('/technician-kyc'),
+                      child: const Text('Complete Registration'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: onLogout,
+                  icon: const Icon(Icons.logout_rounded, color: AppTheme.errorColor),
+                  label: const Text('Log Out', style: TextStyle(color: AppTheme.errorColor)),
+                  style: OutlinedButton.styleFrom(side: const BorderSide(color: AppTheme.errorColor)),
+                ),
+              ),
+            ],
+          );
+        }
+
+        String categoryName = profile.categoryId;
+        for (final c in categoryProvider.categories) {
+          if (c.id == profile.categoryId) {
+            categoryName = c.name;
+            break;
+          }
+        }
+
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+          children: [
+            _ProfileHeader(
+              name: user.name.isNotEmpty ? user.name : 'Technician',
+              subtitle: user.phone,
+              roleLabel: categoryName,
+              photoUrl: profile.profilePhotoUrl.isNotEmpty ? profile.profilePhotoUrl : null,
+              verifiedBadge: profile.isVerified,
+              extra: Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _StatChip(
+                    icon: Icons.star_rounded,
+                    label: profile.ratingCount > 0
+                        ? '${profile.ratingAvg.toStringAsFixed(1)} (${profile.ratingCount})'
+                        : 'No ratings yet',
+                    color: Colors.amber[700]!,
+                  ),
+                  _StatChip(
+                    icon: profile.isAvailable ? Icons.circle : Icons.circle_outlined,
+                    label: profile.isAvailable ? 'Online' : 'Offline',
+                    color: profile.isAvailable ? AppTheme.successColor : Colors.grey,
+                  ),
+                  _ApprovalBadge(status: profile.approvalStatus),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            _SectionCard(
+              title: 'Professional Details',
+              children: [
+                _InfoRow(label: 'Primary Service', value: categoryName),
+                _InfoRow(label: 'Years of Experience', value: '${profile.experienceYears} yrs'),
+                _InfoRow(label: 'Address', value: profile.address.isNotEmpty ? profile.address : '-'),
+                _ActionTile(
+                  icon: Icons.toggle_on_outlined,
+                  label: 'Availability Toggle',
+                  onTap: () => openScreen(const AvailabilityToggleScreen()),
+                ),
+                _ActionTile(
+                  icon: Icons.map_outlined,
+                  label: 'Service Radius',
+                  onTap: () => openScreen(const ServiceRadiusScreen()),
+                ),
+                _ActionTile(
+                  icon: Icons.access_time_outlined,
+                  label: 'Working Hours',
+                  onTap: () => openScreen(const WorkingHoursScreen()),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _SectionCard(
+              title: 'Trust & Verification',
+              children: [
+                _VerificationRow(label: 'Phone Verified', verified: user.phoneVerified),
+                _VerificationRow(label: 'Profile Verified', verified: profile.isVerified),
+                _VerificationRow(
+                  label: 'Government ID Uploaded',
+                  verified: profile.governmentIdUrl.isNotEmpty,
+                ),
+                if (profile.isRejected && profile.rejectionReason != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Text(
+                      'Rejection reason: ${profile.rejectionReason}',
+                      style: const TextStyle(color: AppTheme.errorColor, fontSize: 13),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _SectionCard(
+              title: 'Business Information',
+              children: [
+                _ActionTile(
+                  icon: Icons.currency_rupee_rounded,
+                  label: 'Hourly / Visit Charge',
+                  onTap: () => openScreen(const PricingSettingsScreen()),
+                ),
+                _ActionTile(
+                  icon: Icons.local_shipping_outlined,
+                  label: 'Travel Fee',
+                  onTap: () => openScreen(const PricingSettingsScreen()),
+                ),
+                _ActionTile(
+                  icon: Icons.priority_high_rounded,
+                  label: 'Emergency Service Fee',
+                  onTap: () => openScreen(const PricingSettingsScreen()),
+                ),
+                _ActionTile(
+                  icon: Icons.money_off_csred_outlined,
+                  label: 'Minimum Service Charge',
+                  onTap: () => openScreen(const PricingSettingsScreen()),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _SectionCard(
+              title: 'Performance',
+              children: [
+                _InfoRow(
+                  label: 'Customer Rating',
+                  value: profile.ratingCount > 0
+                      ? '${profile.ratingAvg.toStringAsFixed(1)} ★ (${profile.ratingCount} reviews)'
+                      : 'No reviews yet',
+                ),
+                _ActionTile(
+                  icon: Icons.work_outline_rounded,
+                  label: 'Jobs Completed / Cancelled',
+                  onTap: () => openScreen(const PerformanceScreen()),
+                ),
+                _ActionTile(
+                  icon: Icons.speed_outlined,
+                  label: 'Response Rate & Time',
+                  onTap: () => openScreen(const PerformanceScreen()),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _SectionCard(
+              title: 'Documents',
+              children: [
+                _VerificationRow(
+                  label: 'Government ID',
+                  verified: profile.governmentIdUrl.isNotEmpty,
+                ),
+                _ActionTile(
+                  icon: Icons.workspace_premium_outlined,
+                  label: 'Certificates',
+                  onTap: () => openScreen(const CertificatesScreen()),
+                ),
+                _ActionTile(
+                  icon: Icons.badge_outlined,
+                  label: 'License',
+                  onTap: () => openScreen(const LicenseScreen()),
+                ),
+                _ActionTile(
+                  icon: Icons.account_balance_outlined,
+                  label: 'Bank / UPI Details',
+                  onTap: () => openScreen(const BankDetailsScreen()),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _SectionCard(
+              title: 'Work',
+              children: [
+                _ActionTile(
+                  icon: Icons.work_outline_rounded,
+                  label: 'My Jobs',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const TechnicianJobsScreen()),
+                  ),
+                ),
+                _ActionTile(
+                  icon: Icons.account_balance_wallet_outlined,
+                  label: 'Earnings & Settlement',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const TechnicianSettlementScreen()),
+                  ),
+                ),
+                _ActionTile(
+                  icon: Icons.fact_check_outlined,
+                  label: 'Registration Status',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const TechnicianStatusScreen()),
+                  ),
+                ),
+                _ActionTile(
+                  icon: Icons.videocam_rounded,
+                  label: 'Live Consultation Requests',
+                  onTap: () => Navigator.of(context).pushNamed('/consultation-requests'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _SectionCard(
+              title: 'App Settings',
+              children: [
+                _ActionTile(
+                  icon: Icons.notifications_outlined,
+                  label: 'Notification Settings',
+                  onTap: () => openPlaceholder('Notification Settings', Icons.notifications_outlined),
+                ),
+                _ActionTile(
+                  icon: Icons.payment_outlined,
+                  label: 'Payment Settings',
+                  onTap: () => openPlaceholder('Payment Settings', Icons.payment_outlined),
+                ),
+                _ActionTile(
+                  icon: Icons.privacy_tip_outlined,
+                  label: 'Privacy & Security',
+                  onTap: () => openScreen(const PrivacySecurityScreen()),
+                ),
+                _ActionTile(
+                  icon: Icons.lock_outline_rounded,
+                  label: 'Change Password / PIN',
+                  onTap: openChangePassword,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _SectionCard(
+              title: 'Support',
+              children: [
+                _ActionTile(
+                  icon: Icons.help_outline_rounded,
+                  label: 'Help Center',
+                  onTap: () => openScreen(const HelpCenterScreen()),
+                ),
+                _ActionTile(
+                  icon: Icons.support_agent_outlined,
+                  label: 'Contact Support',
+                  onTap: () => openScreen(const ContactSupportScreen()),
+                ),
+                _ActionTile(
+                  icon: Icons.report_gmailerrorred_outlined,
+                  label: 'Report a Problem',
+                  onTap: () => openScreen(const ReportIssueScreen()),
+                ),
+                _ActionTile(
+                  icon: Icons.description_outlined,
+                  label: 'Terms & Conditions',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const TermsScreen()),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: OutlinedButton.icon(
+                onPressed: onLogout,
+                icon: const Icon(Icons.logout_rounded, color: AppTheme.errorColor),
+                label: const Text('Log Out', style: TextStyle(color: AppTheme.errorColor)),
+                style: OutlinedButton.styleFrom(side: const BorderSide(color: AppTheme.errorColor)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: onDelete,
+              child: const Text('Delete Account', style: TextStyle(color: Colors.grey)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// ============================================================================
+// SHARED WIDGETS
+// ============================================================================
+
+class _ProfileHeader extends StatelessWidget {
+  final String name;
+  final String subtitle;
+  final String roleLabel;
+  final String? photoUrl;
+  final bool verifiedBadge;
+  final Widget? extra;
+
+  const _ProfileHeader({
+    required this.name,
+    required this.subtitle,
+    required this.roleLabel,
+    required this.photoUrl,
+    required this.verifiedBadge,
+    this.extra,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10)],
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Icon(icon, color: AppTheme.primaryColor, size: 22),
-          const SizedBox(width: 14),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Stack(
             children: [
-              Text(label, style: TextStyle(fontSize: 11.5, color: Colors.grey[500])),
-              const SizedBox(height: 2),
-              Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              CircleAvatar(
+                radius: 32,
+                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
+                backgroundImage: photoUrl != null ? NetworkImage(photoUrl!) : null,
+                child: photoUrl == null
+                    ? Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primaryColor,
+                        ),
+                      )
+                    : null,
+              ),
+              if (verifiedBadge)
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.verified_rounded,
+                        color: AppTheme.successColor, size: 16),
+                  ),
+                ),
             ],
           ),
+          const SizedBox(height: 10),
+          Text(name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 2),
+          Text(subtitle, style: TextStyle(color: Colors.grey[600], fontSize: 12.5)),
+          const SizedBox(height: 1),
+          Text(roleLabel,
+              style: const TextStyle(
+                  color: AppTheme.primaryColor, fontSize: 12.5, fontWeight: FontWeight.w600)),
+          if (extra != null) ...[
+            const SizedBox(height: 10),
+            extra!,
+          ],
         ],
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
+
+  const _SectionCard({required this.title, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child: Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+          ),
+          ...children,
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _ActionTile({required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon, color: AppTheme.primaryColor, size: 22),
+      title: Text(label, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
+      trailing: const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
+      onTap: onTap,
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _InfoRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 13.5)),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VerificationRow extends StatelessWidget {
+  final String label;
+  final bool verified;
+
+  const _VerificationRow({required this.label, required this.verified});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(
+        verified ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+        color: verified ? AppTheme.successColor : Colors.grey,
+        size: 22,
+      ),
+      title: Text(label, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
+      trailing: verified
+          ? const Text('Verified', style: TextStyle(color: AppTheme.successColor, fontSize: 12.5))
+          : const Text('Pending', style: TextStyle(color: Colors.grey, fontSize: 12.5)),
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _StatChip({required this.icon, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ApprovalBadge extends StatelessWidget {
+  final String status;
+
+  const _ApprovalBadge({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    Color color;
+    String label;
+    switch (status) {
+      case 'approved':
+        color = AppTheme.successColor;
+        label = 'Approved';
+        break;
+      case 'rejected':
+        color = AppTheme.errorColor;
+        label = 'Rejected';
+        break;
+      default:
+        color = Colors.orange;
+        label = 'Pending Approval';
+    }
+    return _StatChip(icon: Icons.verified_user_outlined, label: label, color: color);
+  }
+}
+
+// ============================================================================
+// PLACEHOLDER SCREEN — shown for features that don't have a dedicated screen
+// or backend endpoint yet. Professional "coming soon" page, not a dead button.
+// ============================================================================
+
+class _PlaceholderScreen extends StatelessWidget {
+  final String title;
+  final IconData icon;
+
+  const _PlaceholderScreen({required this.title, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F8FA),
+      appBar: AppBar(title: Text(title)),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 40, color: AppTheme.primaryColor),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                title,
+                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'We\'re working on this feature. It will be available in an upcoming update.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey[600], fontSize: 14, height: 1.4),
+              ),
+              const SizedBox(height: 28),
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Go Back'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

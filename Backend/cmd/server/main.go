@@ -47,7 +47,7 @@ func main() {
 	analyticsRepo := repository.NewAnalyticsRepository(pool)
 
 	// ---- External services ----
-	groqService := service.NewGroqService(cfg.GroqAPIKey, cfg.GroqModel, cfg.GroqAPIURL, aiRepo)
+	groqService := service.NewGroqService(cfg.GroqAPIKeys, cfg.GroqModel, cfg.GroqAPIURL, aiRepo)
 	upiService := service.NewUpiService(
 		cfg.UpiPayeeVPA, cfg.UpiPayeeName, cfg.PlatformCommissionPercent,
 		paymentRepo, bookingRepo, techRepo, walletRepo,

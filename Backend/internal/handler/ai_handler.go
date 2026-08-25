@@ -2,6 +2,7 @@ package handler
 
 import (
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -52,6 +53,7 @@ func (h *AIHandler) SendMessage(c *gin.Context) {
 	}
 	reply, diagnosis, err := h.groq.SendMessage(c.Request.Context(), sessionID, body.Message)
 	if err != nil {
+		log.Printf("ai_handler: SendMessage failed for session %s: %v", sessionID, err)
 		utils.Error(c, http.StatusBadGateway, err.Error())
 		return
 	}
@@ -101,6 +103,7 @@ func (h *AIHandler) Transcribe(c *gin.Context) {
 
 	text, err := h.groq.TranscribeAudio(c.Request.Context(), data, fileHeader.Filename)
 	if err != nil {
+		log.Printf("ai_handler: TranscribeAudio failed: %v", err)
 		utils.Error(c, http.StatusBadGateway, err.Error())
 		return
 	}

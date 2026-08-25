@@ -27,6 +27,7 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
   final _descriptionController = TextEditingController();
   final _picker = ImagePicker();
   final List<File> _images = [];
+  final List<File> _videos = [];
   bool _isUploading = false;
 
   // Voice recording state.
@@ -49,6 +50,26 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
 
   void _removeImage(int index) {
     setState(() => _images.removeAt(index));
+  }
+
+  Future<void> _pickVideo() async {
+    if (_videos.length >= 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You can add up to 1 video')),
+      );
+      return;
+    }
+    final picked = await _picker.pickVideo(
+      source: ImageSource.camera,
+      maxDuration: const Duration(minutes: 2),
+    );
+    if (picked != null) {
+      setState(() => _videos.add(File(picked.path)));
+    }
+  }
+
+  void _removeVideo(int index) {
+    setState(() => _videos.removeAt(index));
   }
 
   Future<void> _toggleRecording() async {
@@ -111,15 +132,19 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
     setState(() => _isUploading = true);
     final uploadService = context.read<UploadService>();
     final imageUrls = <String>[];
+    final videoUrls = <String>[];
     try {
       for (final img in _images) {
         imageUrls.add(await uploadService.uploadFile(img));
+      }
+      for (final vid in _videos) {
+        videoUrls.add(await uploadService.uploadFile(vid));
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isUploading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Some images failed to upload: $e')),
+        SnackBar(content: Text('Some attachments failed to upload: $e')),
       );
       return;
     }
@@ -128,6 +153,9 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
     if (description.isNotEmpty) issueSummary.write('\n\n$description');
     if (imageUrls.isNotEmpty) {
       issueSummary.write('\n\n(Customer attached ${imageUrls.length} photo(s): ${imageUrls.join(', ')})');
+    }
+    if (videoUrls.isNotEmpty) {
+      issueSummary.write('\n\n(Customer attached ${videoUrls.length} video(s): ${videoUrls.join(', ')})');
     }
 
     if (!mounted) return;
@@ -185,13 +213,13 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Photos (optional)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                const Text('Photos', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                 Text('${_images.length}/5', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
               ],
             ),
             const SizedBox(height: 10),
             SizedBox(
-              height: 84,
+              height: 104,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
@@ -230,11 +258,69 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: Colors.grey[300]!, style: BorderStyle.solid),
                         ),
-                        child: const Icon(Icons.camera_alt_outlined, color: Colors.grey),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.camera_alt_outlined, color: Colors.grey),
+                            SizedBox(height: 4),
+                            Text('Camera', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                          ],
+                        ),
                       ),
                     ),
                     GestureDetector(
                       onTap: () => _pickImage(ImageSource.gallery),
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        margin: const EdgeInsets.only(right: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[300]!, style: BorderStyle.solid),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.add_a_photo_outlined, color: Colors.grey),
+                            SizedBox(height: 4),
+                            Text('Gallery', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                  ..._videos.asMap().entries.map((e) => Padding(
+                        padding: const EdgeInsets.only(right: 10),
+                        child: Stack(
+                          children: [
+                            Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                color: Colors.black87,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.play_circle_fill, color: Colors.white, size: 32),
+                            ),
+                            Positioned(
+                              top: -6,
+                              right: -6,
+                              child: GestureDetector(
+                                onTap: () => _removeVideo(e.key),
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: const BoxDecoration(color: AppTheme.errorColor, shape: BoxShape.circle),
+                                  child: const Icon(Icons.close, color: Colors.white, size: 14),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )),
+                  if (_videos.isEmpty)
+                    GestureDetector(
+                      onTap: _pickVideo,
                       child: Container(
                         width: 80,
                         height: 80,
@@ -243,10 +329,16 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: Colors.grey[300]!, style: BorderStyle.solid),
                         ),
-                        child: const Icon(Icons.add_a_photo_outlined, color: Colors.grey),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.videocam_outlined, color: Colors.grey),
+                            SizedBox(height: 4),
+                            Text('Video', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                          ],
+                        ),
                       ),
                     ),
-                  ],
                 ],
               ),
             ),
@@ -268,7 +360,7 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
                     ? 'Transcribing...'
                     : _isRecording
                         ? 'Stop recording'
-                        : 'Record voice description (optional)',
+                        : 'Record voice description',
                 style: TextStyle(color: _isRecording ? AppTheme.errorColor : null),
               ),
               style: OutlinedButton.styleFrom(

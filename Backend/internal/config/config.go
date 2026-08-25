@@ -25,8 +25,14 @@ type Config struct {
 	RedisURL string
 
 	GroqAPIKey string
-	GroqModel  string
-	GroqAPIURL string
+	// GroqAPIKeys holds all configured Groq keys for automatic rotation (see
+	// internal/service/groq_service.go keyRing). Populated by splitting
+	// GROQ_API_KEY on commas; falls back to a single-element slice with
+	// GroqAPIKey if no commas are present. Supports any number of keys (e.g.
+	// 6), cycling back to the first once all have been tried.
+	GroqAPIKeys []string
+	GroqModel   string
+	GroqAPIURL  string
 
 	UpiPayeeVPA  string
 	UpiPayeeName string
@@ -105,6 +111,18 @@ func Load() *Config {
 		RedisURL: getOr("REDIS_URL", "redis://redis:6379/0"),
 
 		GroqAPIKey: mustGet("GROQ_API_KEY"),
+		GroqAPIKeys: func() []string {
+			raw := mustGet("GROQ_API_KEY")
+			parts := strings.Split(raw, ",")
+			keys := make([]string, 0, len(parts))
+			for _, p := range parts {
+				p = strings.TrimSpace(p)
+				if p != "" {
+					keys = append(keys, p)
+				}
+			}
+			return keys
+		}(),
 		GroqModel:  getOr("GROQ_MODEL", "llama-3.3-70b-versatile"),
 		GroqAPIURL: getOr("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions"),
 

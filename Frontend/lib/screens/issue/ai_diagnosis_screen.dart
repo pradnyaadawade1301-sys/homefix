@@ -229,7 +229,7 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
             if (ai.isStarting && ai.messages.isEmpty) {
               return const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor));
             }
-            if (ai.error != null && ai.messages.isEmpty) {
+            if (ai.error != null && !ai.isSending && ai.messages.every((m) => m.isUser)) {
               return Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),

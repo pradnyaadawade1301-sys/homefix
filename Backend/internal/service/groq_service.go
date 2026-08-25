@@ -10,23 +10,86 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"homefix-backend/internal/models"
 	"homefix-backend/internal/repository"
 )
 
+// keyRing round-robins through a list of Groq API keys. Every outgoing
+// request starts with whatever key is "current"; if that key comes back
+// rate-limited, over quota, or unauthorized, the caller advances the ring
+// and retries with the next key. Once the last key has been tried, the ring
+// wraps back around to the first key automatically (index % len).
+//
+// The ring is intentionally "sticky": a successful call does not reset the
+// index, so once key #3 starts working the service keeps using key #3 for
+// subsequent requests instead of restarting from key #1 every time — it
+// only advances forward (and wraps) when a key actually fails.
+type keyRing struct {
+	mu   sync.Mutex
+	keys []string
+	idx  int
+}
+
+func newKeyRing(keys []string) *keyRing {
+	if len(keys) == 0 {
+		keys = []string{""}
+	}
+	return &keyRing{keys: keys}
+}
+
+// current returns the key currently in use.
+func (r *keyRing) current() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.keys[r.idx]
+}
+
+// advance moves to the next key, wrapping back to the first key once the
+// last one has been reached (e.g. index 5 -> 0 for 6 keys).
+func (r *keyRing) advance() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.idx = (r.idx + 1) % len(r.keys)
+}
+
+func (r *keyRing) count() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.keys)
+}
+
+// isKeyExhaustedError reports whether an error/response indicates the
+// current Groq key is rate-limited, out of quota, or invalid — i.e. it's
+// time to rotate to the next key rather than surface the error to the user.
+func isKeyExhaustedError(statusCode int, message string) bool {
+	if statusCode == http.StatusTooManyRequests || statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden {
+		return true
+	}
+	lower := strings.ToLower(message)
+	return strings.Contains(lower, "rate limit") ||
+		strings.Contains(lower, "quota") ||
+		strings.Contains(lower, "invalid_api_key") ||
+		strings.Contains(lower, "invalid api key")
+}
+
 type GroqService struct {
-	apiKey string
+	keys   *keyRing
 	model  string
 	apiURL string
 	client *http.Client
 	aiRepo *repository.AIRepository
 }
 
-func NewGroqService(apiKey, model, apiURL string, aiRepo *repository.AIRepository) *GroqService {
+// NewGroqService accepts either a single key or a comma-separated list
+// (already split into apiKeys by config.Load). Requests automatically
+// rotate through all provided keys as each one is exhausted, cycling back
+// to the first once the last one fails too.
+func NewGroqService(apiKeys []string, model, apiURL string, aiRepo *repository.AIRepository) *GroqService {
 	return &GroqService{
-		apiKey: apiKey,
+		keys:   newKeyRing(apiKeys),
 		model:  model,
 		apiURL: apiURL,
 		client: &http.Client{Timeout: 30 * time.Second},
@@ -123,36 +186,62 @@ func (s *GroqService) SendMessage(ctx context.Context, sessionID, userMessage st
 		return "", nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.apiURL, bytes.NewReader(payload))
-	if err != nil {
-		return "", nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+s.apiKey)
+	var reply string
+	attempts := s.keys.count()
+	var lastErr error
+	for i := 0; i < attempts; i++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.apiURL, bytes.NewReader(payload))
+		if err != nil {
+			return "", nil, err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+s.keys.current())
 
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return "", nil, fmt.Errorf("groq: request failed: %w", err)
-	}
-	defer resp.Body.Close()
+		resp, err := s.client.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("groq: request failed: %w", err)
+			s.keys.advance()
+			continue
+		}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", nil, err
-	}
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			lastErr = err
+			s.keys.advance()
+			continue
+		}
 
-	var gr groqResponse
-	if err := json.Unmarshal(body, &gr); err != nil {
-		return "", nil, fmt.Errorf("groq: failed to parse response: %w", err)
-	}
-	if gr.Error != nil {
-		return "", nil, fmt.Errorf("groq: api error: %s", gr.Error.Message)
-	}
-	if len(gr.Choices) == 0 {
-		return "", nil, fmt.Errorf("groq: empty response from model")
-	}
+		var gr groqResponse
+		if err := json.Unmarshal(body, &gr); err != nil {
+			lastErr = fmt.Errorf("groq: failed to parse response: %w", err)
+			s.keys.advance()
+			continue
+		}
+		if gr.Error != nil {
+			if isKeyExhaustedError(resp.StatusCode, gr.Error.Message) {
+				// This key is rate-limited/out of quota/invalid — rotate to
+				// the next one (wrapping back to the first after the last)
+				// and retry the same request transparently.
+				lastErr = fmt.Errorf("groq: api error: %s", gr.Error.Message)
+				s.keys.advance()
+				continue
+			}
+			return "", nil, fmt.Errorf("groq: api error: %s", gr.Error.Message)
+		}
+		if len(gr.Choices) == 0 {
+			lastErr = fmt.Errorf("groq: empty response from model")
+			s.keys.advance()
+			continue
+		}
 
-	reply := gr.Choices[0].Message.Content
+		reply = gr.Choices[0].Message.Content
+		lastErr = nil
+		break
+	}
+	if lastErr != nil {
+		return "", nil, fmt.Errorf("groq: all configured API keys exhausted: %w", lastErr)
+	}
 
 	if _, err := s.aiRepo.AddMessage(ctx, sessionID, "assistant", reply); err != nil {
 		return "", nil, fmt.Errorf("groq: failed to store assistant reply: %w", err)
@@ -202,53 +291,71 @@ func (s *GroqService) History(ctx context.Context, sessionID string) ([]models.A
 func (s *GroqService) TranscribeAudio(ctx context.Context, audioData []byte, filename string) (string, error) {
 	const transcribeURL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
+	attempts := s.keys.count()
+	var lastErr error
+	for i := 0; i < attempts; i++ {
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
 
-	part, err := writer.CreateFormFile("file", filename)
-	if err != nil {
-		return "", fmt.Errorf("groq transcribe: failed to create form file: %w", err)
-	}
-	if _, err := part.Write(audioData); err != nil {
-		return "", fmt.Errorf("groq transcribe: failed to write audio data: %w", err)
-	}
-	if err := writer.WriteField("model", "whisper-large-v3"); err != nil {
-		return "", err
-	}
-	if err := writer.Close(); err != nil {
-		return "", err
-	}
+		part, err := writer.CreateFormFile("file", filename)
+		if err != nil {
+			return "", fmt.Errorf("groq transcribe: failed to create form file: %w", err)
+		}
+		if _, err := part.Write(audioData); err != nil {
+			return "", fmt.Errorf("groq transcribe: failed to write audio data: %w", err)
+		}
+		if err := writer.WriteField("model", "whisper-large-v3"); err != nil {
+			return "", err
+		}
+		if err := writer.Close(); err != nil {
+			return "", err
+		}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, transcribeURL, body)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("Authorization", "Bearer "+s.apiKey)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, transcribeURL, body)
+		if err != nil {
+			return "", err
+		}
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		req.Header.Set("Authorization", "Bearer "+s.keys.current())
 
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("groq transcribe: request failed: %w", err)
-	}
-	defer resp.Body.Close()
+		resp, err := s.client.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("groq transcribe: request failed: %w", err)
+			s.keys.advance()
+			continue
+		}
 
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
+		respBody, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			lastErr = err
+			s.keys.advance()
+			continue
+		}
 
-	var result struct {
-		Text  string `json:"text"`
-		Error *struct {
-			Message string `json:"message"`
-		} `json:"error,omitempty"`
-	}
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return "", fmt.Errorf("groq transcribe: failed to parse response: %w", err)
-	}
-	if result.Error != nil {
-		return "", fmt.Errorf("groq transcribe: api error: %s", result.Error.Message)
-	}
+		var result struct {
+			Text  string `json:"text"`
+			Error *struct {
+				Message string `json:"message"`
+			} `json:"error,omitempty"`
+		}
+		if err := json.Unmarshal(respBody, &result); err != nil {
+			lastErr = fmt.Errorf("groq transcribe: failed to parse response: %w", err)
+			s.keys.advance()
+			continue
+		}
+		if result.Error != nil {
+			if isKeyExhaustedError(resp.StatusCode, result.Error.Message) {
+				// Rotate to the next key (wrapping to the first after the
+				// last) and retry the same audio transparently.
+				lastErr = fmt.Errorf("groq transcribe: api error: %s", result.Error.Message)
+				s.keys.advance()
+				continue
+			}
+			return "", fmt.Errorf("groq transcribe: api error: %s", result.Error.Message)
+		}
 
-	return result.Text, nil
+		return result.Text, nil
+	}
+	return "", fmt.Errorf("groq transcribe: all configured API keys exhausted: %w", lastErr)
 }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../providers/category_provider.dart';
-import 'technician_list_screen.dart';
+import '../issue/issue_details_screen.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({Key? key}) : super(key: key);
@@ -63,8 +63,12 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               return InkWell(
                 borderRadius: BorderRadius.circular(20),
                 onTap: () {
+                  // Match the home-screen category grid: start the
+                  // AI-diagnosis flow (Issue Details -> AI Diagnosis ->
+                  // Live Video / Book Technician) instead of jumping
+                  // straight to the technician list.
                   Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => TechnicianListScreen(categoryId: cat.id, categoryName: cat.name),
+                    builder: (_) => IssueDetailsScreen(categoryId: cat.id, categoryName: cat.name),
                   ));
                 },
                 child: Container(
