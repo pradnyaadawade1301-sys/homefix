@@ -180,15 +180,29 @@ class _HomeTabState extends State<_HomeTab> {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, _) {
         final name = authProvider.currentUser?.name;
+        final photoUrl = authProvider.currentUser?.photoUrl;
         final displayName = (name != null && name.trim().isNotEmpty) ? name.split(' ').first : 'there';
         return Row(
           children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
-              child: Text(
-                displayName.isNotEmpty ? displayName[0].toUpperCase() : 'H',
-                style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 18),
+            GestureDetector(
+              onTap: () {
+                final homeState = context.findAncestorStateOfType<_HomeScreenState>();
+                if (homeState != null) {
+                  homeState.setState(() => homeState._selectedIndex = 3);
+                } else {
+                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfileScreen()));
+                }
+              },
+              child: CircleAvatar(
+                radius: 24,
+                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
+                backgroundImage: (photoUrl != null && photoUrl.isNotEmpty) ? NetworkImage(photoUrl) : null,
+                child: (photoUrl == null || photoUrl.isEmpty)
+                    ? Text(
+                        displayName.isNotEmpty ? displayName[0].toUpperCase() : 'H',
+                        style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 18),
+                      )
+                    : null,
               ),
             ),
             const SizedBox(width: 12),

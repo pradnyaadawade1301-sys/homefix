@@ -112,6 +112,7 @@ class _SearchingTechnicianScreenState extends State<SearchingTechnicianScreen> {
           myId: myId,
           peerId: withCallInfo.technicianId ?? '',
           isCaller: true,
+          iceServers: withCallInfo.iceServers.map((s) => s.toMap()).toList(),
         ),
       ));
     } catch (e) {

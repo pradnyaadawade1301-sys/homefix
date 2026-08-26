@@ -5,6 +5,8 @@ class User {
   final String phone;
   final String role; // customer | technician | admin
   final bool phoneVerified;
+  final bool emailVerified;
+  final String? photoUrl;
   final bool isActive;
   final DateTime createdAt;
 
@@ -15,11 +17,30 @@ class User {
     required this.phone,
     required this.role,
     required this.phoneVerified,
+    this.emailVerified = false,
+    this.photoUrl,
     required this.isActive,
     required this.createdAt,
   });
 
   bool get isTechnician => role == 'technician';
+
+  /// Returns a copy with emailVerified updated — used by AuthProvider right
+  /// after a successful verifyEmailOtp so the UI reflects it immediately.
+  User copyWithEmailVerified(bool verified) {
+    return User(
+      id: id,
+      name: name,
+      email: email,
+      phone: phone,
+      role: role,
+      phoneVerified: phoneVerified,
+      emailVerified: verified,
+      photoUrl: photoUrl,
+      isActive: isActive,
+      createdAt: createdAt,
+    );
+  }
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
@@ -29,6 +50,8 @@ class User {
       phone: json['phone'] as String,
       role: (json['role'] as String?) ?? 'customer',
       phoneVerified: json['phone_verified'] as bool? ?? false,
+      emailVerified: json['email_verified'] as bool? ?? false,
+      photoUrl: json['photo_url'] as String?,
       isActive: json['is_active'] as bool? ?? true,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
@@ -44,6 +67,8 @@ class User {
       'phone': phone,
       'role': role,
       'phone_verified': phoneVerified,
+      'email_verified': emailVerified,
+      'photo_url': photoUrl,
       'is_active': isActive,
       'created_at': createdAt.toIso8601String(),
     };

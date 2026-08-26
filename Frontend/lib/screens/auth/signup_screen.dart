@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../providers/auth_provider.dart';
+import 'verify_email_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({Key? key}) : super(key: key);
@@ -44,7 +45,18 @@ class _SignupScreenState extends State<SignupScreen> {
     if (!mounted) return;
     if (success) {
       final destination = _role == 'technician' ? '/technician-kyc' : '/home';
-      Navigator.of(context).pushNamedAndRemoveUntil(destination, (route) => false);
+      final email = _emailController.text.trim();
+      if (email.isNotEmpty) {
+        // Push the verify-email step first; it will forward to `destination`
+        // itself once verified (or immediately if the user taps Skip).
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => VerifyEmailScreen(email: email, destinationRoute: destination),
+          ),
+        );
+      } else {
+        Navigator.of(context).pushNamedAndRemoveUntil(destination, (route) => false);
+      }
     } else if (authProvider.error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(authProvider.error!), backgroundColor: AppTheme.errorColor),
@@ -119,11 +131,11 @@ class _SignupScreenState extends State<SignupScreen> {
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
-                    hintText: 'Email (optional)',
+                    hintText: 'Email',
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return null;
+                    if (v == null || v.trim().isEmpty) return 'Email is required';
                     final ok = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim());
                     return ok ? null : 'Enter a valid email';
                   },

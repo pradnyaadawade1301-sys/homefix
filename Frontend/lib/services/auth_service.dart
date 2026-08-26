@@ -101,6 +101,25 @@ class AuthService {
     }
   }
 
+  /// Email-verification OTP flow, used right after signup (backend:
+  /// /auth/request-email-otp, /auth/verify-email-otp). Separate from the phone
+  /// OTP flow above — this only marks email_verified, it doesn't log the user in.
+  Future<void> requestEmailOtp(String email) async {
+    try {
+      await _httpClient.post(ApiConfig.authRequestEmailOtp, data: {'email': email});
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  Future<void> verifyEmailOtp(String email, String otp) async {
+    try {
+      await _httpClient.post(ApiConfig.authVerifyEmailOtp, data: {'email': email, 'otp': otp});
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
   Future<bool> isLoggedIn() async {
     try {
       await _httpClient.loadStoredTokens();

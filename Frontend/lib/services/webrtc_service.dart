@@ -10,19 +10,12 @@ class WebRTCService {
   MediaStream? localStream;
   MediaStream? remoteStream;
 
-  final Map<String, dynamic> _rtcConfig = {
-    'iceServers': [
-      {'urls': 'stun:stun.l.google.com:19302'},
-      // Production ke liye apna TURN server bhi zaroor add karein.
-      // Sirf STUN se mobile-data/strict-NAT wale users kabhi-kabhi
-      // connect nahi ho paate.
-      // {
-      //   'urls': 'turn:your-turn-server.com:3478',
-      //   'username': 'user',
-      //   'credential': 'pass',
-      // },
-    ]
-  };
+  /// ICE server config for RTCPeerConnection. Pass the backend's
+  /// ice_servers (see GET /consultations/:id/call — includes STUN + a
+  /// short-lived TURN credential) so calls still connect when both sides
+  /// are behind strict/symmetric NAT (common on mobile data), where plain
+  /// STUN alone can't establish a direct path.
+  final Map<String, dynamic> _rtcConfig;
 
   Function(MediaStream stream)? onLocalStream;
   Function(MediaStream stream)? onRemoteStream;
@@ -32,7 +25,14 @@ class WebRTCService {
     required this.signaling,
     required this.peerId,
     required this.myId,
-  });
+    List<Map<String, dynamic>>? iceServers,
+  }) : _rtcConfig = {
+          'iceServers': (iceServers != null && iceServers.isNotEmpty)
+              ? iceServers
+              : [
+                  {'urls': 'stun:stun.l.google.com:19302'},
+                ],
+        };
 
   Future<void> init() async {
     peerConnection = await createPeerConnection(_rtcConfig);

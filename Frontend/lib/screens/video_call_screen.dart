@@ -10,6 +10,7 @@ class VideoCallScreen extends StatefulWidget {
   final String myId;
   final String peerId;
   final bool isCaller; // true = customer (offer create karega)
+  final List<Map<String, dynamic>>? iceServers;
 
   const VideoCallScreen({
     super.key,
@@ -17,6 +18,7 @@ class VideoCallScreen extends StatefulWidget {
     required this.myId,
     required this.peerId,
     required this.isCaller,
+    this.iceServers,
   });
 
   @override
@@ -28,6 +30,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   final _remoteRenderer = RTCVideoRenderer();
   late final WebRTCService _webrtc;
   bool _connecting = true;
+  bool _offerSent = false;
+  bool _peerJoined = false;
+  bool _initDone = false;
 
   @override
   void initState() {
@@ -43,6 +48,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       signaling: widget.signaling,
       peerId: widget.peerId,
       myId: widget.myId,
+      iceServers: widget.iceServers,
     );
 
     _webrtc.onLocalStream = (stream) {
@@ -59,6 +65,15 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
     widget.signaling.onMessage = (msg) async {
       switch (msg.type) {
+        case 'peer-joined':
+          // Backend confirms BOTH sockets are now in the room. Only safe
+          // moment to send the offer — before this, the other side's
+          // socket might not exist yet and the relay would silently drop
+          // it (no queueing for late joiners), leaving the call stuck on
+          // "Connecting..." forever.
+          _peerJoined = true;
+          await _maybeSendOffer();
+          break;
         case 'offer':
           await _webrtc.handleOffer(Map<String, dynamic>.from(msg.data as Map));
           break;
@@ -71,16 +86,29 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         case 'call-end':
           _endCall(notifyPeer: false);
           break;
+        case 'peer-left':
+          _endCall(notifyPeer: false);
+          break;
       }
     };
 
     await _webrtc.init();
+    _initDone = true;
+    // Covers the case where 'peer-joined' arrived (or was queued) before
+    // getUserMedia/createPeerConnection finished — try again now that
+    // _webrtc.peerConnection actually exists.
+    await _maybeSendOffer();
+  }
 
-    if (widget.isCaller) {
-      await _webrtc.createOffer();
-    }
-    // isCaller == false (technician) to bas wait karega, offer upar wale
-    // signaling.onMessage handler se 'offer' case me apne aap handle ho jayega.
+  /// Sends the WebRTC offer exactly once, and only once both (a) our own
+  /// WebRTC setup has finished (peerConnection exists) and (b) the backend
+  /// has confirmed the other side's socket is in the room too. Safe to call
+  /// from either the 'peer-joined' handler or right after init() — whichever
+  /// happens second is what actually triggers the send.
+  Future<void> _maybeSendOffer() async {
+    if (!widget.isCaller || _offerSent || !_peerJoined || !_initDone) return;
+    _offerSent = true;
+    await _webrtc.createOffer();
   }
 
   void _endCall({bool notifyPeer = true}) async {

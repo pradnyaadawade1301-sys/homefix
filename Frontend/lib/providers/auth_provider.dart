@@ -106,4 +106,31 @@ class AuthProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
   }
+
+  /// Sends a 6-digit code to `email` for the post-signup verification step.
+  /// Returns an error message on failure, or null on success.
+  Future<String?> requestEmailOtp(String email) async {
+    try {
+      await _authService.requestEmailOtp(email);
+      return null;
+    } catch (e) {
+      return e.toString().replaceFirst('Exception: ', '');
+    }
+  }
+
+  /// Verifies the code sent by requestEmailOtp. Returns an error message on
+  /// failure, or null on success. Also flips currentUser.emailVerified locally
+  /// so the UI updates without a full profile refetch.
+  Future<String?> verifyEmailOtp(String email, String otp) async {
+    try {
+      await _authService.verifyEmailOtp(email, otp);
+      if (_currentUser != null) {
+        _currentUser = _currentUser!.copyWithEmailVerified(true);
+        notifyListeners();
+      }
+      return null;
+    } catch (e) {
+      return e.toString().replaceFirst('Exception: ', '');
+    }
+  }
 }

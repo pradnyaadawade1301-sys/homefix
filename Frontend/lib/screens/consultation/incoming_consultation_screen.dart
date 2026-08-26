@@ -56,6 +56,7 @@ class _IncomingConsultationScreenState extends State<IncomingConsultationScreen>
           myId: myId,
           peerId: withCallInfo.customerId,
           isCaller: false,
+          iceServers: withCallInfo.iceServers.map((s) => s.toMap()).toList(),
         ),
       ));
       if (mounted) context.read<ConsultationProvider>().loadPending();

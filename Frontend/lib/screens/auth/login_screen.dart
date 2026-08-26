@@ -103,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
-                            return 'Email or phone is required';
+                            return 'Email required';
                           }
                           return null;
                         },

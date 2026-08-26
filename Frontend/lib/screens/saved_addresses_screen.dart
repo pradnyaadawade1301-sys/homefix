@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/theme.dart';
-import '../../models/user_model.dart';
-import '../../providers/address_provider.dart';
+import '../core/theme.dart';
+import '../models/user_model.dart';
+import '../providers/address_provider.dart';
 
 class SavedAddressesScreen extends StatefulWidget {
   const SavedAddressesScreen({Key? key}) : super(key: key);
