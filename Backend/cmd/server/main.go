@@ -49,7 +49,7 @@ func main() {
 	// ---- External services ----
 	groqService := service.NewGroqService(cfg.GroqAPIKeys, cfg.GroqModel, cfg.GroqAPIURL, aiRepo)
 	upiService := service.NewUpiService(
-		cfg.UpiPayeeVPA, cfg.UpiPayeeName, cfg.PlatformCommissionPercent,
+		cfg.UpiPayeeVPA, cfg.UpiPayeeName, cfg.PlatformCommissionPercent, cfg.GSTPercent,
 		paymentRepo, bookingRepo, techRepo, walletRepo,
 	)
 

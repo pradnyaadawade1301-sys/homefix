@@ -24,6 +24,7 @@ type UpiService struct {
 	payeeVPA       string
 	payeeName      string
 	commissionPct  float64
+	gstPct         float64
 	paymentRepo    *repository.PaymentRepository
 	bookingRepo    *repository.BookingRepository
 	technicianRepo *repository.TechnicianRepository
@@ -33,6 +34,7 @@ type UpiService struct {
 func NewUpiService(
 	payeeVPA, payeeName string,
 	commissionPct float64,
+	gstPct float64,
 	paymentRepo *repository.PaymentRepository,
 	bookingRepo *repository.BookingRepository,
 	technicianRepo *repository.TechnicianRepository,
@@ -42,6 +44,7 @@ func NewUpiService(
 		payeeVPA:       payeeVPA,
 		payeeName:      payeeName,
 		commissionPct:  commissionPct,
+		gstPct:         gstPct,
 		paymentRepo:    paymentRepo,
 		bookingRepo:    bookingRepo,
 		technicianRepo: technicianRepo,
@@ -71,17 +74,24 @@ func generateTransactionRef() (string, error) {
 }
 
 // CreateOrder records a "created" payment and builds its UPI deep link.
-func (s *UpiService) CreateOrder(ctx context.Context, bookingID, userID string, amountRupees float64) (*UpiOrder, error) {
+// CreateOrder records a "created" payment and builds its UPI deep link.
+func (s *UpiService) CreateOrder(ctx context.Context, bookingID, userID string, baseAmountRupees float64) (*UpiOrder, error) {
 	ref, err := generateTransactionRef()
 	if err != nil {
 		return nil, fmt.Errorf("upi: failed to generate transaction ref: %w", err)
 	}
 
+	gstAmount := baseAmountRupees * s.gstPct / 100
+	totalAmount := baseAmountRupees + gstAmount
+
 	p := &models.Payment{
 		BookingID:      bookingID,
 		UserID:         userID,
 		TransactionRef: ref,
-		Amount:         amountRupees,
+		Amount:         totalAmount,
+		BaseAmount:     &baseAmountRupees,
+		GstAmount:      &gstAmount,
+		GstPercent:     &s.gstPct,
 		Currency:       "INR",
 	}
 	created, err := s.paymentRepo.Create(ctx, p)
@@ -94,7 +104,7 @@ func (s *UpiService) CreateOrder(ctx context.Context, bookingID, userID string, 
 		url.QueryEscape(s.payeeVPA),
 		url.QueryEscape(s.payeeName),
 		url.QueryEscape(ref),
-		fmt.Sprintf("%.2f", amountRupees),
+		fmt.Sprintf("%.2f", totalAmount),
 		url.QueryEscape(note),
 	)
 
@@ -107,8 +117,6 @@ func (s *UpiService) CreateOrder(ctx context.Context, bookingID, userID string, 
 	}, nil
 }
 
-// ErrPaymentNotVerified means the UPI app's own response wasn't a clear success —
-// the caller should NOT treat the booking as paid and should let the customer retry.
 var ErrPaymentNotVerified = errors.New("payment could not be verified as successful")
 
 // ConfirmPayment is the only place a payment (and therefore its booking) can become

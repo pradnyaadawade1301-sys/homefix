@@ -42,6 +42,12 @@ type Config struct {
 	// internal/service/upi_service.go ConfirmPayment).
 	PlatformCommissionPercent float64
 
+	// GSTPercent is added on top of the technician's billed (base) amount to
+	// arrive at the customer's total payable amount (see
+	// internal/service/upi_service.go CreateOrder). Defaults to 18% (standard
+	// GST rate for services in India) — override via GST_PERCENT env var.
+	GSTPercent float64
+
 	FirebaseCredentialsPath string
 	FirebaseProjectID       string
 
@@ -97,6 +103,10 @@ func Load() *Config {
 	if err != nil {
 		commissionPct = 15
 	}
+	gstPct, err := strconv.ParseFloat(getOr("GST_PERCENT", "18"), 64)
+	if err != nil {
+		gstPct = 18
+	}
 
 	return &Config{
 		Port:  getOr("PORT", "8080"),
@@ -142,5 +152,6 @@ func Load() *Config {
 		TurnTTLSecond: turnTTL,
 
 		PlatformCommissionPercent: commissionPct,
+		GSTPercent:                gstPct,
 	}
 }

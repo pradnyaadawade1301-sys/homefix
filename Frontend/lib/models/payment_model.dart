@@ -35,6 +35,9 @@ class Payment {
   final String? upiTxnId;
   final String? invoiceNumber;
   final double amount;
+  final double? baseAmount;
+  final double? gstAmount;
+  final double? gstPercent;
   final String currency;
   final String? method;
   final String status; // created | paid | failed | refunded
@@ -52,6 +55,9 @@ class Payment {
     this.upiTxnId,
     this.invoiceNumber,
     required this.amount,
+    this.baseAmount,
+    this.gstAmount,
+    this.gstPercent,
     required this.currency,
     this.method,
     required this.status,
@@ -75,6 +81,9 @@ class Payment {
       upiTxnId: json['upi_txn_id'] as String?,
       invoiceNumber: json['invoice_number'] as String?,
       amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+      baseAmount: (json['base_amount'] as num?)?.toDouble(),
+      gstAmount: (json['gst_amount'] as num?)?.toDouble(),
+      gstPercent: (json['gst_percent'] as num?)?.toDouble(),
       currency: (json['currency'] as String?) ?? 'INR',
       method: json['method'] as String?,
       status: (json['status'] as String?) ?? 'created',

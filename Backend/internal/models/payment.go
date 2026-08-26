@@ -17,6 +17,9 @@ type Payment struct {
 	UpiTxnID           *string    `json:"upi_txn_id,omitempty"`
 	InvoiceNumber      *string    `json:"invoice_number,omitempty"`
 	Amount             float64    `json:"amount"`
+	BaseAmount         *float64   `json:"base_amount,omitempty"`
+	GstAmount          *float64   `json:"gst_amount,omitempty"`
+	GstPercent         *float64   `json:"gst_percent,omitempty"`
 	Currency           string     `json:"currency"`
 	Method             *string    `json:"method,omitempty"`
 	Status             string     `json:"status"`

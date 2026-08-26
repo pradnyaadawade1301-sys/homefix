@@ -15,7 +15,7 @@ import '../legal_screens.dart';
 import '../change_password_screen.dart';
 import '../service_history_screen.dart';
 import '../payment_methods_screen.dart';
-import '../transaction_history_screen.dart';
+import '../payment/transaction_history_screen.dart';
 import '../privacy_security_screen.dart';
 import '../help_center_screen.dart';
 import '../report_issue_screen.dart';

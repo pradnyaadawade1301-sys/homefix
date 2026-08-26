@@ -19,13 +19,13 @@ func NewPaymentRepository(db *pgxpool.Pool) *PaymentRepository {
 }
 
 const paymentColumns = `id, booking_id, user_id, transaction_ref, upi_txn_id, invoice_number,
-	       amount, currency, method, status, upi_status, upi_response_code, upi_approval_ref,
+	       amount, base_amount, gst_amount, gst_percent, currency, method, status, upi_status, upi_response_code, upi_approval_ref,
 	       verified, platform_commission, technician_earning, refunded_at, created_at, updated_at`
 
 func scanPayment(row pgx.Row) (*models.Payment, error) {
 	var p models.Payment
 	err := row.Scan(&p.ID, &p.BookingID, &p.UserID, &p.TransactionRef, &p.UpiTxnID, &p.InvoiceNumber,
-		&p.Amount, &p.Currency, &p.Method, &p.Status, &p.UpiStatus, &p.UpiResponseCode, &p.UpiApprovalRef,
+		&p.Amount, &p.BaseAmount, &p.GstAmount, &p.GstPercent, &p.Currency, &p.Method, &p.Status, &p.UpiStatus, &p.UpiResponseCode, &p.UpiApprovalRef,
 		&p.Verified, &p.PlatformCommission, &p.TechnicianEarning, &p.RefundedAt, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, err
@@ -35,10 +35,10 @@ func scanPayment(row pgx.Row) (*models.Payment, error) {
 
 func (r *PaymentRepository) Create(ctx context.Context, p *models.Payment) (*models.Payment, error) {
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO payments (booking_id, user_id, transaction_ref, amount, currency, status)
-		VALUES ($1,$2,$3,$4,$5,'created')
+		INSERT INTO payments (booking_id, user_id, transaction_ref, amount, base_amount, gst_amount, gst_percent, currency, status)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'created')
 		RETURNING id, status, created_at, updated_at
-	`, p.BookingID, p.UserID, p.TransactionRef, p.Amount, p.Currency).Scan(&p.ID, &p.Status, &p.CreatedAt, &p.UpdatedAt)
+	`, p.BookingID, p.UserID, p.TransactionRef, p.Amount, p.BaseAmount, p.GstAmount, p.GstPercent, p.Currency).Scan(&p.ID, &p.Status, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
