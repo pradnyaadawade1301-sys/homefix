@@ -141,41 +141,43 @@ class BookingProvider extends ChangeNotifier {
 
   /// Technician moves a job forward: in_progress, etc.
   Future<void> updateBookingStatus(String bookingId, String status, {String? note}) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+  _isLoading = true;
+  _error = null;
+  notifyListeners();
 
-    try {
-      await _bookingService.updateBookingStatus(bookingId, status, note: note);
-      _error = null;
-      await fetchBookingDetail(bookingId);
-    } catch (e) {
-      _error = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
+  try {
+    await _bookingService.updateBookingStatus(bookingId, status, note: note);
+    _error = null;
+    final idx = _bookings.indexWhere((b) => b.id == bookingId);
+    if (idx != -1) {
+      _selectedBooking = await _bookingService.getBookingDetail(bookingId);
+      _bookings[idx] = _selectedBooking!;
     }
-  }
-
-  Future<void> completeBooking(String bookingId, double finalPrice) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      await _bookingService.completeBooking(bookingId, finalPrice);
-      _error = null;
-      await fetchBookingDetail(bookingId);
-    } catch (e) {
-      _error = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  void clearError() {
-    _error = null;
+  } catch (e) {
+    _error = e.toString();
+  } finally {
+    _isLoading = false;
     notifyListeners();
   }
 }
+
+Future<void> completeBooking(String bookingId, double finalPrice) async {
+  _isLoading = true;
+  _error = null;
+  notifyListeners();
+
+  try {
+    await _bookingService.completeBooking(bookingId, finalPrice);
+    _error = null;
+    final idx = _bookings.indexWhere((b) => b.id == bookingId);
+    if (idx != -1) {
+      _selectedBooking = await _bookingService.getBookingDetail(bookingId);
+      _bookings[idx] = _selectedBooking!;
+    }
+  } catch (e) {
+    _error = e.toString();
+  } finally {
+    _isLoading = false;
+    notifyListeners();
+  }
+}}

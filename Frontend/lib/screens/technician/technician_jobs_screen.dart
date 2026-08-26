@@ -339,13 +339,15 @@ padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),          child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _pendingRequests.length == 1
-                          ? '1 live consultation request'
-                          : '${_pendingRequests.length} live consultation requests',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14.5),
-                    ),
-                    const SizedBox(height: 2),
-                    const Text('Tap to accept or reject', style: TextStyle(color: Colors.white70, fontSize: 12)),
+  _pendingRequests.length == 1
+      ? '${_pendingRequests.first.customerName} — ${_pendingRequests.first.categoryName}'
+      : '${_pendingRequests.length} live consultation requests',
+  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14.5),
+  maxLines: 1,
+  overflow: TextOverflow.ellipsis,
+),
+const SizedBox(height: 2),
+const Text('Tap to accept or reject', style: TextStyle(color: Colors.white70, fontSize: 12)),
                   ],
                 ),
               ),

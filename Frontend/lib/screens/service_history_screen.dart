@@ -1,77 +1,97 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../core/theme.dart';
+import '../models/booking_model.dart';
+import '../providers/booking_provider.dart';
+import '../screens/booking/book_technician_screen.dart';
 
-/// Shows the customer's past service bookings (completed / cancelled).
-/// UI-only for now with sample data — wire this to your bookings
-/// provider/API and filter by status ('completed' / 'cancelled') once ready.
-class ServiceHistoryScreen extends StatelessWidget {
+/// Shows the customer's past service bookings (completed / cancelled), with a
+/// "Book Again" action that pre-fills the same technician + category for a
+/// repeat booking — see BookTechnicianScreen's preferredTechnician param.
+class ServiceHistoryScreen extends StatefulWidget {
   const ServiceHistoryScreen({Key? key}) : super(key: key);
 
-  // TODO: Replace with real data from your bookings provider/API,
-  // filtered to closed-out statuses (completed / cancelled).
-  static final List<_HistoryItem> _sampleHistory = [
-    _HistoryItem(
-      title: 'AC Repair & Service',
-      date: '18 Aug 2026',
-      amount: 899,
-      completed: true,
-    ),
-    _HistoryItem(
-      title: 'Plumbing — Tap Leakage',
-      date: '02 Aug 2026',
-      amount: 349,
-      completed: true,
-    ),
-    _HistoryItem(
-      title: 'Electrical Wiring Check',
-      date: '27 Jul 2026',
-      amount: 0,
-      completed: false,
-    ),
-  ];
+  @override
+  State<ServiceHistoryScreen> createState() => _ServiceHistoryScreenState();
+}
+
+class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<BookingProvider>().fetchUserBookings();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       appBar: AppBar(title: const Text('Service History')),
-      body: _sampleHistory.isEmpty
-          ? const _EmptyState(
-              icon: Icons.history_rounded,
-              title: 'No service history yet',
-              subtitle: 'Completed and cancelled bookings will show up here.',
-            )
-          : ListView.separated(
+      body: RefreshIndicator(
+        onRefresh: () => context.read<BookingProvider>().fetchUserBookings(),
+        child: Consumer<BookingProvider>(
+          builder: (context, provider, _) {
+            if (provider.isLoading && provider.bookings.isEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final closed = provider.bookings
+                .where((b) => b.status == 'completed' || b.status == 'cancelled')
+                .toList();
+            if (closed.isEmpty) {
+              return const _EmptyState(
+                icon: Icons.history_rounded,
+                title: 'No service history yet',
+                subtitle: 'Completed and cancelled bookings will show up here.',
+              );
+            }
+            return ListView.separated(
               padding: const EdgeInsets.all(16),
-              itemCount: _sampleHistory.length,
+              itemCount: closed.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, index) => _HistoryCard(item: _sampleHistory[index]),
-            ),
+              itemBuilder: (context, index) => _HistoryCard(booking: closed[index]),
+            );
+          },
+        ),
+      ),
     );
   }
 }
 
-class _HistoryItem {
-  final String title;
-  final String date;
-  final double amount;
-  final bool completed;
-
-  const _HistoryItem({
-    required this.title,
-    required this.date,
-    required this.amount,
-    required this.completed,
-  });
-}
-
 class _HistoryCard extends StatelessWidget {
-  final _HistoryItem item;
+  final Booking booking;
 
-  const _HistoryCard({required this.item});
+  const _HistoryCard({required this.booking});
+
+  void _bookAgain(BuildContext context, BookingTechnicianInfo tech) {
+    final technician = Technician(
+      id: tech.id,
+      name: tech.name,
+      categoryId: booking.categoryId,
+      categoryName: tech.categoryName,
+      experienceYears: tech.experienceYears,
+      ratingAvg: tech.ratingAvg,
+      ratingCount: tech.ratingCount,
+      isVerified: tech.isVerified,
+      isAvailable: true,
+      createdAt: DateTime.now(),
+    );
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => BookTechnicianScreen(
+        categoryId: booking.categoryId,
+        categoryName: booking.categoryName,
+        problemDescription: booking.problemDescription,
+        preferredTechnician: technician,
+      ),
+    ));
+  }
 
   @override
   Widget build(BuildContext context) {
+    final completed = booking.status == 'completed';
+    final tech = booking.technician;
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -79,49 +99,88 @@ class _HistoryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppTheme.lightOutline),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: (item.completed ? AppTheme.successColor : AppTheme.errorColor)
-                  .withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              item.completed ? Icons.check_circle_outline_rounded : Icons.cancel_outlined,
-              color: item.completed ? AppTheme.successColor : AppTheme.errorColor,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(item.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
-                const SizedBox(height: 3),
-                Text(item.date, style: TextStyle(fontSize: 12.5, color: Colors.grey[600])),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Row(
             children: [
-              if (item.completed)
-                Text('₹${item.amount.toStringAsFixed(0)}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              const SizedBox(height: 3),
-              Text(
-                item.completed ? 'Completed' : 'Cancelled',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: item.completed ? AppTheme.successColor : AppTheme.errorColor,
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: (completed ? AppTheme.successColor : AppTheme.errorColor).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
                 ),
+                child: Icon(
+                  completed ? Icons.check_circle_outline_rounded : Icons.cancel_outlined,
+                  color: completed ? AppTheme.successColor : AppTheme.errorColor,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      booking.categoryName.isNotEmpty ? booking.categoryName : 'Service booking',
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${booking.createdAt.day}/${booking.createdAt.month}/${booking.createdAt.year}'
+                      '${tech != null ? ' • ${tech.name}' : ''}',
+                      style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (completed && booking.finalPrice != null)
+                    Text('₹${booking.finalPrice!.toStringAsFixed(0)}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(height: 3),
+                  Text(
+                    completed ? 'Completed' : 'Cancelled',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: completed ? AppTheme.successColor : AppTheme.errorColor,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
+          if (completed && tech != null) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 40,
+              child: Material(
+                color: AppTheme.primaryColor,
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => _bookAgain(context, tech),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.replay_rounded, size: 16, color: Colors.white),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Book ${tech.name} again',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13.5),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -147,9 +206,7 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 16),
             Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
-            Text(subtitle,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+            Text(subtitle, textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Colors.grey[600])),
           ],
         ),
       ),

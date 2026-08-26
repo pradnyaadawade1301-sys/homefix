@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../providers/category_provider.dart';
-import '../issue/issue_details_screen.dart';
+import 'technician_list_screen.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({Key? key}) : super(key: key);
@@ -20,6 +20,21 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     'Roofer': Icons.roofing_rounded,
     'Carpenter': Icons.carpenter_rounded,
     'Painter': Icons.format_paint_rounded,
+    'RO Service': Icons.water_drop_rounded,
+    'CCTV': Icons.videocam_rounded,
+    'Home Cleaning': Icons.cleaning_services_rounded,
+  };
+
+  static const Map<String, String> _images = {
+    'Electrician': 'assets/images/electrician.png',
+    'Plumber': 'assets/images/plumber.png',
+    'AC Repair': 'assets/images/AC repair.png',
+    'Appliance Repair': 'assets/images/appliance repair.png',
+    'Carpenter': 'assets/images/carpentr.png',
+    'Painter': 'assets/images/painter.png',
+    'RO Service': 'assets/images/RO-service.png',
+    'CCTV': 'assets/images/cctv repair.png',
+    'Home Cleaning': 'assets/images/home cleaning.png',
   };
 
   @override
@@ -40,7 +55,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           if (provider.isLoading && provider.categories.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (provider.categories.isEmpty) {
+          final categories = provider.categories.where((c) => c.name != 'Refrigerator').toList();
+          if (categories.isEmpty) {
             return Center(
               child: Text(
                 provider.error != null ? 'Could not load services' : 'No services available yet',
@@ -50,52 +66,55 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           }
           return GridView.builder(
             padding: const EdgeInsets.all(20),
-            itemCount: provider.categories.length,
+            itemCount: categories.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               mainAxisSpacing: 16,
               crossAxisSpacing: 16,
-              childAspectRatio: 1.15,
+              childAspectRatio: 0.85,
             ),
             itemBuilder: (context, i) {
-              final cat = provider.categories[i];
+              final cat = categories[i];
               final icon = _icons[cat.name] ?? Icons.build_rounded;
+              final imagePath = _images[cat.name];
               return InkWell(
                 borderRadius: BorderRadius.circular(20),
+                splashColor: Colors.transparent,
+                highlightColor: Colors.transparent,
                 onTap: () {
-                  // Match the home-screen category grid: start the
-                  // AI-diagnosis flow (Issue Details -> AI Diagnosis ->
-                  // Live Video / Book Technician) instead of jumping
-                  // straight to the technician list.
                   Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => IssueDetailsScreen(categoryId: cat.id, categoryName: cat.name),
+                    builder: (_) => TechnicianListScreen(categoryId: cat.id, categoryName: cat.name),
                   ));
                 },
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4))],
                   ),
-                  padding: const EdgeInsets.all(16),
+                  clipBehavior: Clip.antiAlias,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Icon(icon, color: AppTheme.primaryColor, size: 24),
+                      Expanded(
+                        child: imagePath != null
+                            ? Image.asset(
+                                imagePath,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => Container(
+                                  color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                                  child: Icon(icon, color: AppTheme.primaryColor, size: 34),
+                                ),
+                              )
+                            : Container(
+                                color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                                child: Icon(icon, color: AppTheme.primaryColor, size: 34),
+                              ),
                       ),
-                      const Spacer(),
-                      Text(cat.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                      const SizedBox(height: 4),
-                      Text(
-                        '₹${cat.basePrice.toStringAsFixed(0)} onwards',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+                        child: Text(cat.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
                       ),
                     ],
                   ),
