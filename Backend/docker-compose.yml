@@ -20,24 +20,6 @@ services:
       timeout: 5s
       retries: 10
 
-  redis:
-    image: redis:7-alpine
-    container_name: homefix_redis
-    restart: unless-stopped
-    ports:
-      - "6380:6379"
-    volumes:
-      - redisdata:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  # S3-compatible object storage. Not yet wired into the app (technician KYC
-  # uploads still use local disk — see internal/handler/upload_handler.go's doc
-  # comment for the swap-in point); included so a production deploy has a real
-  # bucket ready to point PUBLIC_BASE_URL/UPLOAD_DIR-equivalent config at.
   minio:
     image: minio/minio:latest
     container_name: homefix_minio
@@ -64,13 +46,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
     env_file:
       - .env
     environment:
       DATABASE_URL: postgres://homefix:homefix_pass@postgres:5432/homefix?sslmode=disable
-      REDIS_URL: redis://redis:6379/0
     ports:
       - "8090:8080"
     volumes:
@@ -107,5 +86,4 @@ services:
 volumes:
   pgdata:
   uploads_data:
-  redisdata:
   miniodata:

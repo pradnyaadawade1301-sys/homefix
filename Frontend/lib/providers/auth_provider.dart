@@ -15,6 +15,21 @@ class AuthProvider extends ChangeNotifier {
 
   User? get currentUser => _currentUser;
   String? get accessToken => _accessToken;
+
+  /// Guaranteed-fresh token — refreshes first if the cached one has expired.
+  /// [accessToken] above is only set once at login/session-restore and never
+  /// updated when the HTTP client silently refreshes it for REST calls, so
+  /// it can go stale after ~15 minutes. Use this instead right before a
+  /// one-shot handshake outside the normal REST flow, e.g. opening the
+  /// /ws/call/:id WebSocket for a video call — otherwise the call can fail
+  /// with a 401 even though every other screen in the app works fine.
+  Future<String?> getValidAccessToken() async {
+    final fresh = await _authService.getValidAccessToken();
+    if (fresh != null && fresh != _accessToken) {
+      _accessToken = fresh;
+    }
+    return _accessToken;
+  }
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isLoggedIn => _isLoggedIn;
@@ -80,9 +95,25 @@ class AuthProvider extends ChangeNotifier {
   Future<void> checkLoginStatus() async {
     try {
       _isLoggedIn = await _authService.isLoggedIn();
+      // isLoggedIn() only tells us a token exists in storage — it never
+      // used to update _accessToken, so a restored session left it null
+      // forever (until the next fresh login/signup call). Any screen that
+      // read AuthProvider.accessToken directly — e.g. starting a video
+      // call — would then fail with "Could not start/join the call" even
+      // though every other REST call kept working fine.
+      _accessToken = _isLoggedIn ? _authService.currentAccessToken : null;
     } catch (e) {
       _isLoggedIn = false;
+      _accessToken = null;
     }
+    notifyListeners();
+  }
+
+  /// Restores the in-memory user after a resumed session. SplashScreen calls
+  /// this right after it fetches the profile via UserProvider — checkLoginStatus
+  /// alone can't populate this since it only confirms the stored token exists.
+  void setCurrentUser(User user) {
+    _currentUser = user;
     notifyListeners();
   }
 

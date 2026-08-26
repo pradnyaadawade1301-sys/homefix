@@ -79,8 +79,14 @@ class _SearchingTechnicianScreenState extends State<SearchingTechnicianScreen> {
             updated.status != ConsultationStatus.ringing) {
           _pollTimer?.cancel();
         }
-      } catch (_) {
-        // Transient network error — keep polling
+      } catch (e) {
+        // TEMP DEBUG: previously silently swallowed, which is why the
+        // customer side could get stuck on "Connecting..." with zero
+        // visible error even when every poll was failing. Print it so the
+        // real cause (auth error, wrong URL, timeout, etc.) is visible in
+        // the console. Remove once the underlying issue is confirmed fixed.
+        // ignore: avoid_print
+        print('SearchingTechnicianScreen: poll failed for $consultationId: $e');
       }
     });
   }
@@ -91,7 +97,8 @@ class _SearchingTechnicianScreenState extends State<SearchingTechnicianScreen> {
     try {
       final provider = context.read<ConsultationProvider>();
       final withCallInfo = await provider.getCallInfo(consultation.id);
-      final token = context.read<AuthProvider>().accessToken;
+      // Fresh, not cached-from-login token — see AuthProvider.getValidAccessToken.
+      final token = await context.read<AuthProvider>().getValidAccessToken();
       final myId = context.read<AuthProvider>().currentUser?.id ?? '';
 
       if (token == null || withCallInfo.roomId == null) {

@@ -23,8 +23,8 @@ func (r *UserRepository) CreateWithPhone(ctx context.Context, phone string) (*mo
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO users (phone, role, phone_verified)
 		VALUES ($1, 'customer', false)
-		RETURNING id, phone, COALESCE(name,''), email, role, phone_verified, is_active, created_at, updated_at
-	`, phone).Scan(&u.ID, &u.Phone, &u.Name, &u.Email, &u.Role, &u.PhoneVerified, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+		RETURNING id, phone, COALESCE(name,''), email, role, phone_verified, photo_url, is_active, created_at, updated_at
+	`, phone).Scan(&u.ID, &u.Phone, &u.Name, &u.Email, &u.Role, &u.PhoneVerified, &u.PhotoURL, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -42,9 +42,9 @@ func (r *UserRepository) CreateFull(ctx context.Context, name, email, phone, pas
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO users (name, email, phone, password_hash, role, phone_verified)
 		VALUES ($1, $2, $3, $4, $5, false)
-		RETURNING id, phone, COALESCE(name,''), email, role, phone_verified, is_active, created_at, updated_at
+		RETURNING id, phone, COALESCE(name,''), email, role, phone_verified, photo_url, is_active, created_at, updated_at
 	`, name, emailArg, phone, passwordHash, role).Scan(
-		&u.ID, &u.Phone, &u.Name, &u.Email, &u.Role, &u.PhoneVerified, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+		&u.ID, &u.Phone, &u.Name, &u.Email, &u.Role, &u.PhoneVerified, &u.PhotoURL, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -56,10 +56,10 @@ func (r *UserRepository) GetByIdentifier(ctx context.Context, identifier string)
 	var u models.User
 	err := r.db.QueryRow(ctx, `
 		SELECT id, phone, COALESCE(name,''), email, COALESCE(password_hash,''), role,
-		       otp_code, otp_expires_at, phone_verified, fcm_token, is_active, created_at, updated_at
+		       otp_code, otp_expires_at, phone_verified, photo_url, fcm_token, is_active, created_at, updated_at
 		FROM users WHERE email = $1 OR phone = $1
 	`, identifier).Scan(&u.ID, &u.Phone, &u.Name, &u.Email, &u.PasswordHash, &u.Role,
-		&u.OTPCode, &u.OTPExpiresAt, &u.PhoneVerified, &u.FCMToken, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+		&u.OTPCode, &u.OTPExpiresAt, &u.PhoneVerified, &u.PhotoURL, &u.FCMToken, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -83,10 +83,10 @@ func (r *UserRepository) GetByPhone(ctx context.Context, phone string) (*models.
 	var u models.User
 	err := r.db.QueryRow(ctx, `
 		SELECT id, phone, COALESCE(name,''), email, COALESCE(password_hash,''), role,
-		       otp_code, otp_expires_at, phone_verified, fcm_token, is_active, created_at, updated_at
+		       otp_code, otp_expires_at, phone_verified, photo_url, fcm_token, is_active, created_at, updated_at
 		FROM users WHERE phone = $1
 	`, phone).Scan(&u.ID, &u.Phone, &u.Name, &u.Email, &u.PasswordHash, &u.Role,
-		&u.OTPCode, &u.OTPExpiresAt, &u.PhoneVerified, &u.FCMToken, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+		&u.OTPCode, &u.OTPExpiresAt, &u.PhoneVerified, &u.PhotoURL, &u.FCMToken, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -100,10 +100,10 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, 
 	var u models.User
 	err := r.db.QueryRow(ctx, `
 		SELECT id, phone, COALESCE(name,''), email, COALESCE(password_hash,''), role,
-		       phone_verified, fcm_token, is_active, created_at, updated_at
+		       phone_verified, email_verified, photo_url, fcm_token, is_active, created_at, updated_at
 		FROM users WHERE id = $1
 	`, id).Scan(&u.ID, &u.Phone, &u.Name, &u.Email, &u.PasswordHash, &u.Role,
-		&u.PhoneVerified, &u.FCMToken, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+		&u.PhoneVerified, &u.EmailVerified, &u.PhotoURL, &u.FCMToken, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -111,6 +111,35 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, 
 		return nil, err
 	}
 	return &u, nil
+}
+
+// GetByEmail is used by the post-signup email-verification flow (RequestEmailOTP /
+// VerifyEmailOTP) to look the account up by email rather than phone.
+func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
+	var u models.User
+	err := r.db.QueryRow(ctx, `
+		SELECT id, phone, COALESCE(name,''), email, COALESCE(password_hash,''), role,
+		       otp_code, otp_expires_at, phone_verified, email_verified, photo_url, fcm_token, is_active, created_at, updated_at
+		FROM users WHERE email = $1
+	`, email).Scan(&u.ID, &u.Phone, &u.Name, &u.Email, &u.PasswordHash, &u.Role,
+		&u.OTPCode, &u.OTPExpiresAt, &u.PhoneVerified, &u.EmailVerified, &u.PhotoURL, &u.FCMToken, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &u, nil
+}
+
+// MarkEmailVerified flips email_verified to true and clears the OTP, mirroring
+// VerifyOTPAndActivate's handling of phone_verified.
+func (r *UserRepository) MarkEmailVerified(ctx context.Context, userID string) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE users SET email_verified = true, otp_code = NULL, otp_expires_at = NULL, updated_at = now()
+		WHERE id = $1
+	`, userID)
+	return err
 }
 
 func (r *UserRepository) SetOTP(ctx context.Context, userID, otp string, expiresAt time.Time) error {
@@ -133,6 +162,15 @@ func (r *UserRepository) UpdateProfile(ctx context.Context, userID, name string,
 	return err
 }
 
+// UpdatePhotoURL sets (or clears, when photoURL is nil) the account avatar shown in the
+// app header and profile screen. Separate from UpdateProfile so the Flutter app can call
+// it right after POST /api/v1/uploads without also having to resend name/email.
+func (r *UserRepository) UpdatePhotoURL(ctx context.Context, userID string, photoURL *string) error {
+	_, err := r.db.Exec(ctx, `UPDATE users SET photo_url = $1, updated_at = now() WHERE id = $2`,
+		photoURL, userID)
+	return err
+}
+
 func (r *UserRepository) SetPasswordHash(ctx context.Context, userID, hash string) error {
 	_, err := r.db.Exec(ctx, `UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2`, hash, userID)
 	return err
@@ -147,7 +185,7 @@ func (r *UserRepository) SetFCMToken(ctx context.Context, userID, token string) 
 
 // ListAll powers the admin panel's User Management screen. role == "" lists every role.
 func (r *UserRepository) ListAll(ctx context.Context, role string) ([]models.User, error) {
-	query := `SELECT id, phone, COALESCE(name,''), email, '', role, phone_verified, fcm_token, is_active, created_at, updated_at FROM users`
+	query := `SELECT id, phone, COALESCE(name,''), email, '', role, phone_verified, photo_url, fcm_token, is_active, created_at, updated_at FROM users`
 	args := []interface{}{}
 	if role != "" {
 		query += ` WHERE role = $1`
@@ -165,7 +203,7 @@ func (r *UserRepository) ListAll(ctx context.Context, role string) ([]models.Use
 	for rows.Next() {
 		var u models.User
 		if err := rows.Scan(&u.ID, &u.Phone, &u.Name, &u.Email, &u.PasswordHash, &u.Role,
-			&u.PhoneVerified, &u.FCMToken, &u.IsActive, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			&u.PhoneVerified, &u.PhotoURL, &u.FCMToken, &u.IsActive, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, u)

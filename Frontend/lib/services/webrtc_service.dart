@@ -85,11 +85,21 @@ class WebRTCService {
     ));
   }
 
+  // ICE candidates from the peer can legitimately arrive before we've called
+  // setRemoteDescription (offer/answer) — WebRTC forbids addCandidate() until
+  // then. Without buffering, any candidate that races ahead of the SDP is
+  // silently dropped (flutter_webrtc throws, caught nowhere), which weakens
+  // or fully breaks connectivity depending on how many were lost — a classic
+  // source of "sometimes connects, sometimes doesn't".
+  bool _remoteDescriptionSet = false;
+  final List<RTCIceCandidate> _pendingCandidates = [];
+
   /// Technician side: customer ka offer receive karke answer bhejta hai.
   Future<void> handleOffer(Map<String, dynamic> data) async {
     await peerConnection!.setRemoteDescription(
       RTCSessionDescription(data['sdp'] as String, data['type'] as String),
     );
+    await _flushPendingCandidates();
     final answer = await peerConnection!.createAnswer();
     await peerConnection!.setLocalDescription(answer);
     signaling.send(SignalingMessage(
@@ -105,6 +115,15 @@ class WebRTCService {
     await peerConnection!.setRemoteDescription(
       RTCSessionDescription(data['sdp'] as String, data['type'] as String),
     );
+    await _flushPendingCandidates();
+  }
+
+  Future<void> _flushPendingCandidates() async {
+    _remoteDescriptionSet = true;
+    for (final c in _pendingCandidates) {
+      await peerConnection?.addCandidate(c);
+    }
+    _pendingCandidates.clear();
   }
 
   Future<void> handleRemoteIceCandidate(Map<String, dynamic> data) async {
@@ -113,7 +132,43 @@ class WebRTCService {
       data['sdpMid'] as String?,
       data['sdpMLineIndex'] as int?,
     );
+    if (!_remoteDescriptionSet) {
+      _pendingCandidates.add(candidate);
+      return;
+    }
     await peerConnection?.addCandidate(candidate);
+  }
+
+  /// Mutes/unmutes the mic by toggling the local audio track directly —
+  /// cheaper than renegotiating and works even mid-call. Returns the new
+  /// enabled state so the caller doesn't have to track it separately.
+  bool toggleMic() {
+    final audioTracks = localStream?.getAudioTracks() ?? [];
+    if (audioTracks.isEmpty) return false;
+    final newEnabled = !audioTracks.first.enabled;
+    for (final track in audioTracks) {
+      track.enabled = newEnabled;
+    }
+    return newEnabled;
+  }
+
+  /// Enables/disables the camera without stopping the track, so the peer
+  /// connection and its senders stay intact — just a black frame goes out.
+  bool toggleCamera() {
+    final videoTracks = localStream?.getVideoTracks() ?? [];
+    if (videoTracks.isEmpty) return false;
+    final newEnabled = !videoTracks.first.enabled;
+    for (final track in videoTracks) {
+      track.enabled = newEnabled;
+    }
+    return newEnabled;
+  }
+
+  /// Flips between front and back camera on the existing video track.
+  Future<void> switchCamera() async {
+    final videoTracks = localStream?.getVideoTracks() ?? [];
+    if (videoTracks.isEmpty) return;
+    await Helper.switchCamera(videoTracks.first);
   }
 
   Future<void> hangUp() async {

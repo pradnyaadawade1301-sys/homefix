@@ -54,6 +54,8 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		auth.POST("/verify-otp", middleware.RateLimit(rdb, "otp-verify", 10, time.Minute), h.Auth.VerifyOTP)
 		auth.POST("/signup", middleware.RateLimit(rdb, "signup", 10, time.Minute), h.Auth.Signup)
 		auth.POST("/login", middleware.RateLimit(rdb, "login", 10, time.Minute), h.Auth.Login)
+		auth.POST("/request-email-otp", middleware.RateLimit(rdb, "email-otp", 5, time.Minute), h.Auth.RequestEmailOTP)
+		auth.POST("/verify-email-otp", middleware.RateLimit(rdb, "email-otp-verify", 10, time.Minute), h.Auth.VerifyEmailOTP)
 		auth.POST("/refresh", h.Auth.Refresh)
 	}
 	api.GET("/categories", h.Category.List)
@@ -85,6 +87,7 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 
 		authed.GET("/users/me", h.User.GetProfile)
 		authed.PUT("/users/me", h.User.UpdateProfile)
+		authed.PUT("/users/me/photo", h.User.UpdatePhoto)
 		authed.POST("/users/me/fcm-token", h.User.RegisterFCMToken)
 		authed.POST("/users/me/addresses", h.User.AddAddress)
 		authed.GET("/users/me/addresses", h.User.ListAddresses)

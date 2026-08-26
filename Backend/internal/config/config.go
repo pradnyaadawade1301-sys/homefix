@@ -19,10 +19,20 @@ type Config struct {
 	JWTAccessTTLMin  int
 	JWTRefreshTTLHrs int
 
-	// RedisURL backs both rate limiting (login/signup/OTP brute-force protection)
-	// and response caching (category list, technician availability). Empty disables
-	// both — the app still runs, just without either (see internal/cache).
+	// RedisURL: Redis has been removed from this project. This field is kept
+	// (unused) only so the Config struct's shape doesn't change under other
+	// call sites; internal/cache is now a permanent no-op regardless of value.
 	RedisURL string
+
+	// SMTP settings for the email-OTP verification flow (see internal/service/mail_service.go).
+	// Free option: Gmail SMTP with an App Password (smtp.gmail.com:587) — no paid
+	// provider needed. If SMTPUser is empty, email sending is a no-op (dev mode
+	// still returns the OTP in the API response, same pattern as phone OTP).
+	SMTPHost string
+	SMTPPort int
+	SMTPUser string
+	SMTPPass string
+	SMTPFrom string
 
 	GroqAPIKey string
 	// GroqAPIKeys holds all configured Groq keys for automatic rotation (see
@@ -107,6 +117,10 @@ func Load() *Config {
 	if err != nil {
 		gstPct = 18
 	}
+	smtpPort, err := strconv.Atoi(getOr("SMTP_PORT", "587"))
+	if err != nil {
+		smtpPort = 587
+	}
 
 	return &Config{
 		Port:  getOr("PORT", "8080"),
@@ -117,6 +131,12 @@ func Load() *Config {
 		JWTRefreshSecret: mustGet("JWT_REFRESH_SECRET"),
 		JWTAccessTTLMin:  accessTTL,
 		JWTRefreshTTLHrs: refreshTTL,
+
+		SMTPHost: getOr("SMTP_HOST", "smtp.gmail.com"),
+		SMTPPort: smtpPort,
+		SMTPUser: getOr("SMTP_USER", ""),
+		SMTPPass: getOr("SMTP_PASS", ""),
+		SMTPFrom: getOr("SMTP_FROM", ""),
 
 		RedisURL: getOr("REDIS_URL", "redis://redis:6379/0"),
 

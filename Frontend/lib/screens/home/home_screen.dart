@@ -105,13 +105,26 @@ class _HomeTab extends StatefulWidget {
   State<_HomeTab> createState() => _HomeTabState();
 }
 
-class _HomeTabState extends State<_HomeTab> {
+class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin {
   final _searchController = TextEditingController();
+  late final AnimationController _bannerAnimController;
+  late final Animation<double> _floatAnim;
+  late final Animation<double> _sparkleAnim;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+    _bannerAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat(reverse: true);
+    _floatAnim = Tween<double>(begin: -6, end: 6).animate(
+      CurvedAnimation(parent: _bannerAnimController, curve: Curves.easeInOut),
+    );
+    _sparkleAnim = Tween<double>(begin: 0.6, end: 1.0).animate(
+      CurvedAnimation(parent: _bannerAnimController, curve: Curves.easeInOut),
+    );
   }
 
   void _loadData() {
@@ -146,6 +159,7 @@ class _HomeTabState extends State<_HomeTab> {
   @override
   void dispose() {
     _searchController.dispose();
+    _bannerAnimController.dispose();
     super.dispose();
   }
 
@@ -329,49 +343,165 @@ class _HomeTabState extends State<_HomeTab> {
   }
 
   Widget _buildPromoBanner(BuildContext context) {
-    return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFFFB562), Color(0xFFFF8A5B)],
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(28),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFFFB84D), Color(0xFFFF7A1A)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(22),
         ),
-        child: Row(
+        child: Stack(
+          clipBehavior: Clip.none,
           children: [
-            Expanded(
+            // Decorative dot grid, top-right and bottom-left corners.
+            Positioned(top: 16, right: 16, child: _dotGrid()),
+            Positioned(bottom: 16, left: 16, child: _dotGrid()),
+
+            // Sparkle accents that gently twinkle beside the technician.
+            AnimatedBuilder(
+              animation: _sparkleAnim,
+              builder: (context, child) => Positioned(
+                top: 44,
+                right: 118,
+                child: Opacity(
+                  opacity: _sparkleAnim.value,
+                  child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFFFFC94A), size: 20),
+                ),
+              ),
+            ),
+            AnimatedBuilder(
+              animation: _sparkleAnim,
+              builder: (context, child) => Positioned(
+                top: 74,
+                right: 6,
+                child: Opacity(
+                  opacity: 1.6 - _sparkleAnim.value,
+                  child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 12),
+                ),
+              ),
+            ),
+
+            // Text content — left column, always fully readable.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 18, 148, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Get 30% Off Today!',
-                      style: TextStyle(color: Colors.black.withValues(alpha: 0.65), fontSize: 12, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Professional Help\nfor Your Home',
-                    style: TextStyle(color: Color(0xFF1A1F36), fontSize: 18, fontWeight: FontWeight.bold, height: 1.25),
+                  // "Get 30% Off Today!" pill badge.
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF241C15),
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: RichText(
+                      text: const TextSpan(
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+                        children: [
+                          TextSpan(text: '🏷️ Get '),
+                          TextSpan(text: '30%', style: TextStyle(color: Color(0xFFFFC94A))),
+                          TextSpan(text: ' Off Today!'),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  // Heading — last line in white, rest in dark ink.
+                  const Text.rich(
+                    TextSpan(
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, height: 1.15, color: Color(0xFF241C15)),
+                      children: [
+                        TextSpan(text: 'Professional\nHelp for\n'),
+                        TextSpan(text: 'Your Home', style: TextStyle(color: Colors.white)),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 14),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFFFF8A5B),
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                    ),
-                    onPressed: _openCategories,
-                    child: const Text('Book a Service'),
+                  // Trust badges row — each is icon-on-top, label below, so
+                  // narrow labels never get squeezed into a one-letter-per-line
+                  // column the way a cramped horizontal Row did before.
+                  Row(
+                    children: [
+                      _trustBadge(Icons.verified_user_rounded, 'Trusted\nExperts'),
+                      _trustBadge(Icons.access_time_filled_rounded, 'On-Time\nService'),
+                      _trustBadge(Icons.home_rounded, 'Quality\nGuaranteed'),
+                    ],
                   ),
                 ],
               ),
             ),
-            Image.asset(
-              'assets/images/worker_illustration.png',
-              height: 130,
-              errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+
+            // Technician illustration — bleeds off the bottom edge on the
+            // right side, matching the reference banner, with a soft
+            // continuous float animation.
+            Positioned(
+              right: -18,
+              bottom: -14,
+              child: AnimatedBuilder(
+                animation: _floatAnim,
+                builder: (context, child) => Transform.translate(
+                  offset: Offset(0, _floatAnim.value),
+                  child: child,
+                ),
+                child: Image.asset(
+                  'assets/images/worker_illustration.png',
+                  height: 190,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                ),
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _trustBadge(IconData icon, String label) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.55),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 15, color: const Color(0xFF241C15)),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF241C15), height: 1.2),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dotGrid() {
+    return SizedBox(
+      width: 34,
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: List.generate(
+          16,
+          (_) => Container(
+            width: 4,
+            height: 4,
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.35), shape: BoxShape.circle),
+          ),
+        ),
+      ),
     );
   }
 

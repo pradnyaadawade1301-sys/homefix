@@ -12,15 +12,17 @@ import (
 
 type AuthService struct {
 	userRepo        *repository.UserRepository
+	mailService     *MailService
 	accessSecret    string
 	refreshSecret   string
 	accessTTLMin    int
 	refreshTTLHours int
 }
 
-func NewAuthService(userRepo *repository.UserRepository, accessSecret, refreshSecret string, accessTTLMin, refreshTTLHours int) *AuthService {
+func NewAuthService(userRepo *repository.UserRepository, mailService *MailService, accessSecret, refreshSecret string, accessTTLMin, refreshTTLHours int) *AuthService {
 	return &AuthService{
 		userRepo:        userRepo,
+		mailService:     mailService,
 		accessSecret:    accessSecret,
 		refreshSecret:   refreshSecret,
 		accessTTLMin:    accessTTLMin,
@@ -80,8 +82,7 @@ func (s *AuthService) VerifyOTP(ctx context.Context, phone, otp string) (*models
 	return u, access, refresh, nil
 }
 
-// LoginWithPassword supports login via either email or phone (identifier) + password,
-// used by both customer and technician login screens.
+// LoginWithPassword supports login via either email or phone (identifier) + password,// used by both customer and technician login screens.
 func (s *AuthService) LoginWithPassword(ctx context.Context, identifier, password string) (*models.User, string, string, error) {
 	u, err := s.userRepo.GetByIdentifier(ctx, identifier)
 	if err != nil {
@@ -158,4 +159,54 @@ func (s *AuthService) issueTokens(userID, role string) (string, string, error) {
 		return "", "", err
 	}
 	return access, refresh, nil
+}
+
+// RequestEmailOTP sends a 6-digit verification code to an existing account's email —
+// used for the "verify your email" step after signup. Reuses the same otp_code/
+// otp_expires_at columns as phone OTP, so requesting a new one invalidates any
+// pending phone OTP for that user (and vice versa); acceptable since only one
+// verification step is normally in flight at a time.
+func (s *AuthService) RequestEmailOTP(ctx context.Context, email string) (string, error) {
+	u, err := s.userRepo.GetByEmail(ctx, email)
+	if err != nil {
+		return "", err
+	}
+	if u == nil {
+		return "", errors.New("no account found with this email")
+	}
+	if u.EmailVerified {
+		return "", errors.New("email is already verified")
+	}
+
+	otp, err := utils.GenerateOTP()
+	if err != nil {
+		return "", err
+	}
+	expiresAt := time.Now().Add(10 * time.Minute)
+	if err := s.userRepo.SetOTP(ctx, u.ID, otp, expiresAt); err != nil {
+		return "", err
+	}
+	if s.mailService != nil {
+		_ = s.mailService.SendOTPEmail(email, otp) // fail-open — see MailService doc comment
+	}
+	return otp, nil
+}
+
+// VerifyEmailOTP checks the code sent by RequestEmailOTP and, on success, marks
+// the account's email as verified.
+func (s *AuthService) VerifyEmailOTP(ctx context.Context, email, otp string) error {
+	u, err := s.userRepo.GetByEmail(ctx, email)
+	if err != nil {
+		return err
+	}
+	if u == nil {
+		return errors.New("no account found with this email")
+	}
+	if u.OTPCode == nil || *u.OTPCode != otp {
+		return errors.New("invalid OTP")
+	}
+	if u.OTPExpiresAt == nil || time.Now().After(*u.OTPExpiresAt) {
+		return errors.New("OTP has expired")
+	}
+	return s.userRepo.MarkEmailVerified(ctx, u.ID)
 }

@@ -82,8 +82,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 }
 
 type signupBody struct {
-	Name     string `json:"name" binding:"required"`
-	Email    string `json:"email"`
+	Name  string `json:"name" binding:"required"`
+	// Email is mandatory (not just optional) since every new account must go
+	// through email verification (see VerifyEmailScreen on the Flutter side).
+	Email    string `json:"email" binding:"required,email"`
 	Phone    string `json:"phone" binding:"required"`
 	Password string `json:"password" binding:"required,min=6"`
 	Role     string `json:"role"` // "customer" or "technician"
@@ -144,4 +146,49 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	// Stateless JWT: logout is handled client-side by discarding tokens.
 	// (A refresh-token blocklist table can be added later if server-side revocation is needed.)
 	utils.Success(c, http.StatusOK, gin.H{"message": "logged out"})
+}
+
+type requestEmailOTPBody struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+// RequestEmailOTP sends a 6-digit verification code to the given email — used for
+// the "verify your email" step shown right after signup.
+func (h *AuthHandler) RequestEmailOTP(c *gin.Context) {
+	var body requestEmailOTPBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	otp, err := h.authService.RequestEmailOTP(c.Request.Context(), body.Email)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	resp := gin.H{"message": "OTP sent to your email"}
+	// Same non-production debug echo as phone OTP — lets the flow be tested
+	// before Gmail SMTP credentials are configured.
+	if h.env != "production" {
+		resp["debug_otp"] = otp
+	}
+	utils.Success(c, http.StatusOK, resp)
+}
+
+type verifyEmailOTPBody struct {
+	Email string `json:"email" binding:"required,email"`
+	OTP   string `json:"otp" binding:"required"`
+}
+
+func (h *AuthHandler) VerifyEmailOTP(c *gin.Context) {
+	var body verifyEmailOTPBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.authService.VerifyEmailOTP(c.Request.Context(), body.Email, body.OTP); err != nil {
+		utils.Error(c, http.StatusUnauthorized, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"message": "email verified"})
 }

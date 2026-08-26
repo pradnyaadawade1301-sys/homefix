@@ -128,4 +128,21 @@ class AuthService {
       return false;
     }
   }
+
+  /// The in-memory access token after [isLoggedIn] (or login/signup) has
+  /// loaded it. Used by AuthProvider to re-hydrate its own copy on a
+  /// restored session — without this, a resumed session leaves
+  /// AuthProvider.accessToken null even though every REST call still works
+  /// fine (HttpClient attaches its own copy), which broke any screen that
+  /// reads AuthProvider.accessToken directly, like starting a video call.
+  String? get currentAccessToken => _httpClient.getAccessToken();
+
+  /// Guaranteed-fresh token — refreshes first if the cached one has expired.
+  /// AuthProvider.accessToken is only ever set once (at login/session
+  /// restore) and never updated when HttpClient silently refreshes it for
+  /// REST calls, so a screen that reads AuthProvider.accessToken directly
+  /// (e.g. to open the /ws/call/:id WebSocket) can end up sending an
+  /// expired token and get a 401 even though the rest of the app is fine.
+  /// Call this instead right before any such one-shot handshake.
+  Future<String?> getValidAccessToken() => _httpClient.getValidAccessToken();
 }

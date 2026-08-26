@@ -156,6 +156,22 @@ class TechnicianKycService {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
   }
+
+  /// Online/offline master toggle — PATCH /technicians/:id/availability.
+  /// This is what actually flips `is_available` in the DB; without calling
+  /// this, the customer-facing "nearest available technician" match (and
+  /// the preferred-technician video-call check) never sees this technician
+  /// as bookable, no matter what any local UI switch shows.
+  Future<void> setAvailability(String technicianId, bool available) async {
+    try {
+      await _httpClient.patch(
+        '${ApiConfig.technicianDetail}/$technicianId/availability',
+        data: {'available': available},
+      );
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
 }
 
 // Technician Service — public browse endpoints, no auth required.

@@ -24,9 +24,12 @@ func main() {
 	defer pool.Close()
 	log.Println("connected to Postgres")
 
-	rdb := cache.New(cfg.RedisURL)
-	if rdb.Enabled() {
-		log.Println("connected to Redis (caching + rate limiting active)")
+	rdb := cache.New(cfg.RedisURL) // no-op now — Redis removed, see internal/cache
+	mailService := service.NewMailService(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPass, cfg.SMTPFrom)
+	if mailService.Enabled() {
+		log.Println("SMTP configured — email OTP will be sent via", cfg.SMTPHost)
+	} else {
+		log.Println("SMTP not configured — email OTP will be logged instead of sent (set SMTP_USER/SMTP_PASS in .env)")
 	}
 
 	// ---- Repositories ----
@@ -65,7 +68,7 @@ func main() {
 	}
 
 	// ---- Domain services ----
-	authService := service.NewAuthService(userRepo, cfg.JWTAccessSecret, cfg.JWTRefreshSecret, cfg.JWTAccessTTLMin, cfg.JWTRefreshTTLHrs)
+	authService := service.NewAuthService(userRepo, mailService, cfg.JWTAccessSecret, cfg.JWTRefreshSecret, cfg.JWTAccessTTLMin, cfg.JWTRefreshTTLHrs)
 	userService := service.NewUserService(userRepo)
 	techService := service.NewTechnicianService(techRepo, catRepo, reviewRepo)
 	bookingService := service.NewBookingService(bookingRepo, catRepo, techRepo, fcmService)

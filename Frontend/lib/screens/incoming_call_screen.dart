@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart' show FlutterRingtonePlayer;
 import '../services/signaling_service.dart';
 import 'video_call_screen.dart';
 
 /// Technician ke app me jab bhi 'call-request' message aaye, is screen
 /// ko push kar dena (dekhein README ke "Technician side wiring" section).
-class IncomingCallScreen extends StatelessWidget {
+class IncomingCallScreen extends StatefulWidget {
   final SignalingService signaling;
   final String myId;
   final String callerId; // customer ki id
@@ -16,15 +17,36 @@ class IncomingCallScreen extends StatelessWidget {
     required this.callerId,
   });
 
+  @override
+  State<IncomingCallScreen> createState() => _IncomingCallScreenState();
+}
+
+class _IncomingCallScreenState extends State<IncomingCallScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Ringtone bajti rahe jab tak technician accept/reject na kare (loop).
+    FlutterRingtonePlayer().playRingtone(looping: true, volume: 1.0, asAlarm: false);
+  }
+
+  void _stopRingtone() => FlutterRingtonePlayer().stop();
+
+  @override
+  void dispose() {
+    _stopRingtone();
+    super.dispose();
+  }
+
   void _accept(BuildContext context) {
-    signaling.send(SignalingMessage(type: 'call-accept', from: myId, to: callerId));
+    _stopRingtone();
+    widget.signaling.send(SignalingMessage(type: 'call-accept', from: widget.myId, to: widget.callerId));
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
         builder: (_) => VideoCallScreen(
-          signaling: signaling,
-          myId: myId,
-          peerId: callerId,
+          signaling: widget.signaling,
+          myId: widget.myId,
+          peerId: widget.callerId,
           isCaller: false, // technician customer ke offer ka wait karega
         ),
       ),
@@ -32,7 +54,8 @@ class IncomingCallScreen extends StatelessWidget {
   }
 
   void _reject(BuildContext context) {
-    signaling.send(SignalingMessage(type: 'call-reject', from: myId, to: callerId));
+    _stopRingtone();
+    widget.signaling.send(SignalingMessage(type: 'call-reject', from: widget.myId, to: widget.callerId));
     Navigator.pop(context);
   }
 
@@ -54,7 +77,7 @@ class IncomingCallScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  callerId,
+                  widget.callerId,
                   style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                 ),
               ],

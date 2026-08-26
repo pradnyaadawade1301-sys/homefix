@@ -181,6 +181,18 @@ class HttpClient {
   }
 
   String? getAccessToken() => _accessToken;
+
+  /// Returns a token guaranteed not to be expired, refreshing first if the
+  /// current one already is. Use this (instead of getAccessToken()) right
+  /// before a one-shot handshake that isn't covered by the Dio interceptor —
+  /// e.g. building the /ws/call/:id URL — since a stale token there fails
+  /// the WebSocket upgrade with a 401 instead of getting silently retried.
+  Future<String?> getValidAccessToken() async {
+    if (_accessToken != null && JwtDecoder.isExpired(_accessToken!)) {
+      await _refreshAccessToken();
+    }
+    return _accessToken;
+  }
 }
 
 /// The Go backend wraps every response as {"success": bool, "data": ...} or

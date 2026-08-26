@@ -137,6 +137,29 @@ class TechnicianKycProvider extends ChangeNotifier {
     }
   }
 
+  /// Online/offline master toggle. This is the ONLY thing that actually
+  /// flips `is_available` in the DB — without calling this, a technician
+  /// never shows up in the customer-facing "nearest available" match, and
+  /// preferred-technician video calls hit the same `is_available` gate too.
+  /// Optimistic UI update with rollback on failure.
+  Future<bool> setAvailability(bool available) async {
+    final profile = _profile;
+    if (profile == null) return false;
+    final previous = profile.isAvailable;
+    _profile = profile.copyWith(isAvailable: available);
+    _error = null;
+    notifyListeners();
+    try {
+      await _kycService.setAvailability(profile.id, available);
+      return true;
+    } catch (e) {
+      _profile = _profile?.copyWith(isAvailable: previous);
+      _error = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<String?> uploadFile(File file) async {
     _isUploading = true;
     _error = null;

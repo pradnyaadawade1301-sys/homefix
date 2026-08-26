@@ -33,6 +33,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   bool _offerSent = false;
   bool _peerJoined = false;
   bool _initDone = false;
+  bool _micOn = true;
+  bool _cameraOn = true;
 
   @override
   void initState() {
@@ -111,7 +113,30 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     await _webrtc.createOffer();
   }
 
+  void _toggleMic() {
+    final enabled = _webrtc.toggleMic();
+    setState(() => _micOn = enabled);
+  }
+
+  void _toggleCamera() {
+    final enabled = _webrtc.toggleCamera();
+    setState(() => _cameraOn = enabled);
+  }
+
+  Future<void> _switchCamera() async {
+    await _webrtc.switchCamera();
+  }
+
+  bool _ended = false;
+
   void _endCall({bool notifyPeer = true}) async {
+    // Guards against this firing twice — once from the user's own tap, and
+    // again from the onConnectionState callback that fires when hangUp()
+    // below closes the peer connection locally. Without this, the second
+    // call could pop an extra screen off the navigation stack.
+    if (_ended) return;
+    _ended = true;
+
     if (notifyPeer) {
       widget.signaling.send(SignalingMessage(
         type: 'call-end',
@@ -128,6 +153,15 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     _localRenderer.dispose();
     _remoteRenderer.dispose();
     _webrtc.hangUp();
+    // Without this, the client-side socket to /ws/call/:id stays open in the
+    // background even after this screen is popped — the server never sees a
+    // close frame, so it keeps treating the room as occupied for up to the
+    // 60s keepalive timeout. Since a room caps at 2 sockets, the very next
+    // call attempt on the same room finds it "full" and never gets
+    // peer-joined, hanging on "Connecting..." forever — then the attempt
+    // after that works again once the stale socket finally times out. This
+    // is the exact odd/even alternating failure pattern.
+    widget.signaling.disconnect();
     super.dispose();
   }
 
@@ -168,15 +202,54 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             bottom: 40,
             left: 0,
             right: 0,
-            child: Center(
-              child: FloatingActionButton(
-                backgroundColor: Colors.red,
-                onPressed: () => _endCall(),
-                child: const Icon(Icons.call_end, color: Colors.white),
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _controlButton(
+                  icon: _micOn ? Icons.mic : Icons.mic_off,
+                  onPressed: _toggleMic,
+                  active: _micOn,
+                ),
+                const SizedBox(width: 18),
+                _controlButton(
+                  icon: _cameraOn ? Icons.videocam : Icons.videocam_off,
+                  onPressed: _toggleCamera,
+                  active: _cameraOn,
+                ),
+                const SizedBox(width: 18),
+                _controlButton(
+                  icon: Icons.cameraswitch,
+                  onPressed: _switchCamera,
+                  active: true,
+                ),
+                const SizedBox(width: 18),
+                FloatingActionButton(
+                  backgroundColor: Colors.red,
+                  onPressed: () => _endCall(),
+                  child: const Icon(Icons.call_end, color: Colors.white),
+                ),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Round call-control button — filled white when the feature is on
+  /// (mic/camera live), filled red when off, so state is readable at a
+  /// glance without reading the icon.
+  Widget _controlButton({required IconData icon, required VoidCallback onPressed, required bool active}) {
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: active ? Colors.white24 : Colors.red,
+      ),
+      child: IconButton(
+        icon: Icon(icon, color: Colors.white),
+        onPressed: onPressed,
       ),
     );
   }

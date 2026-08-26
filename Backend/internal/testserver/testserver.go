@@ -55,7 +55,8 @@ func New(pool *pgxpool.Pool) *Server {
 
 	groqService := service.NewGroqService([]string{"test-key"}, "test-model", "http://127.0.0.1:0/unused", aiRepo)
 	upiService := service.NewUpiService("test@upi", "Test Payee", 15, 18, paymentRepo, bookingRepo, techRepo, walletRepo)
-	authService := service.NewAuthService(userRepo, JWTAccessSecret, JWTRefreshSecret, 15, 720)
+
+	authService := service.NewAuthService(userRepo, service.NewMailService("", 0, "", "", ""), JWTAccessSecret, JWTRefreshSecret, 15, 720)
 	userService := service.NewUserService(userRepo)
 	techService := service.NewTechnicianService(techRepo, catRepo, reviewRepo)
 	bookingService := service.NewBookingService(bookingRepo, catRepo, techRepo, nil)

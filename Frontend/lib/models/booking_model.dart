@@ -363,6 +363,25 @@ class TechnicianProfile {
   bool get isApproved => approvalStatus == 'approved';
   bool get isRejected => approvalStatus == 'rejected';
 
+  TechnicianProfile copyWith({bool? isAvailable}) {
+    return TechnicianProfile(
+      id: id,
+      userId: userId,
+      categoryId: categoryId,
+      experienceYears: experienceYears,
+      address: address,
+      governmentIdUrl: governmentIdUrl,
+      profilePhotoUrl: profilePhotoUrl,
+      approvalStatus: approvalStatus,
+      rejectionReason: rejectionReason,
+      ratingAvg: ratingAvg,
+      ratingCount: ratingCount,
+      isVerified: isVerified,
+      isAvailable: isAvailable ?? this.isAvailable,
+      createdAt: createdAt,
+    );
+  }
+
   factory TechnicianProfile.fromJson(Map<String, dynamic> json) {
     return TechnicianProfile(
       id: json['id'] as String,

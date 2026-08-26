@@ -35,7 +35,8 @@ class _IncomingConsultationScreenState extends State<IncomingConsultationScreen>
       final provider = context.read<ConsultationProvider>();
       await provider.acceptRequest(consultationId);
       final withCallInfo = await provider.getCallInfo(consultationId);
-      final token = context.read<AuthProvider>().accessToken;
+      // Fresh, not cached-from-login token — see AuthProvider.getValidAccessToken.
+      final token = await context.read<AuthProvider>().getValidAccessToken();
       final myId = context.read<AuthProvider>().currentUser?.id ?? '';
 
       if (token == null || withCallInfo.roomId == null) {

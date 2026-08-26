@@ -48,6 +48,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     await userProvider.fetchProfile();
     if (!mounted) return;
 
+    // checkLoginStatus() only restores the access token; the in-memory user
+    // (needed as myId for things like starting a video call) has to come
+    // from this profile fetch.
+    if (userProvider.user != null) {
+      authProvider.setCurrentUser(userProvider.user!);
+    }
+
     if (userProvider.user?.role != 'technician') {
       Navigator.of(context).pushReplacementNamed('/home');
       return;

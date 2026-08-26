@@ -23,6 +23,10 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID, name string, em
 	return s.userRepo.UpdateProfile(ctx, userID, name, email)
 }
 
+func (s *UserService) UpdatePhotoURL(ctx context.Context, userID string, photoURL *string) error {
+	return s.userRepo.UpdatePhotoURL(ctx, userID, photoURL)
+}
+
 func (s *UserService) RegisterFCMToken(ctx context.Context, userID, token string) error {
 	return s.userRepo.SetFCMToken(ctx, userID, token)
 }

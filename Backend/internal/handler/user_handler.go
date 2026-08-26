@@ -51,6 +51,29 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	utils.Success(c, http.StatusOK, gin.H{"message": "profile updated"})
 }
 
+type updatePhotoBody struct {
+	// PhotoURL is the "url" returned by POST /api/v1/uploads. Send null/omit to remove
+	// the current photo and fall back to the name-initial avatar in the app.
+	PhotoURL *string `json:"photo_url"`
+}
+
+// UpdatePhoto sets the caller's avatar shown in the app header and profile screen.
+// Flutter flow: upload the picked image via POST /api/v1/uploads, then call this with
+// the returned url.
+func (h *UserHandler) UpdatePhoto(c *gin.Context) {
+	userID := c.GetString("user_id")
+	var body updatePhotoBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.userService.UpdatePhotoURL(c.Request.Context(), userID, body.PhotoURL); err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"message": "photo updated"})
+}
+
 type fcmTokenBody struct {
 	Token string `json:"token" binding:"required"`
 }

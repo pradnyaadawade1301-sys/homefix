@@ -12,6 +12,8 @@ type User struct {
 	OTPCode       *string    `json:"-"`
 	OTPExpiresAt  *time.Time `json:"-"`
 	PhoneVerified bool       `json:"phone_verified"`
+	EmailVerified bool       `json:"email_verified"`
+	PhotoURL      *string    `json:"photo_url,omitempty"`
 	FCMToken      *string    `json:"-"`
 	IsActive      bool       `json:"is_active"`
 	CreatedAt     time.Time  `json:"created_at"`
