@@ -415,3 +415,30 @@ class AIService {
     }
   }
 }
+class ReviewService {
+  final HttpClient _httpClient;
+  ReviewService({required HttpClient httpClient}) : _httpClient = httpClient;
+
+  Future<Review> create({required String bookingId, required int rating, String comment = ''}) async {
+    try {
+      final response = await _httpClient.post(
+        ApiConfig.reviewCreate,
+        data: {'booking_id': bookingId, 'rating': rating, if (comment.isNotEmpty) 'comment': comment},
+      );
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return Review.fromJson(data);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  Future<List<Review>> listForTechnician(String technicianId) async {
+    try {
+      final response = await _httpClient.get('${ApiConfig.technicianReviews}/$technicianId/reviews');
+      final list = ApiEnvelope.unwrap(response) as List? ?? [];
+      return list.map((e) => Review.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+}

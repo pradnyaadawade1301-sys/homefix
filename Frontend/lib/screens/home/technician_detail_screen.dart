@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../models/booking_model.dart';
+import '../../services/service_locator.dart';
 import '../booking/book_technician_screen.dart';
 import '../consultation/searching_technician_screen.dart';
-import '../chat/booking_chat_screen.dart';
-import 'package:provider/provider.dart';
-import '../../providers/booking_provider.dart';
 
 class TechnicianDetailScreen extends StatefulWidget {
   final Technician technician;
@@ -21,6 +20,9 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
   late final Animation<double> _fade;
   late final Animation<Offset> _slide;
 
+  List<Review> _reviews = [];
+  bool _loadingReviews = true;
+
   static const Color _accent = Color(0xFF0F766E);
   static const Color _accentDark = Color(0xFF115E59);
 
@@ -32,6 +34,21 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
     _slide = Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero)
         .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
     _controller.forward();
+    _loadReviews();
+  }
+
+  Future<void> _loadReviews() async {
+    try {
+      final reviews = await context.read<ReviewService>().listForTechnician(widget.technician.id);
+      if (!mounted) return;
+      setState(() {
+        _reviews = reviews;
+        _loadingReviews = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingReviews = false);
+    }
   }
 
   @override
@@ -39,44 +56,6 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
     _controller.dispose();
     super.dispose();
   }
-  Future<void> _openChat(BuildContext context) async {
-  final t = widget.technician;
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (_) => const Center(child: CircularProgressIndicator()),
-  );
-
-  try {
-    final provider = context.read<BookingProvider>();
-    await provider.fetchUserBookings();
-    if (!context.mounted) return;
-    Navigator.of(context).pop(); // close loading dialog
-
-    final activeBooking = provider.bookings.where((b) {
-      final techMatches = b.technician?.id == t.id;
-      final isActive = b.status == 'requested' || b.status == 'accepted' || b.status == 'in_progress';
-      return techMatches && isActive;
-    }).toList();
-
-    if (activeBooking.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Chat opens once you have an active booking with this technician.')),
-      );
-      return;
-    }
-
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => BookingChatScreen(bookingId: activeBooking.first.id, peerName: t.name),
-    ));
-  } catch (e) {
-    if (!context.mounted) return;
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Could not check bookings: $e')),
-    );
-  }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -261,6 +240,50 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                       const SizedBox(height: 16),
                       Container(
                         width: double.infinity,
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10)],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Reviews (${t.ratingCount})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5)),
+                            const SizedBox(height: 12),
+                            if (_loadingReviews)
+                              const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2)))
+                            else if (_reviews.isEmpty)
+                              Text('No reviews yet', style: TextStyle(fontSize: 13, color: Colors.grey[500]))
+                            else
+                              ..._reviews.take(5).map((r) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: List.generate(
+                                            5,
+                                            (i) => Icon(
+                                              i < r.rating ? Icons.star_rounded : Icons.star_border_rounded,
+                                              size: 16,
+                                              color: const Color(0xFFF5A623),
+                                            ),
+                                          ),
+                                        ),
+                                        if (r.comment.isNotEmpty) ...[
+                                          const SizedBox(height: 4),
+                                          Text(r.comment, style: TextStyle(fontSize: 13, color: Colors.grey[700])),
+                                        ],
+                                      ],
+                                    ),
+                                  )),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -323,17 +346,6 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                           style: OutlinedButton.styleFrom(foregroundColor: _accent, side: const BorderSide(color: _accent, width: 1.4)),
                           icon: const Icon(Icons.videocam_rounded),
                           label: const Text('Video Call', style: TextStyle(fontWeight: FontWeight.w600)),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 54,
-                        child: OutlinedButton.icon(
-                          onPressed: () => _openChat(context),
-                          style: OutlinedButton.styleFrom(foregroundColor: _accent, side: const BorderSide(color: _accent, width: 1.4)),
-                          icon: const Icon(Icons.chat_bubble_outline_rounded),
-                          label: const Text('Chat', style: TextStyle(fontWeight: FontWeight.w600)),
                         ),
                       ),
                     ],

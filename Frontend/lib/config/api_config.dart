@@ -29,6 +29,8 @@ class ApiConfig {
   static const String authRefresh = '/auth/refresh';
   static const String authSetPassword = '/auth/set-password';
   static const String authLogout = '/auth/logout';
+    static const String reviewCreate = '/reviews';
+  static const String technicianReviews = '/technicians'; // + /:id/reviews
 
   static const String userProfile = '/users/me';
   static const String userAddresses = '/users/me/addresses';
