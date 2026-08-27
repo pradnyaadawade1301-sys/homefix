@@ -24,7 +24,8 @@ import 'services/consultation_service.dart';
 import 'services/location_service.dart';
 import 'services/service_locator.dart';
 import 'screens/technician/technician_jobs_screen.dart';
-import 'main.dart' as app; // for fcmNotificationService
+import 'screens/notifications/notification_detail_screen.dart';
+import 'main.dart' as app; // for fcmNotificationService, navigatorKey
 
 /// Sends the current FCM token to the backend via the authenticated endpoint.
 /// Called when the token is first obtained or refreshed.
@@ -89,17 +90,24 @@ class _MyAppState extends State<MyApp> {
       _registerFcmToken(_httpClient);
     };
 
-    // Wire up notification tap: navigate to the relevant screen based on
-    // the notification payload data.
-    app.fcmNotificationService.onNotificationTap = (data) {
-      if (data == null) return;
-      final type = data['type'] as String?;
-      final bookingId = data['booking_id'] as String?;
-      final paymentId = data['payment_id'] as String?;
-      final consultationId = data['consultation_id'] as String?;
-      debugPrint('[FCM Navigate] type=$type booking=$bookingId payment=$paymentId consultation=$consultationId');
-      // Navigation can be expanded via NavigatorKey or route definitions
-      // based on the notification type.
+    // `fcmNotificationService.initialize()` (called from main() before runApp())
+    // already fetches the initial token — but at that point onTokenRefreshed
+    // above wasn't wired up yet, so that first token was never sent to the
+    // backend. Register it now if it's already available; otherwise the
+    // onTokenRefreshed callback above will handle it once the token arrives.
+    if (app.fcmNotificationService.fcmToken != null) {
+      _registerFcmToken(_httpClient);
+    }
+
+    // Wire up notification tap: open that exact notification's message,
+    // with a shortcut to the booking when the payload has a booking_id.
+    app.fcmNotificationService.onNotificationTap = (payload) {
+      final title = (payload['title'] as String?) ?? 'HomeFix';
+      final body = (payload['body'] as String?) ?? '';
+      debugPrint('[FCM Navigate] title=$title body=$body payload=$payload');
+      app.navigatorKey.currentState?.push(MaterialPageRoute(
+        builder: (_) => NotificationDetailScreen(title: title, body: body, data: payload),
+      ));
     };
   }
 
@@ -108,7 +116,8 @@ class _MyAppState extends State<MyApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (_) => AuthProvider(authService: _authService),
+          create: (_) => AuthProvider(authService: _authService)
+            ..onAuthenticated = () => _registerFcmToken(_httpClient),
         ),
         ChangeNotifierProvider(
           create: (_) => BookingProvider(bookingService: _bookingService),
@@ -149,6 +158,7 @@ class _MyAppState extends State<MyApp> {
         ),
       ],
       child: MaterialApp(
+        navigatorKey: app.navigatorKey,
         title: 'HomeFix Live',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,

@@ -13,6 +13,12 @@ class AuthProvider extends ChangeNotifier {
 
   AuthProvider({required AuthService authService}) : _authService = authService;
 
+  /// Called whenever the user becomes authenticated — fresh login, signup,
+  /// or a restored session. Used to (re)register the FCM push token with the
+  /// backend, since the very first token fetch on app start happens before
+  /// the user is logged in and that registration call fails silently (401).
+  void Function()? onAuthenticated;
+
   User? get currentUser => _currentUser;
   String? get accessToken => _accessToken;
 
@@ -46,6 +52,7 @@ class AuthProvider extends ChangeNotifier {
       _accessToken = response.accessToken;
       _isLoggedIn = true;
       _error = null;
+      onAuthenticated?.call();
       return true;
     } catch (e) {
       _error = e.toString().replaceFirst('Exception: ', '');
@@ -81,6 +88,7 @@ class AuthProvider extends ChangeNotifier {
       _accessToken = response.accessToken;
       _isLoggedIn = true;
       _error = null;
+      onAuthenticated?.call();
       return true;
     } catch (e) {
       _error = e.toString().replaceFirst('Exception: ', '');
@@ -102,6 +110,7 @@ class AuthProvider extends ChangeNotifier {
       // call — would then fail with "Could not start/join the call" even
       // though every other REST call kept working fine.
       _accessToken = _isLoggedIn ? _authService.currentAccessToken : null;
+      if (_isLoggedIn) onAuthenticated?.call();
     } catch (e) {
       _isLoggedIn = false;
       _accessToken = null;

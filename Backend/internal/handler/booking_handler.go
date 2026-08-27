@@ -105,6 +105,39 @@ func (h *BookingHandler) RepeatCustomers(c *gin.Context) {
 	utils.Success(c, http.StatusOK, list)
 }
 
+// RepeatTechnicians is the customer-side mirror of RepeatCustomers — powers the
+// customer's "My Technicians" screen.
+func (h *BookingHandler) RepeatTechnicians(c *gin.Context) {
+	customerID := c.GetString("user_id")
+	list, err := h.bookingService.RepeatTechnicians(c.Request.Context(), customerID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if list == nil {
+		list = []models.RepeatTechnician{}
+	}
+	utils.Success(c, http.StatusOK, list)
+}
+
+// MyServiceHistoryWithTechnician is the customer-side mirror of ServiceHistory —
+// every past booking the logged-in customer has made with a specific technician
+// (date, work done/category, status, payment amount). Reached by tapping a
+// technician on the customer's "My Technicians" screen.
+func (h *BookingHandler) MyServiceHistoryWithTechnician(c *gin.Context) {
+	customerID := c.GetString("user_id")
+	technicianID := c.Param("technicianId")
+	list, err := h.bookingService.ServiceHistory(c.Request.Context(), technicianID, customerID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if list == nil {
+		list = []models.ServiceHistoryEntry{}
+	}
+	utils.Success(c, http.StatusOK, list)
+}
+
 // ServiceHistory returns a specific customer's past bookings with this
 // technician, each with pricing/tier info — reached by tapping a customer on
 // the technician's "My Customers" (repeat customers) screen.

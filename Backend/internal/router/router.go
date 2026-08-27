@@ -104,6 +104,8 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.GET("/technicians/:id/bookings", middleware.RequireRole("technician", "admin"), h.Booking.TechnicianBookings)
 		authed.GET("/technicians/:id/repeat-customers", middleware.RequireRole("technician", "admin"), h.Booking.RepeatCustomers)
 		authed.GET("/technicians/:id/customers/:customerId/history", middleware.RequireRole("technician", "admin"), h.Booking.ServiceHistory)
+		authed.GET("/me/repeat-technicians", middleware.RequireRole("customer"), h.Booking.RepeatTechnicians)
+		authed.GET("/me/repeat-technicians/:technicianId/history", middleware.RequireRole("customer"), h.Booking.MyServiceHistoryWithTechnician)
 
 		authed.POST("/bookings", h.Booking.Create)
 		authed.GET("/bookings/me", h.Booking.MyBookings)

@@ -183,6 +183,13 @@ func (s *BookingService) RepeatCustomers(ctx context.Context, technicianID strin
 	return s.bookingRepo.ListRepeatCustomersByTechnician(ctx, technicianID)
 }
 
+// RepeatTechnicians is the customer-side mirror of RepeatCustomers — powers the
+// customer's "My Technicians" screen with technicians they've booked more than
+// once.
+func (s *BookingService) RepeatTechnicians(ctx context.Context, customerID string) ([]models.RepeatTechnician, error) {
+	return s.bookingRepo.ListRepeatTechniciansByCustomer(ctx, customerID)
+}
+
 // ServiceHistory returns every past booking a specific customer has made with a
 // specific technician, each with its payment/pricing-tier info attached — reached
 // from the technician's repeat-customers list by tapping a customer.

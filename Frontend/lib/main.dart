@@ -8,6 +8,11 @@ import 'services/firebase_messaging_handler.dart';
 /// and any screen that needs to navigate on notification tap.
 final FcmNotificationService fcmNotificationService = FcmNotificationService();
 
+/// Global navigator key so a notification tap (which fires outside any
+/// screen's BuildContext — could be from a killed/background app) can still
+/// push a screen onto the app's navigator.
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 

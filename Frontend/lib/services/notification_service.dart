@@ -28,9 +28,11 @@ class FcmNotificationService {
   /// The current FCM registration token. Null until Firebase initializes.
   String? get fcmToken => _fcmToken;
 
-  /// Callback invoked when a notification is tapped, carrying the
-  /// payload data map so the app can navigate to the relevant screen.
-  void Function(Map<String, dynamic>? data)? onNotificationTap;
+  /// Callback invoked when a notification is tapped, carrying the full
+  /// payload — `title`, `body`, and the notification's custom `data` map
+  /// merged together — so the app can show that exact notification's
+  /// message and/or navigate to the relevant screen.
+  void Function(Map<String, dynamic> payload)? onNotificationTap;
 
   /// Set this callback to send the FCM token to your backend whenever
   /// it is first obtained or refreshed. Called with the new token value.
@@ -106,7 +108,7 @@ class FcmNotificationService {
       final initialMessage = await _messaging!.getInitialMessage();
       if (initialMessage != null) {
         debugPrint('[FCM] App opened from terminated notification');
-        _handleNotificationTap(initialMessage.data);
+        _handleNotificationTap(_toTapPayload(initialMessage));
       }
 
       _initialized = true;
@@ -180,7 +182,17 @@ class FcmNotificationService {
   /// Handles a notification tap when the app was in the background.
   Future<void> _onNotificationOpenedApp(RemoteMessage message) async {
     debugPrint('[FCM OpenedApp] data: ${message.data}');
-    _handleNotificationTap(message.data);
+    _handleNotificationTap(_toTapPayload(message));
+  }
+
+  /// Merges a RemoteMessage's title/body with its custom data map into the
+  /// single payload shape [onNotificationTap] expects.
+  Map<String, dynamic> _toTapPayload(RemoteMessage message) {
+    return {
+      'title': message.notification?.title ?? 'HomeFix',
+      'body': message.notification?.body ?? '',
+      ...message.data,
+    };
   }
 
   /// Handles a tap on a local notification displayed by this service.
@@ -188,18 +200,18 @@ class FcmNotificationService {
     debugPrint('[FCM LocalTap] payload: ${response.payload}');
     if (response.payload != null && response.payload!.isNotEmpty) {
       try {
-        final data = jsonDecode(response.payload!) as Map<String, dynamic>;
-        _handleNotificationTap(data);
+        final payload = jsonDecode(response.payload!) as Map<String, dynamic>;
+        _handleNotificationTap(payload);
       } catch (e) {
         debugPrint('[FCM] Error parsing local notification payload: $e');
       }
     }
   }
 
-  /// Routes notification data to the appropriate screen via the callback.
-  void _handleNotificationTap(Map<String, dynamic>? data) {
-    debugPrint('[FCM] Handling notification tap with data: $data');
-    onNotificationTap?.call(data);
+  /// Invokes the tap callback with the notification's title/body/data.
+  void _handleNotificationTap(Map<String, dynamic> payload) {
+    debugPrint('[FCM] Handling notification tap with payload: $payload');
+    onNotificationTap?.call(payload);
   }
 
   // ────────────────── Local Notification Display ──────────────────
@@ -208,7 +220,7 @@ class FcmNotificationService {
   Future<void> _showLocalNotification(RemoteMessage message) async {
     final title = message.notification?.title ?? 'HomeFix';
     final body = message.notification?.body ?? '';
-    final payload = message.data.isNotEmpty ? jsonEncode(message.data) : null;
+    final payload = jsonEncode(_toTapPayload(message));
 
     const androidDetails = AndroidNotificationDetails(
       'homefix_notifications',
@@ -268,11 +280,9 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBCOMKYqH0f44oMieGbRljGewoZbXWLO_Y',
-    appId: '1:299649646704:android:a3d43695262f40edb6b4b5',
+    appId: '1:299649646704:android:c55aa0e209775eb3b6b4b5',
     messagingSenderId: '299649646704',
     projectId: 'homefix-live',
     storageBucket: 'homefix-live.firebasestorage.app',
   );
 }
-  
-

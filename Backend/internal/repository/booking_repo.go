@@ -210,6 +210,41 @@ func (r *BookingRepository) ListRepeatCustomersByTechnician(ctx context.Context,
 	return out, rows.Err()
 }
 
+// ListRepeatTechniciansByCustomer is the customer-side mirror of
+// ListRepeatCustomersByTechnician — technicians this customer has booked more
+// than once, most-frequent first — powers the customer's "My Technicians"
+// (repeat technicians) screen.
+func (r *BookingRepository) ListRepeatTechniciansByCustomer(ctx context.Context, customerID string) ([]models.RepeatTechnician, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT b.technician_id, COALESCE(u.name,''), COALESCE(u.phone,''),
+		       COALESCE(cat.name,''), COALESCE(t.profile_photo_url,''), COALESCE(t.rating_avg,0),
+		       COUNT(*) AS total_bookings, MAX(b.created_at) AS last_booking_at
+		FROM bookings b
+		JOIN technicians t ON t.id = b.technician_id
+		JOIN users u ON u.id = t.user_id
+		LEFT JOIN categories cat ON cat.id = t.category_id
+		WHERE b.customer_id = $1 AND b.technician_id IS NOT NULL
+		GROUP BY b.technician_id, u.name, u.phone, cat.name, t.profile_photo_url, t.rating_avg
+		HAVING COUNT(*) > 1
+		ORDER BY total_bookings DESC, last_booking_at DESC
+	`, customerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []models.RepeatTechnician
+	for rows.Next() {
+		var rt models.RepeatTechnician
+		if err := rows.Scan(&rt.TechnicianID, &rt.Name, &rt.Phone, &rt.CategoryName,
+			&rt.ProfilePhotoURL, &rt.RatingAvg, &rt.TotalBookings, &rt.LastBookingAt); err != nil {
+			return nil, err
+		}
+		out = append(out, rt)
+	}
+	return out, rows.Err()
+}
+
 // --- Booking chat (customer <-> assigned technician) ---
 
 func (r *BookingRepository) CreateMessage(ctx context.Context, m *models.BookingMessage) (*models.BookingMessage, error) {

@@ -59,6 +59,33 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
             if (provider.isLoadingHistory && provider.history.isEmpty) {
               return const Center(child: CircularProgressIndicator());
             }
+            if (provider.error != null && provider.history.isEmpty) {
+              return ListView(
+                children: [
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+                  Icon(Icons.wifi_off_rounded, size: 64, color: Colors.grey[300]),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: Text(
+                        provider.error!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey[700]),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: OutlinedButton.icon(
+                      onPressed: () => context.read<PaymentProvider>().loadHistory(),
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('Retry'),
+                    ),
+                  ),
+                ],
+              );
+            }
             if (provider.history.isEmpty) {
               return ListView(
                 children: [

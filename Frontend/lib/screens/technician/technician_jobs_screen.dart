@@ -12,6 +12,7 @@ import '../../providers/consultation_provider.dart';
 import '../consultation/incoming_consultation_screen.dart';
 import '../profile/profile_screen.dart';
 import 'technician_settlement_screen.dart';
+import 'repeat_customers_screen.dart';
 
 /// Technician-facing home screen — the mirror image of the customer's
 /// [BookingsScreen]. A logged-in technician lands here and sees:
@@ -98,6 +99,13 @@ class _TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
       appBar: AppBar(
         title: Text(_navIndex == 0 ? 'My Jobs' : 'Settlement'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.people_alt_outlined),
+            tooltip: 'My Customers',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const RepeatCustomersScreen()),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.person_outline),
             onPressed: () => Navigator.of(context).push(

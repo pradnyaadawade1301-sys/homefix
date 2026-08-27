@@ -529,3 +529,41 @@ class RepeatCustomer {
     );
   }
 }
+
+// RepeatTechnician — customer-side mirror of RepeatCustomer: a technician the
+// logged-in customer has booked more than once.
+// Matches backend internal/models/technician.go -> RepeatTechnician.
+class RepeatTechnician {
+  final String technicianId;
+  final String name;
+  final String phone;
+  final String categoryName;
+  final String profilePhotoUrl;
+  final double ratingAvg;
+  final int totalBookings;
+  final DateTime lastBookingAt;
+
+  RepeatTechnician({
+    required this.technicianId,
+    required this.name,
+    required this.phone,
+    required this.categoryName,
+    required this.profilePhotoUrl,
+    required this.ratingAvg,
+    required this.totalBookings,
+    required this.lastBookingAt,
+  });
+
+  factory RepeatTechnician.fromJson(Map<String, dynamic> json) {
+    return RepeatTechnician(
+      technicianId: json['technician_id'] as String? ?? '',
+      name: (json['name'] as String?) ?? '',
+      phone: (json['phone'] as String?) ?? '',
+      categoryName: (json['category_name'] as String?) ?? '',
+      profilePhotoUrl: (json['profile_photo_url'] as String?) ?? '',
+      ratingAvg: (json['rating_avg'] as num?)?.toDouble() ?? 0,
+      totalBookings: (json['total_bookings'] as num?)?.toInt() ?? 0,
+      lastBookingAt: DateTime.tryParse(json['last_booking_at'] as String? ?? '') ?? DateTime.now(),
+    );
+  }
+}

@@ -9,7 +9,6 @@ import '../notifications/notifications_screen.dart';
 import '../technician/technician_jobs_screen.dart';
 import '../technician/technician_settlement_screen.dart';
 import '../technician/technician_status_screen.dart';
-import '../technician/repeat_customers_screen.dart';
 import '../personal_info_screen.dart';
 import '../saved_addresses_screen.dart';
 import '../legal_screens.dart';
@@ -19,7 +18,6 @@ import '../payment_methods_screen.dart';
 import '../payment/transaction_history_screen.dart';
 import '../privacy_security_screen.dart';
 import '../help_center_screen.dart';
-import '../report_issue_screen.dart';
 import '../contact_support_screen.dart';
 import '../availability_toggle_screen.dart';
 import '../service_radius_screen.dart';
@@ -266,11 +264,6 @@ class _CustomerProfileBody extends StatelessWidget {
               icon: Icons.help_outline_rounded,
               label: 'Help Center',
               onTap: () => openScreen(const HelpCenterScreen()),
-            ),
-            _ActionTile(
-              icon: Icons.report_gmailerrorred_outlined,
-              label: 'Report an Issue',
-              onTap: () => openScreen(const ReportIssueScreen()),
             ),
             _ActionTile(
               icon: Icons.support_agent_outlined,
@@ -569,13 +562,6 @@ class _TechnicianProfileBody extends StatelessWidget {
                   ),
                 ),
                 _ActionTile(
-                  icon: Icons.people_alt_outlined,
-                  label: 'My Customers',
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const RepeatCustomersScreen()),
-                  ),
-                ),
-                _ActionTile(
                   icon: Icons.fact_check_outlined,
                   label: 'Registration Status',
                   onTap: () => Navigator.of(context).push(
@@ -628,11 +614,6 @@ class _TechnicianProfileBody extends StatelessWidget {
                   icon: Icons.support_agent_outlined,
                   label: 'Contact Support',
                   onTap: () => openScreen(const ContactSupportScreen()),
-                ),
-                _ActionTile(
-                  icon: Icons.report_gmailerrorred_outlined,
-                  label: 'Report a Problem',
-                  onTap: () => openScreen(const ReportIssueScreen()),
                 ),
                 _ActionTile(
                   icon: Icons.description_outlined,

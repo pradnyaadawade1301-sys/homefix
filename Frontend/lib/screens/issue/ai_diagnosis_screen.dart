@@ -4,11 +4,10 @@ import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../providers/ai_provider.dart';
 import '../home/technician_list_screen.dart';
-import '../consultation/searching_technician_screen.dart';
 
 /// Steps 4-5 of the customer flow: AI Diagnosis chat (backed by the real Groq
-/// endpoint) followed by the customer's decision — Live Video Consultation or
-/// Book Technician Visit. Chat starts pre-seeded (see IssueDetailsScreen) with
+/// endpoint) followed by the customer's decision to Book a Technician Visit.
+/// Chat starts pre-seeded (see IssueDetailsScreen) with
 /// the customer's issue title/description/image URLs as the first message.
 class AIDiagnosisScreen extends StatefulWidget {
   final String categoryId;
@@ -48,16 +47,6 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
     _messageController.clear();
     await context.read<AIProvider>().sendMessage(text);
     _scrollToBottom();
-  }
-
-  void _openLiveConsultation() {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => SearchingTechnicianScreen(
-        categoryId: widget.categoryId,
-        categoryName: widget.categoryName,
-        note: widget.problemDescription,
-      ),
-    ));
   }
 
   // "Book Technician Visit" opens the technician browse/select list for this
@@ -311,24 +300,16 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
                 if (ai.messages.any((m) => !m.isUser))
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _openLiveConsultation,
-                            icon: const Icon(Icons.videocam_outlined, size: 18),
-                            label: const Text('Live Consultation', style: TextStyle(fontSize: 12.5)),
-                          ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _bookTechnician,
+                        icon: const Icon(Icons.build_rounded, size: 18),
+                        label: const Text('Book Technician', style: TextStyle(fontSize: 13.5)),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _bookTechnician,
-                            icon: const Icon(Icons.build_rounded, size: 18),
-                            label: const Text('Book Technician', style: TextStyle(fontSize: 12.5)),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 SafeArea(

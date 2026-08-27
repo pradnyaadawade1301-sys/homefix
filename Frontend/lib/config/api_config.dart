@@ -15,7 +15,7 @@ class ApiConfig {
   // Running on a REAL Android device over Wi-Fi: phone and PC must be on the same
   // network. Update the IP below any time your PC's Wi-Fi IP changes (check via
   // `ipconfig` -> IPv4 Address under your active Wi-Fi adapter).
-  static const String baseUrl = 'http://192.168.1.23:8090/api/v1'; // Real device via LAN Wi-Fi
+  static const String baseUrl = 'http://192.168.1.9:8090/api/v1'; // Real device via LAN Wi-Fi
   // static const String baseUrl = 'http://10.0.2.2:8090/api/v1'; // Android emulator
   // static const String baseUrl = 'https://api.homefixlive.com/api/v1'; // Production
 
@@ -43,6 +43,7 @@ class ApiConfig {
   static const String technicianAvailable = '/technicians/available';
   static const String technicianBookings = '/technicians'; // + /:id/bookings
   static const String technicianRepeatCustomers = '/technicians'; // + /:id/repeat-customers
+  static const String myRepeatTechnicians = '/me/repeat-technicians';
 
   static const String uploads = '/uploads'; // POST multipart "file" -> {url}
 

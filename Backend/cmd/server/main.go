@@ -56,15 +56,12 @@ func main() {
 		paymentRepo, bookingRepo, techRepo, walletRepo,
 	)
 
-	var fcmService *service.FirebaseService
-	if cfg.FirebaseCredentialsPath != "" && cfg.FirebaseProjectID != "" {
-		fcmService, err = service.NewFirebaseService(context.Background(), cfg.FirebaseCredentialsPath, cfg.FirebaseProjectID, notifRepo, userRepo)
-		if err != nil {
-			log.Printf("warning: firebase init failed, push notifications disabled: %v", err)
-			fcmService = nil
-		}
-	} else {
-		log.Println("warning: FIREBASE_CREDENTIALS_PATH/FIREBASE_PROJECT_ID not set, push notifications disabled")
+	// fcmService is never nil: in-app notification rows must always be written even
+	// when Firebase/push isn't configured. When push isn't available, SendToUser
+	// simply skips the actual FCM send and records the in-app notification only.
+	fcmService := service.NewFirebaseServiceOrDegraded(context.Background(), cfg.FirebaseCredentialsPath, cfg.FirebaseProjectID, notifRepo, userRepo)
+	if cfg.FirebaseCredentialsPath == "" || cfg.FirebaseProjectID == "" {
+		log.Println("warning: FIREBASE_CREDENTIALS_PATH/FIREBASE_PROJECT_ID not set, push notifications disabled (in-app notifications still work)")
 	}
 
 	// ---- Domain services ----

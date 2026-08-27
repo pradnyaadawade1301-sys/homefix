@@ -9,9 +9,11 @@ class BookingProvider extends ChangeNotifier {
   Booking? _selectedBooking;
   List<BookingStatusHistory> _history = [];
   List<RepeatCustomer> _repeatCustomers = [];
+  List<RepeatTechnician> _repeatTechnicians = [];
   List<ServiceHistoryEntry> _serviceHistory = [];
   bool _isLoading = false;
   bool _isLoadingRepeatCustomers = false;
+  bool _isLoadingRepeatTechnicians = false;
   bool _isLoadingServiceHistory = false;
   String? _error;
 
@@ -21,9 +23,11 @@ class BookingProvider extends ChangeNotifier {
   Booking? get selectedBooking => _selectedBooking;
   List<BookingStatusHistory> get history => _history;
   List<RepeatCustomer> get repeatCustomers => _repeatCustomers;
+  List<RepeatTechnician> get repeatTechnicians => _repeatTechnicians;
   List<ServiceHistoryEntry> get serviceHistory => _serviceHistory;
   bool get isLoading => _isLoading;
   bool get isLoadingRepeatCustomers => _isLoadingRepeatCustomers;
+  bool get isLoadingRepeatTechnicians => _isLoadingRepeatTechnicians;
   bool get isLoadingServiceHistory => _isLoadingServiceHistory;
   String? get error => _error;
 
@@ -79,6 +83,45 @@ class BookingProvider extends ChangeNotifier {
       _error = e.toString();
     } finally {
       _isLoadingRepeatCustomers = false;
+      notifyListeners();
+    }
+  }
+
+  /// Customer side — technicians the logged-in customer has booked more than
+  /// once, for the "My Technicians" screen.
+  Future<void> fetchRepeatTechnicians() async {
+    _isLoadingRepeatTechnicians = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _repeatTechnicians = await _bookingService.getRepeatTechnicians();
+      _error = null;
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoadingRepeatTechnicians = false;
+      notifyListeners();
+    }
+  }
+
+  /// Customer side — every past booking with a specific (repeat) technician.
+  /// Reached by tapping a technician on the "My Technicians" screen. Reuses
+  /// the same _serviceHistory/isLoadingServiceHistory state as the
+  /// technician-side fetchServiceHistory, since only one such screen is ever
+  /// open at a time.
+  Future<void> fetchMyServiceHistoryWithTechnician(String technicianId) async {
+    _isLoadingServiceHistory = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _serviceHistory = await _bookingService.getMyServiceHistoryWithTechnician(technicianId);
+      _error = null;
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoadingServiceHistory = false;
       notifyListeners();
     }
   }

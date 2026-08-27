@@ -131,7 +131,17 @@ func (s *ConsultationService) Reject(ctx context.Context, consultationID, techni
 	if c.TechnicianID == nil || *c.TechnicianID != technicianID {
 		return errors.New("this consultation was not offered to you")
 	}
-	return s.consultRepo.UpdateStatus(ctx, consultationID, "rejected")
+	if err := s.consultRepo.UpdateStatus(ctx, consultationID, "rejected"); err != nil {
+		return err
+	}
+	// Notify the customer their call wasn't answered — otherwise, if the app is
+	// backgrounded, they're left staring at "Searching..." with no signal at all.
+	if s.fcm != nil {
+		_ = s.fcm.SendToUser(ctx, c.CustomerID, "Call not answered",
+			"The technician couldn't take your live video consultation right now.",
+			map[string]string{"consultation_id": consultationID, "type": "consultation_rejected"})
+	}
+	return nil
 }
 
 // AcceptByUser resolves the calling user's own technician profile and accepts the

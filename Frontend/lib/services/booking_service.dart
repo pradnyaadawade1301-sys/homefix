@@ -89,6 +89,33 @@ class BookingService {
     }
   }
 
+  /// Customer side — technicians the logged-in customer has booked more than
+  /// once. GET /me/repeat-technicians (customer id comes from the JWT).
+  Future<List<RepeatTechnician>> getRepeatTechnicians() async {
+    try {
+      final response = await _httpClient.get(ApiConfig.myRepeatTechnicians);
+      final list = ApiEnvelope.unwrap(response) as List? ?? [];
+      return list.map((e) => RepeatTechnician.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Customer side — every past booking the logged-in customer has made with a
+  /// specific technician (date, work/category, status, payment). Reached by
+  /// tapping a technician on the "My Technicians" screen.
+  /// GET /me/repeat-technicians/:technicianId/history.
+  Future<List<ServiceHistoryEntry>> getMyServiceHistoryWithTechnician(String technicianId) async {
+    try {
+      final response =
+          await _httpClient.get('${ApiConfig.myRepeatTechnicians}/$technicianId/history');
+      final list = ApiEnvelope.unwrap(response) as List? ?? [];
+      return list.map((e) => ServiceHistoryEntry.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
   Future<Booking> getBookingDetail(String bookingId) async {
     try {
       final response = await _httpClient.get('${ApiConfig.bookingDetail}/$bookingId');

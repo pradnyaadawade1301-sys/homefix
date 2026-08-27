@@ -57,6 +57,20 @@ type RepeatCustomer struct {
 	LastBookingAt time.Time `json:"last_booking_at"`
 }
 
+// RepeatTechnician is the customer-side mirror of RepeatCustomer — technicians a
+// given customer has booked more than once, powering the customer's "My
+// Technicians" (repeat technicians) screen.
+type RepeatTechnician struct {
+	TechnicianID    string    `json:"technician_id"`
+	Name            string    `json:"name"`
+	Phone           string    `json:"phone"`
+	CategoryName    string    `json:"category_name"`
+	ProfilePhotoURL string    `json:"profile_photo_url,omitempty"`
+	RatingAvg       float64   `json:"rating_avg"`
+	TotalBookings   int       `json:"total_bookings"`
+	LastBookingAt   time.Time `json:"last_booking_at"`
+}
+
 type Technician struct {
 	ID              string `json:"id"`
 	UserID          string `json:"user_id"`

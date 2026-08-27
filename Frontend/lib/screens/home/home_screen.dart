@@ -5,6 +5,7 @@ import '../../models/booking_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/location_provider.dart';
+import '../../providers/booking_provider.dart';
 import '../booking/bookings_screen.dart';
 import '../issue/issue_details_screen.dart';
 import '../notifications/notifications_screen.dart';
@@ -12,6 +13,7 @@ import '../profile/profile_screen.dart';
 import 'categories_screen.dart';
 import 'technician_detail_screen.dart';
 import 'technician_list_screen.dart';
+import 'repeat_technicians_screen.dart';
 import '../payment/transaction_history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -131,6 +133,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
     context.read<CategoryProvider>().fetchCategories();
     context.read<TechnicianProvider>().fetchTechnicians();
     context.read<LocationProvider>().resolveLocation();
+    context.read<BookingProvider>().fetchRepeatTechnicians();
   }
 
   void _openTechnicianList({String? categoryId, String? categoryName, String? initialQuery}) {
@@ -181,12 +184,99 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
             const SizedBox(height: 14),
             _buildCategoriesRow(),
             const SizedBox(height: 24),
+            _buildRepeatTechniciansSection(),
             _sectionTitle('Top Picks for you', onViewAll: () => _openTechnicianList()),
             const SizedBox(height: 14),
             _buildTechnicianList(),
           ],
         ),
       ),
+    );
+  }
+
+  void _openRepeatTechnicians() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RepeatTechniciansScreen()));
+  }
+
+  Widget _buildRepeatTechniciansSection() {
+    return Consumer<BookingProvider>(
+      builder: (context, provider, _) {
+        final hasData = provider.repeatTechnicians.isNotEmpty;
+        final hasError = provider.error != null && provider.repeatTechnicians.isEmpty;
+        if (!provider.isLoadingRepeatTechnicians && !hasData && !hasError) {
+          return const SizedBox.shrink();
+        }
+        final technicians = provider.repeatTechnicians;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sectionTitle('My Technicians', onViewAll: _openRepeatTechnicians),
+            const SizedBox(height: 14),
+            if (hasError)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(
+                  'Could not load repeat technicians: ${provider.error}',
+                  style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                ),
+              ),
+            SizedBox(
+              height: 96,
+              child: provider.isLoadingRepeatTechnicians
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: technicians.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 14),
+                      itemBuilder: (context, i) {
+                        final t = technicians[i];
+                        return GestureDetector(
+                          onTap: _openRepeatTechnicians,
+                          child: SizedBox(
+                            width: 76,
+                            child: Column(
+                              children: [
+                                CircleAvatar(
+                                  radius: 30,
+                                  backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.12),
+                                  child: t.profilePhotoUrl.isNotEmpty
+                                      ? ClipOval(
+                                          child: Image.network(
+                                            t.profilePhotoUrl,
+                                            width: 60,
+                                            height: 60,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => Text(
+                                              t.name.isNotEmpty ? t.name[0].toUpperCase() : '?',
+                                              style: const TextStyle(
+                                                  color: AppTheme.primaryColor, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                        )
+                                      : Text(
+                                          t.name.isNotEmpty ? t.name[0].toUpperCase() : '?',
+                                          style: const TextStyle(
+                                              color: AppTheme.primaryColor, fontWeight: FontWeight.bold),
+                                        ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  t.name.isNotEmpty ? t.name.split(' ').first : 'Technician',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        );
+      },
     );
   }
 

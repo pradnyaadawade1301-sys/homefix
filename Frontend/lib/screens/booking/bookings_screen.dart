@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
-import '../../core/contact_actions.dart';
 import '../../providers/booking_provider.dart';
 import '../../models/booking_model.dart';
 import 'booking_tracking_screen.dart';
@@ -212,18 +211,6 @@ class _TechnicianTile extends StatelessWidget {
               ],
             ),
           ),
-          if (technician.phone.isNotEmpty) ...[
-            IconButton(
-              icon: const Icon(Icons.call, color: AppTheme.primaryColor, size: 20),
-              tooltip: 'Call',
-              onPressed: () => callContact(context, technician.phone),
-            ),
-            IconButton(
-              icon: const Icon(Icons.chat, color: Color(0xFF25D366), size: 20),
-              tooltip: 'WhatsApp',
-              onPressed: () => openWhatsApp(context, technician.phone),
-            ),
-          ],
         ],
       ),
     );

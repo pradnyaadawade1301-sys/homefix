@@ -17,7 +17,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   bool _saving = false;
 
   // TODO: persist this via settings/user API once biometric endpoint is ready
-  bool _biometricEnabled = false;
 
   @override
   void initState() {
@@ -126,16 +125,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               ),
               child: Column(
                 children: [
-                  SwitchListTile(
-                    title: const Text('Biometric Login'),
-                    subtitle: const Text('Use fingerprint / face unlock to sign in'),
-                    value: _biometricEnabled,
-                    onChanged: (val) {
-                      setState(() => _biometricEnabled = val);
-                      // TODO: call settings/user API to persist biometric preference
-                    },
-                  ),
-                  const Divider(height: 1),
                   ListTile(
                     title: const Text('Change Password'),
                     trailing: const Icon(Icons.chevron_right),
