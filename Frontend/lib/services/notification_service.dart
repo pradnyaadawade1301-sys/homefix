@@ -34,6 +34,13 @@ class FcmNotificationService {
   /// message and/or navigate to the relevant screen.
   void Function(Map<String, dynamic> payload)? onNotificationTap;
 
+  /// Callback invoked the moment a "New consultation request" push arrives
+  /// while the app is in the foreground (data['type'] == 'consultation_request').
+  /// Unlike [onNotificationTap], this fires immediately without the user
+  /// having to tap anything — used to start ringing + jump the technician
+  /// straight to the incoming-request screen, like a real incoming call.
+  void Function(Map<String, dynamic> payload)? onIncomingConsultation;
+
   /// Set this callback to send the FCM token to your backend whenever
   /// it is first obtained or refreshed. Called with the new token value.
   void Function(String token)? onTokenRefreshed;
@@ -108,7 +115,12 @@ class FcmNotificationService {
       final initialMessage = await _messaging!.getInitialMessage();
       if (initialMessage != null) {
         debugPrint('[FCM] App opened from terminated notification');
-        _handleNotificationTap(_toTapPayload(initialMessage));
+        final payload = _toTapPayload(initialMessage);
+        if (initialMessage.data['type'] == 'consultation_request') {
+          onIncomingConsultation?.call(payload);
+        } else {
+          _handleNotificationTap(payload);
+        }
       }
 
       _initialized = true;
@@ -175,6 +187,14 @@ class FcmNotificationService {
     debugPrint('[FCM Foreground] body: ${message.notification?.body}');
     debugPrint('[FCM Foreground] data: ${message.data}');
 
+    // Incoming consultation request: ring + jump straight to the
+    // accept/decline screen immediately, instead of waiting for the user to
+    // tap a notification banner — matches how a real incoming call behaves.
+    if (message.data['type'] == 'consultation_request') {
+      onIncomingConsultation?.call(_toTapPayload(message));
+      return;
+    }
+
     // Show local notification
     await _showLocalNotification(message);
   }
@@ -182,7 +202,12 @@ class FcmNotificationService {
   /// Handles a notification tap when the app was in the background.
   Future<void> _onNotificationOpenedApp(RemoteMessage message) async {
     debugPrint('[FCM OpenedApp] data: ${message.data}');
-    _handleNotificationTap(_toTapPayload(message));
+    final payload = _toTapPayload(message);
+    if (message.data['type'] == 'consultation_request') {
+      onIncomingConsultation?.call(payload);
+      return;
+    }
+    _handleNotificationTap(payload);
   }
 
   /// Merges a RemoteMessage's title/body with its custom data map into the

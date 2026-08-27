@@ -1,6 +1,6 @@
 module homefix-backend
 
-go 1.25
+go 1.26
 
 require (
 	firebase.google.com/go/v4 v4.14.1
@@ -10,7 +10,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/jackc/pgx/v5 v5.5.3
 	github.com/joho/godotenv v1.5.1
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.11.1
 	golang.org/x/crypto v0.21.0
 	google.golang.org/api v0.170.0
 )
@@ -56,6 +56,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/razorpay/razorpay-go v1.4.1 // indirect
 	github.com/redis/go-redis/v9 v9.6.1 // indirect
 	github.com/rogpeppe/go-internal v1.15.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect

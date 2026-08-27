@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart' show FlutterRingtonePlayer;
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../services/signaling_service.dart';
 import '../services/webrtc_service.dart';
@@ -35,10 +36,29 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   bool _initDone = false;
   bool _micOn = true;
   bool _cameraOn = true;
+  bool _ringing = false;
+
+  /// Ringback tone for the caller (customer) — plays while we're waiting for
+  /// the other side to accept, stops the moment the remote stream arrives
+  /// (call connected) or the call ends. Only the caller rings here; the
+  /// receiver's ring happens on the incoming-request screen before they even
+  /// open this screen.
+  void _startRingback() {
+    if (!widget.isCaller || _ringing) return;
+    _ringing = true;
+    FlutterRingtonePlayer().playRingtone(looping: true, volume: 1.0, asAlarm: false);
+  }
+
+  void _stopRingback() {
+    if (!_ringing) return;
+    _ringing = false;
+    FlutterRingtonePlayer().stop();
+  }
 
   @override
   void initState() {
     super.initState();
+    _startRingback();
     _setup();
   }
 
@@ -59,9 +79,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     };
     _webrtc.onRemoteStream = (stream) {
       _remoteRenderer.srcObject = stream;
+      _stopRingback();
       if (mounted) setState(() => _connecting = false);
     };
     _webrtc.onCallEnded = () {
+      _stopRingback();
       if (mounted) Navigator.of(context).pop();
     };
 
@@ -86,6 +108,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
           await _webrtc.handleRemoteIceCandidate(Map<String, dynamic>.from(msg.data as Map));
           break;
         case 'call-end':
+          _endCall(notifyPeer: false);
+          break;
+        case 'call-reject':
           _endCall(notifyPeer: false);
           break;
         case 'peer-left':
@@ -136,6 +161,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     // call could pop an extra screen off the navigation stack.
     if (_ended) return;
     _ended = true;
+    _stopRingback();
 
     if (notifyPeer) {
       widget.signaling.send(SignalingMessage(
@@ -150,6 +176,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   @override
   void dispose() {
+    _stopRingback();
     _localRenderer.dispose();
     _remoteRenderer.dispose();
     _webrtc.hangUp();
@@ -178,13 +205,16 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             ),
           ),
           if (_connecting)
-            const Center(
+            Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircularProgressIndicator(color: Colors.white),
-                  SizedBox(height: 12),
-                  Text('Connecting...', style: TextStyle(color: Colors.white)),
+                  const CircularProgressIndicator(color: Colors.white),
+                  const SizedBox(height: 12),
+                  Text(
+                    widget.isCaller ? 'Ringing...' : 'Connecting...',
+                    style: const TextStyle(color: Colors.white),
+                  ),
                 ],
               ),
             ),

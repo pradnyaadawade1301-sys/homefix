@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart' show FlutterRingtonePlayer;
 import 'package:provider/provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'core/http_client.dart';
@@ -110,6 +111,19 @@ class _MyAppState extends State<MyApp> {
       app.navigatorKey.currentState?.push(MaterialPageRoute(
         builder: (_) => NotificationDetailScreen(title: title, body: body, data: payload),
       ));
+    };
+
+    // Wire up incoming consultation requests: ring immediately (like a real
+    // incoming call) and jump the technician straight to the
+    // accept/decline screen — whether the app was already open on some
+    // other screen, in the background, or freshly launched from the tap.
+    // The ring itself keeps looping until IncomingConsultationScreen's own
+    // pending-list sync takes over (or stops it once the list empties out
+    // after accept/reject) — see incoming_consultation_screen.dart.
+    app.fcmNotificationService.onIncomingConsultation = (payload) {
+      debugPrint('[FCM] Incoming consultation request: $payload');
+      FlutterRingtonePlayer().playRingtone(looping: true, volume: 1.0, asAlarm: false);
+      app.navigatorKey.currentState?.pushNamed('/consultation-requests');
     };
   }
 

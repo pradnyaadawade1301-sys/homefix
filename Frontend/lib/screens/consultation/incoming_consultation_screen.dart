@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart' show FlutterRingtonePlayer;
 import 'package:provider/provider.dart';
 import '../../config/api_config.dart';
 import '../../core/theme.dart';
@@ -11,6 +12,10 @@ import '../video_call_screen.dart';
 /// requests currently waiting for a response (GET /consultations/pending) and
 /// lets the technician accept or reject each one. Accepting fetches the call's
 /// room_id + ICE servers and opens the real WebRTC [VideoCallScreen].
+///
+/// Rings (device ringtone, looping) for as long as there's at least one
+/// pending request on screen, and stops the moment the list empties out
+/// (accepted/rejected/expired) or this screen is left.
 class IncomingConsultationScreen extends StatefulWidget {
   const IncomingConsultationScreen({Key? key}) : super(key: key);
 
@@ -20,6 +25,17 @@ class IncomingConsultationScreen extends StatefulWidget {
 
 class _IncomingConsultationScreenState extends State<IncomingConsultationScreen> {
   String? _joiningConsultationId;
+  bool _ringing = false;
+
+  void _syncRingtone(bool hasPending) {
+    if (hasPending && !_ringing) {
+      _ringing = true;
+      FlutterRingtonePlayer().playRingtone(looping: true, volume: 1.0, asAlarm: false);
+    } else if (!hasPending && _ringing) {
+      _ringing = false;
+      FlutterRingtonePlayer().stop();
+    }
+  }
 
   @override
   void initState() {
@@ -29,8 +45,17 @@ class _IncomingConsultationScreenState extends State<IncomingConsultationScreen>
     });
   }
 
+  @override
+  void dispose() {
+    if (_ringing) {
+      FlutterRingtonePlayer().stop();
+    }
+    super.dispose();
+  }
+
   Future<void> _accept(String consultationId) async {
     setState(() => _joiningConsultationId = consultationId);
+    _syncRingtone(false);
     try {
       final provider = context.read<ConsultationProvider>();
       await provider.acceptRequest(consultationId);
@@ -72,6 +97,7 @@ class _IncomingConsultationScreenState extends State<IncomingConsultationScreen>
   }
 
   Future<void> _reject(String consultationId) async {
+    _syncRingtone(false);
     try {
       await context.read<ConsultationProvider>().rejectRequest(consultationId);
     } catch (e) {
@@ -90,6 +116,9 @@ class _IncomingConsultationScreenState extends State<IncomingConsultationScreen>
         onRefresh: () => context.read<ConsultationProvider>().loadPending(),
         child: Consumer<ConsultationProvider>(
           builder: (context, provider, _) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _syncRingtone(provider.pendingRequests.isNotEmpty);
+            });
             if (provider.isLoadingPending && provider.pendingRequests.isEmpty) {
               return const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor));
             }
