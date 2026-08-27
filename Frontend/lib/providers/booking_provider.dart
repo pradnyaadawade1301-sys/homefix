@@ -8,7 +8,11 @@ class BookingProvider extends ChangeNotifier {
   List<Booking> _bookings = [];
   Booking? _selectedBooking;
   List<BookingStatusHistory> _history = [];
+  List<RepeatCustomer> _repeatCustomers = [];
+  List<ServiceHistoryEntry> _serviceHistory = [];
   bool _isLoading = false;
+  bool _isLoadingRepeatCustomers = false;
+  bool _isLoadingServiceHistory = false;
   String? _error;
 
   BookingProvider({required BookingService bookingService}) : _bookingService = bookingService;
@@ -16,7 +20,11 @@ class BookingProvider extends ChangeNotifier {
   List<Booking> get bookings => _bookings;
   Booking? get selectedBooking => _selectedBooking;
   List<BookingStatusHistory> get history => _history;
+  List<RepeatCustomer> get repeatCustomers => _repeatCustomers;
+  List<ServiceHistoryEntry> get serviceHistory => _serviceHistory;
   bool get isLoading => _isLoading;
+  bool get isLoadingRepeatCustomers => _isLoadingRepeatCustomers;
+  bool get isLoadingServiceHistory => _isLoadingServiceHistory;
   String? get error => _error;
 
   /// Customer side — "My Bookings". Each booking includes the assigned
@@ -52,6 +60,43 @@ class BookingProvider extends ChangeNotifier {
       _error = e.toString();
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Technician side — "My Customers". Customers who have booked this
+  /// technician more than once. `technicianId` is the technician RECORD id
+  /// (TechnicianProfile.id), not the user id.
+  Future<void> fetchRepeatCustomers(String technicianId) async {
+    _isLoadingRepeatCustomers = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _repeatCustomers = await _bookingService.getRepeatCustomers(technicianId);
+      _error = null;
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoadingRepeatCustomers = false;
+      notifyListeners();
+    }
+  }
+
+  /// A specific customer's past bookings with this technician (with pricing/tier
+  /// info) — reached by tapping a customer on the "My Customers" screen.
+  Future<void> fetchServiceHistory(String technicianId, String customerId) async {
+    _isLoadingServiceHistory = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _serviceHistory = await _bookingService.getServiceHistory(technicianId, customerId);
+      _error = null;
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoadingServiceHistory = false;
       notifyListeners();
     }
   }

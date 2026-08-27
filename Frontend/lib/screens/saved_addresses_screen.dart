@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import '../models/user_model.dart';
 import '../providers/address_provider.dart';
+import '../services/location_service.dart';
+import '../services/places_service.dart';
+import '../widgets/places_autocomplete_field.dart';
 
 class SavedAddressesScreen extends StatefulWidget {
   const SavedAddressesScreen({Key? key}) : super(key: key);
@@ -160,8 +163,15 @@ class _AddAddressSheetState extends State<_AddAddressSheet> {
   final _cityController = TextEditingController();
   final _stateController = TextEditingController();
   final _pincodeController = TextEditingController();
+  final _locationService = LocationService();
   bool _isDefault = false;
   bool _saving = false;
+  bool _locating = false;
+
+  // Populated once a place is picked (via search or current location).
+  double? _latitude;
+  double? _longitude;
+  bool get _addressResolved => _line1Controller.text.trim().isNotEmpty;
 
   @override
   void dispose() {
@@ -174,8 +184,58 @@ class _AddAddressSheetState extends State<_AddAddressSheet> {
     super.dispose();
   }
 
+  void _applyPlaceDetails(PlaceDetails details) {
+    setState(() {
+      _line1Controller.text = details.line1;
+      _cityController.text = details.city;
+      _stateController.text = details.state;
+      _pincodeController.text = details.pincode;
+      _latitude = details.latitude;
+      _longitude = details.longitude;
+    });
+  }
+
+  Future<void> _useCurrentLocation() async {
+    setState(() => _locating = true);
+    final result = await _locationService.resolveLocation();
+    if (!mounted) return;
+    if (!result.hasLocation) {
+      setState(() => _locating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.errorMessage ?? 'Could not fetch current location.')),
+      );
+      return;
+    }
+    // Prefer Google's reverse-geocoding for accuracy; fall back to the
+    // on-device result already returned by resolveLocation() if it fails.
+    final placesService = PlacesService();
+    PlaceDetails? details;
+    if (placesService.isConfigured) {
+      details = await placesService.reverseGeocode(result.latitude!, result.longitude!);
+    }
+    if (!mounted) return;
+    setState(() => _locating = false);
+    if (details != null) {
+      _applyPlaceDetails(details);
+    } else {
+      setState(() {
+        _line1Controller.text = result.address ?? '';
+        _cityController.text = result.city ?? '';
+        _stateController.text = result.state ?? '';
+        _latitude = result.latitude;
+        _longitude = result.longitude;
+      });
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_addressResolved || _cityController.text.trim().isEmpty || _stateController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please search and select an address, or use current location.')),
+      );
+      return;
+    }
     setState(() => _saving = true);
     try {
       await context.read<AddressProvider>().addAddress(
@@ -185,6 +245,8 @@ class _AddAddressSheetState extends State<_AddAddressSheet> {
             city: _cityController.text.trim(),
             state: _stateController.text.trim(),
             pincode: _pincodeController.text.trim(),
+            latitude: _latitude,
+            longitude: _longitude,
             isDefault: _isDefault,
           );
       if (!mounted) return;
@@ -238,43 +300,57 @@ class _AddAddressSheetState extends State<_AddAddressSheet> {
                   validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                 ),
                 const SizedBox(height: 12),
-                TextFormField(
-                  controller: _line1Controller,
-                  decoration: const InputDecoration(labelText: 'Address Line 1'),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                PlacesAutocompleteField(onPlaceSelected: _applyPlaceDetails),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: _locating ? null : _useCurrentLocation,
+                  icon: _locating
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.my_location_rounded, size: 18),
+                  label: Text(_locating ? 'Fetching location…' : 'Use current location'),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
+                if (_addressResolved) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle_rounded, color: AppTheme.primaryColor, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${_line1Controller.text}, ${_cityController.text}, ${_stateController.text} - ${_pincodeController.text}',
+                            style: const TextStyle(fontSize: 12.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 TextFormField(
                   controller: _line2Controller,
-                  decoration: const InputDecoration(labelText: 'Address Line 2 (optional)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Flat / House No. / Floor (optional)',
+                  ),
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _cityController,
-                        decoration: const InputDecoration(labelText: 'City'),
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _stateController,
-                        decoration: const InputDecoration(labelText: 'State'),
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _pincodeController,
-                  decoration: const InputDecoration(labelText: 'Pincode'),
-                  keyboardType: TextInputType.number,
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                ),
+                if (_addressResolved) ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _pincodeController,
+                    decoration: const InputDecoration(labelText: 'Pincode'),
+                    keyboardType: TextInputType.number,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                ],
                 const SizedBox(height: 8),
                 CheckboxListTile(
                   value: _isDefault,

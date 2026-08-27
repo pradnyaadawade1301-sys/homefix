@@ -72,25 +72,33 @@ func (r *TechnicianRepository) GetByUserID(ctx context.Context, userID string) (
 // Nearest-first when coordinates are supplied, using the haversine formula for a real
 // distance in km rather than a raw squared-degree ordering; falls back to rating-first
 // when no coordinates are given.
-func (r *TechnicianRepository) ListAvailableByCategory(ctx context.Context, categoryID string, lat, lng *float64) ([]models.TechnicianNearby, error) {
+func (r *TechnicianRepository) ListAvailableByCategory(ctx context.Context, categoryID string, lat, lng, radiusKm *float64) ([]models.TechnicianNearby, error) {
 	var rows pgx.Rows
 	var err error
 	if lat != nil && lng != nil {
-		rows, err = r.db.Query(ctx, `
-			SELECT t.id, COALESCE(u.name,''), t.category_id, c.name, t.experience_years,
-			       t.rating_avg, t.rating_count, t.is_available, t.current_lat, t.current_lng,
-			       (6371 * acos(LEAST(1.0, GREATEST(-1.0,
-			           cos(radians($2)) * cos(radians(COALESCE(t.current_lat,$2))) *
-			           cos(radians(COALESCE(t.current_lng,$3)) - radians($3)) +
-			           sin(radians($2)) * sin(radians(COALESCE(t.current_lat,$2)))
-			       )))) AS distance_km
-			FROM technicians t
-			JOIN users u ON u.id = t.user_id
-			JOIN categories c ON c.id = t.category_id
-			WHERE t.category_id = $1 AND t.is_available = true AND t.approval_status = 'approved'
-			ORDER BY distance_km ASC
-			LIMIT 20
-		`, categoryID, *lat, *lng)
+		query := `
+			SELECT id, name, category_id, category_name, experience_years,
+			       rating_avg, rating_count, is_available, current_lat, current_lng, distance_km
+			FROM (
+				SELECT t.id, COALESCE(u.name,'') AS name, t.category_id, c.name AS category_name, t.experience_years,
+				       t.rating_avg, t.rating_count, t.is_available, t.current_lat, t.current_lng,
+				       (6371 * acos(LEAST(1.0, GREATEST(-1.0,
+				           cos(radians($2)) * cos(radians(COALESCE(t.current_lat,$2))) *
+				           cos(radians(COALESCE(t.current_lng,$3)) - radians($3)) +
+				           sin(radians($2)) * sin(radians(COALESCE(t.current_lat,$2)))
+				       )))) AS distance_km
+				FROM technicians t
+				JOIN users u ON u.id = t.user_id
+				JOIN categories c ON c.id = t.category_id
+				WHERE t.category_id = $1 AND t.is_available = true AND t.approval_status = 'approved'
+			) matched`
+		args := []interface{}{categoryID, *lat, *lng}
+		if radiusKm != nil {
+			query += ` WHERE distance_km <= $4`
+			args = append(args, *radiusKm)
+		}
+		query += ` ORDER BY distance_km ASC LIMIT 20`
+		rows, err = r.db.Query(ctx, query, args...)
 	} else {
 		rows, err = r.db.Query(ctx, `
 			SELECT t.id, COALESCE(u.name,''), t.category_id, c.name, t.experience_years,

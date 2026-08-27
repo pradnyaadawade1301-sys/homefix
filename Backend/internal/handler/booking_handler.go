@@ -91,6 +91,37 @@ func (h *BookingHandler) TechnicianBookings(c *gin.Context) {
 	utils.Success(c, http.StatusOK, list)
 }
 
+// RepeatCustomers powers the technician's "My Customers" screen.
+func (h *BookingHandler) RepeatCustomers(c *gin.Context) {
+	technicianID := c.Param("id")
+	list, err := h.bookingService.RepeatCustomers(c.Request.Context(), technicianID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if list == nil {
+		list = []models.RepeatCustomer{}
+	}
+	utils.Success(c, http.StatusOK, list)
+}
+
+// ServiceHistory returns a specific customer's past bookings with this
+// technician, each with pricing/tier info — reached by tapping a customer on
+// the technician's "My Customers" (repeat customers) screen.
+func (h *BookingHandler) ServiceHistory(c *gin.Context) {
+	technicianID := c.Param("id")
+	customerID := c.Param("customerId")
+	list, err := h.bookingService.ServiceHistory(c.Request.Context(), technicianID, customerID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if list == nil {
+		list = []models.ServiceHistoryEntry{}
+	}
+	utils.Success(c, http.StatusOK, list)
+}
+
 type acceptBody struct {
 	TechnicianID string `json:"technician_id" binding:"required"`
 }

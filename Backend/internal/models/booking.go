@@ -92,3 +92,22 @@ type BookingStatusHistory struct {
 	Note      string    `json:"note,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+// ServiceHistoryPayment is a slimmed-down view of a booking's payment — just enough
+// to show what was paid and whether a repeat-customer discount applied — for the
+// technician's per-customer Service History screen.
+type ServiceHistoryPayment struct {
+	Amount                float64  `json:"amount"`
+	Status                string   `json:"status"`
+	IsRepeatCustomer      bool     `json:"is_repeat_customer"`
+	RepeatDiscountPercent *float64 `json:"repeat_discount_percent,omitempty"`
+	RepeatDiscountAmount  *float64 `json:"repeat_discount_amount,omitempty"`
+}
+
+// ServiceHistoryEntry is one past booking between a specific customer and
+// technician, with its payment/pricing-tier info attached (nil if never paid) —
+// powers GET /technicians/:id/customers/:customerId/history.
+type ServiceHistoryEntry struct {
+	BookingDetail
+	Payment *ServiceHistoryPayment `json:"payment,omitempty"`
+}

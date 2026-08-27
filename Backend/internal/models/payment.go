@@ -27,6 +27,9 @@ type Payment struct {
 	UpiResponseCode    *string    `json:"upi_response_code,omitempty"`
 	UpiApprovalRef     *string    `json:"upi_approval_ref,omitempty"`
 	Verified           bool       `json:"verified"` // true only once the UPI app reported SUCCESS
+	IsRepeatCustomer   bool       `json:"is_repeat_customer"`
+	RepeatDiscountPercent *float64 `json:"repeat_discount_percent,omitempty"`
+	RepeatDiscountAmount  *float64 `json:"repeat_discount_amount,omitempty"`
 	PlatformCommission *float64   `json:"platform_commission,omitempty"`
 	TechnicianEarning  *float64   `json:"technician_earning,omitempty"`
 	RefundedAt         *time.Time `json:"refunded_at,omitempty"`

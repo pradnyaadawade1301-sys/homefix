@@ -128,8 +128,11 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
                     ),
                     const SizedBox(height: 24),
                   ],
-                  if (booking.status == 'completed' && booking.displayPrice != null) ...[
+                  if (booking.isInvoiced && !booking.isPaid) ...[
                     _paymentDueCard(booking),
+                    const SizedBox(height: 24),
+                  ] else if (booking.isInvoiced && booking.isPaid) ...[
+                    _paidCard(booking),
                     const SizedBox(height: 24),
                   ],
                   if (booking.problemDescription.isNotEmpty) ...[
@@ -151,6 +154,32 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
   /// Shown once the technician has marked the job "completed" — the amount is
   /// [Booking.displayPrice] (final price if the technician set one, else the
   /// original estimate). Tapping it opens the existing UPI PaymentScreen.
+  /// Shown once the customer has already paid the invoice — replaces the
+  /// "Pay Now" card so there's no way to accidentally trigger a second
+  /// payment for the same booking.
+  Widget _paidCard(Booking booking) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppTheme.successColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTheme.successColor.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle_rounded, color: AppTheme.successColor, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Paid ₹${booking.displayPrice!.toStringAsFixed(0)} — thank you!',
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _paymentDueCard(Booking booking) {
     return Container(
       padding: const EdgeInsets.all(18),

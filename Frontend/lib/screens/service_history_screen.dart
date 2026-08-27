@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../core/theme.dart';
 import '../models/booking_model.dart';
 import '../providers/booking_provider.dart';
-import '../screens/booking/book_technician_screen.dart';
 
-/// Shows the customer's past service bookings (completed / cancelled), with a
-/// "Book Again" action that pre-fills the same technician + category for a
-/// repeat booking — see BookTechnicianScreen's preferredTechnician param.
+/// Shows the logged-in customer's own past bookings, filtered to closed-out
+/// statuses (completed / cancelled). Reached from Profile > Service History.
+///
+/// Not to be confused with CustomerServiceHistoryScreen
+/// (lib/screens/technician/customer_service_history_screen.dart) — that one
+/// is the technician's view of a single repeat customer's history with them;
+/// this one is the customer looking back at their own bookings with any
+/// technician.
 class ServiceHistoryScreen extends StatefulWidget {
   const ServiceHistoryScreen({Key? key}) : super(key: key);
 
@@ -19,41 +24,56 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<BookingProvider>().fetchUserBookings();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
+
+  Future<void> _load() => context.read<BookingProvider>().fetchUserBookings();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       appBar: AppBar(title: const Text('Service History')),
-      body: RefreshIndicator(
-        onRefresh: () => context.read<BookingProvider>().fetchUserBookings(),
-        child: Consumer<BookingProvider>(
-          builder: (context, provider, _) {
-            if (provider.isLoading && provider.bookings.isEmpty) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final closed = provider.bookings
-                .where((b) => b.status == 'completed' || b.status == 'cancelled')
-                .toList();
-            if (closed.isEmpty) {
-              return const _EmptyState(
-                icon: Icons.history_rounded,
-                title: 'No service history yet',
-                subtitle: 'Completed and cancelled bookings will show up here.',
-              );
-            }
-            return ListView.separated(
+      body: Consumer<BookingProvider>(
+        builder: (context, provider, _) {
+          if (provider.isLoading && provider.bookings.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (provider.error != null && provider.bookings.isEmpty) {
+            return _ErrorState(message: provider.error!, onRetry: _load);
+          }
+
+          final closed = provider.bookings
+              .where((b) => b.status == 'completed' || b.status == 'cancelled')
+              .toList()
+            ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+          if (closed.isEmpty) {
+            return RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: const [
+                  _EmptyState(
+                    icon: Icons.history_rounded,
+                    title: 'No service history yet',
+                    subtitle: 'Completed and cancelled bookings will show up here.',
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: _load,
+            child: ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: closed.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, index) => _HistoryCard(booking: closed[index]),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -61,36 +81,12 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
 
 class _HistoryCard extends StatelessWidget {
   final Booking booking;
-
   const _HistoryCard({required this.booking});
-
-  void _bookAgain(BuildContext context, BookingTechnicianInfo tech) {
-    final technician = Technician(
-      id: tech.id,
-      name: tech.name,
-      categoryId: booking.categoryId,
-      categoryName: tech.categoryName,
-      experienceYears: tech.experienceYears,
-      ratingAvg: tech.ratingAvg,
-      ratingCount: tech.ratingCount,
-      isVerified: tech.isVerified,
-      isAvailable: true,
-      createdAt: DateTime.now(),
-    );
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => BookTechnicianScreen(
-        categoryId: booking.categoryId,
-        categoryName: booking.categoryName,
-        problemDescription: booking.problemDescription,
-        preferredTechnician: technician,
-      ),
-    ));
-  }
 
   @override
   Widget build(BuildContext context) {
     final completed = booking.status == 'completed';
-    final tech = booking.technician;
+    final dateFmt = DateFormat('d MMM yyyy');
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -99,88 +95,51 @@ class _HistoryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppTheme.lightOutline),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: (completed ? AppTheme.successColor : AppTheme.errorColor).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: (completed ? AppTheme.successColor : AppTheme.errorColor).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              completed ? Icons.check_circle_outline_rounded : Icons.cancel_outlined,
+              color: completed ? AppTheme.successColor : AppTheme.errorColor,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  booking.categoryName.isNotEmpty ? booking.categoryName : 'Service booking',
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5),
                 ),
-                child: Icon(
-                  completed ? Icons.check_circle_outline_rounded : Icons.cancel_outlined,
+                const SizedBox(height: 3),
+                Text(dateFmt.format(booking.updatedAt), style: TextStyle(fontSize: 12.5, color: Colors.grey[600])),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (completed && booking.displayPrice != null)
+                Text('₹${booking.displayPrice!.toStringAsFixed(0)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              const SizedBox(height: 3),
+              Text(
+                completed ? 'Completed' : 'Cancelled',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
                   color: completed ? AppTheme.successColor : AppTheme.errorColor,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      booking.categoryName.isNotEmpty ? booking.categoryName : 'Service booking',
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '${booking.createdAt.day}/${booking.createdAt.month}/${booking.createdAt.year}'
-                      '${tech != null ? ' • ${tech.name}' : ''}',
-                      style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (completed && booking.finalPrice != null)
-                    Text('₹${booking.finalPrice!.toStringAsFixed(0)}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  const SizedBox(height: 3),
-                  Text(
-                    completed ? 'Completed' : 'Cancelled',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: completed ? AppTheme.successColor : AppTheme.errorColor,
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
-          if (completed && tech != null) ...[
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              height: 40,
-              child: Material(
-                color: AppTheme.primaryColor,
-                borderRadius: BorderRadius.circular(10),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: () => _bookAgain(context, tech),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.replay_rounded, size: 16, color: Colors.white),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Book ${tech.name} again',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13.5),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -207,6 +166,31 @@ class _EmptyState extends StatelessWidget {
             Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
             Text(subtitle, textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  final String message;
+  final Future<void> Function() onRetry;
+  const _ErrorState({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 48, color: AppTheme.errorColor),
+            const SizedBox(height: 12),
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
       ),

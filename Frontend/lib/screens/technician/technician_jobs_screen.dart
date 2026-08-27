@@ -339,15 +339,13 @@ padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),          child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-  _pendingRequests.length == 1
-      ? '${_pendingRequests.first.customerName} — ${_pendingRequests.first.categoryName}'
-      : '${_pendingRequests.length} live consultation requests',
-  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14.5),
-  maxLines: 1,
-  overflow: TextOverflow.ellipsis,
-),
-const SizedBox(height: 2),
-const Text('Tap to accept or reject', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      _pendingRequests.length == 1
+                          ? '1 live consultation request'
+                          : '${_pendingRequests.length} live consultation requests',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14.5),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text('Tap to accept or reject', style: TextStyle(color: Colors.white70, fontSize: 12)),
                   ],
                 ),
               ),
@@ -546,15 +544,71 @@ class _ActionRow extends StatelessWidget {
         return SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: () {
-              final price = booking.estimatedPrice ?? 0;
-              provider.completeBooking(booking.id, price);
-            },
-            child: const Text('Mark as completed'),
+            onPressed: () => _showInvoiceDialog(context, provider, booking),
+            child: const Text('Generate invoice & complete'),
           ),
         );
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  /// The technician's "invoice" — a single final-amount entry, since that's
+  /// what the backend actually stores (Booking.FinalPrice) and what
+  /// UpiService.CreateOrder validates the customer's payment against. Pre-
+  /// filled with the original estimate so the common case (no change) is a
+  /// single tap, but the technician can adjust it up or down for parts used,
+  /// extra labor, etc. before it goes to the customer.
+  void _showInvoiceDialog(BuildContext context, BookingProvider provider, Booking booking) {
+    final controller = TextEditingController(
+      text: (booking.estimatedPrice ?? 0) > 0 ? (booking.estimatedPrice ?? 0).toStringAsFixed(0) : '',
+    );
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Generate invoice'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter the final amount the customer should pay. This is sent to them immediately as the amount due.',
+              style: TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                prefixText: '₹ ',
+                labelText: 'Final amount',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final price = double.tryParse(controller.text.trim());
+              if (price == null || price <= 0) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(content: Text('Enter a valid amount')),
+                );
+                return;
+              }
+              Navigator.of(dialogContext).pop();
+              provider.completeBooking(booking.id, price);
+            },
+            child: const Text('Send invoice'),
+          ),
+        ],
+      ),
+    );
   }
 }

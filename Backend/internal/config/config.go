@@ -58,6 +58,12 @@ type Config struct {
 	// GST rate for services in India) — override via GST_PERCENT env var.
 	GSTPercent float64
 
+	// RepeatCustomerDiscountPercent is taken off the base (pre-GST) amount when a
+	// customer has booked the same technician before (see
+	// internal/service/upi_service.go CreateOrder). Defaults to 5%; override via
+	// REPEAT_CUSTOMER_DISCOUNT_PERCENT env var. Set to 0 to disable.
+	RepeatCustomerDiscountPercent float64
+
 	FirebaseCredentialsPath string
 	FirebaseProjectID       string
 
@@ -121,6 +127,10 @@ func Load() *Config {
 	if err != nil {
 		smtpPort = 587
 	}
+	repeatDiscountPct, err := strconv.ParseFloat(getOr("REPEAT_CUSTOMER_DISCOUNT_PERCENT", "5"), 64)
+	if err != nil {
+		repeatDiscountPct = 5
+	}
 
 	return &Config{
 		Port:  getOr("PORT", "8080"),
@@ -171,7 +181,8 @@ func Load() *Config {
 		TurnRealm:     getOr("TURN_REALM", "homefixlive.com"),
 		TurnTTLSecond: turnTTL,
 
-		PlatformCommissionPercent: commissionPct,
-		GSTPercent:                gstPct,
+		PlatformCommissionPercent:     commissionPct,
+		GSTPercent:                    gstPct,
+		RepeatCustomerDiscountPercent: repeatDiscountPct,
 	}
 }

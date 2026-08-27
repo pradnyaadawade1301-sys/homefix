@@ -97,6 +97,7 @@ class Booking {
   final String categoryId;
   final String addressId;
   final String status; // requested, accepted, in_progress, completed, cancelled
+  final String paymentStatus; // pending, paid, refunded
   final String problemDescription;
   final DateTime? scheduledAt;
   final double? estimatedPrice;
@@ -115,6 +116,7 @@ class Booking {
     required this.categoryId,
     required this.addressId,
     required this.status,
+    this.paymentStatus = 'pending',
     required this.problemDescription,
     this.scheduledAt,
     this.estimatedPrice,
@@ -130,6 +132,12 @@ class Booking {
   /// Price to display: final price once the job is done, otherwise the estimate.
   double? get displayPrice => finalPrice ?? estimatedPrice;
 
+  /// True once the technician has submitted final_price (the invoice) via
+  /// Complete — this is what should trigger a "Pay Now" prompt, and
+  /// [paymentStatus] is what should hide it again once actually paid.
+  bool get isInvoiced => status == 'completed' && finalPrice != null;
+  bool get isPaid => paymentStatus == 'paid';
+
   factory Booking.fromJson(Map<String, dynamic> json) {
     return Booking(
       id: json['id'] as String,
@@ -138,6 +146,7 @@ class Booking {
       categoryId: json['category_id'] as String,
       addressId: json['address_id'] as String? ?? '',
       status: json['status'] as String,
+      paymentStatus: (json['payment_status'] as String?) ?? 'pending',
       problemDescription: (json['problem_description'] as String?) ?? '',
       scheduledAt: json['scheduled_at'] != null ? DateTime.tryParse(json['scheduled_at'] as String) : null,
       estimatedPrice: (json['estimated_price'] as num?)?.toDouble(),
@@ -441,5 +450,82 @@ class Category {
       'base_price': basePrice,
       'is_active': isActive,
     };
+  }
+}
+
+// ServiceHistoryPayment — pricing/tier info for one paid booking. Matches backend
+// internal/models/booking.go -> ServiceHistoryPayment.
+class ServiceHistoryPayment {
+  final double amount;
+  final String status;
+  final bool isRepeatCustomer;
+  final double? repeatDiscountPercent;
+  final double? repeatDiscountAmount;
+
+  ServiceHistoryPayment({
+    required this.amount,
+    required this.status,
+    required this.isRepeatCustomer,
+    this.repeatDiscountPercent,
+    this.repeatDiscountAmount,
+  });
+
+  factory ServiceHistoryPayment.fromJson(Map<String, dynamic> json) {
+    return ServiceHistoryPayment(
+      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+      status: (json['status'] as String?) ?? '',
+      isRepeatCustomer: json['is_repeat_customer'] as bool? ?? false,
+      repeatDiscountPercent: (json['repeat_discount_percent'] as num?)?.toDouble(),
+      repeatDiscountAmount: (json['repeat_discount_amount'] as num?)?.toDouble(),
+    );
+  }
+}
+
+// ServiceHistoryEntry — one past booking between a specific customer and
+// technician, with its payment/pricing-tier info attached (null if never paid).
+// Matches backend internal/models/booking.go -> ServiceHistoryEntry. Reuses
+// [Booking.fromJson] for the embedded booking fields since the backend embeds
+// BookingDetail the same way as the other detailed booking endpoints.
+class ServiceHistoryEntry {
+  final Booking booking;
+  final ServiceHistoryPayment? payment;
+
+  ServiceHistoryEntry({required this.booking, this.payment});
+
+  factory ServiceHistoryEntry.fromJson(Map<String, dynamic> json) {
+    return ServiceHistoryEntry(
+      booking: Booking.fromJson(json),
+      payment: json['payment'] != null
+          ? ServiceHistoryPayment.fromJson(json['payment'] as Map<String, dynamic>)
+          : null,
+    );
+  }
+}
+
+// RepeatCustomer — a customer who has booked a given technician more than once.
+// Matches backend internal/models/technician.go -> RepeatCustomer.
+class RepeatCustomer {
+  final String customerId;
+  final String name;
+  final String phone;
+  final int totalBookings;
+  final DateTime lastBookingAt;
+
+  RepeatCustomer({
+    required this.customerId,
+    required this.name,
+    required this.phone,
+    required this.totalBookings,
+    required this.lastBookingAt,
+  });
+
+  factory RepeatCustomer.fromJson(Map<String, dynamic> json) {
+    return RepeatCustomer(
+      customerId: json['customer_id'] as String? ?? '',
+      name: (json['name'] as String?) ?? '',
+      phone: (json['phone'] as String?) ?? '',
+      totalBookings: (json['total_bookings'] as num?)?.toInt() ?? 0,
+      lastBookingAt: DateTime.tryParse(json['last_booking_at'] as String? ?? '') ?? DateTime.now(),
+    );
   }
 }

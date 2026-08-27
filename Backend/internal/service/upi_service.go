@@ -21,34 +21,37 @@ import (
 // app's OWN response (via startActivityForResult, not a plain "I paid" button —
 // see ConfirmPayment) and reports it back here.
 type UpiService struct {
-	payeeVPA       string
-	payeeName      string
-	commissionPct  float64
-	gstPct         float64
-	paymentRepo    *repository.PaymentRepository
-	bookingRepo    *repository.BookingRepository
-	technicianRepo *repository.TechnicianRepository
-	walletRepo     *repository.WalletRepository
+	payeeVPA          string
+	payeeName         string
+	commissionPct     float64
+	gstPct            float64
+	repeatDiscountPct float64
+	paymentRepo       *repository.PaymentRepository
+	bookingRepo       *repository.BookingRepository
+	technicianRepo    *repository.TechnicianRepository
+	walletRepo        *repository.WalletRepository
 }
 
 func NewUpiService(
 	payeeVPA, payeeName string,
 	commissionPct float64,
 	gstPct float64,
+	repeatDiscountPct float64,
 	paymentRepo *repository.PaymentRepository,
 	bookingRepo *repository.BookingRepository,
 	technicianRepo *repository.TechnicianRepository,
 	walletRepo *repository.WalletRepository,
 ) *UpiService {
 	return &UpiService{
-		payeeVPA:       payeeVPA,
-		payeeName:      payeeName,
-		commissionPct:  commissionPct,
-		gstPct:         gstPct,
-		paymentRepo:    paymentRepo,
-		bookingRepo:    bookingRepo,
-		technicianRepo: technicianRepo,
-		walletRepo:     walletRepo,
+		payeeVPA:          payeeVPA,
+		payeeName:         payeeName,
+		commissionPct:     commissionPct,
+		gstPct:            gstPct,
+		repeatDiscountPct: repeatDiscountPct,
+		paymentRepo:       paymentRepo,
+		bookingRepo:       bookingRepo,
+		technicianRepo:    technicianRepo,
+		walletRepo:        walletRepo,
 	}
 }
 
@@ -74,25 +77,70 @@ func generateTransactionRef() (string, error) {
 }
 
 // CreateOrder records a "created" payment and builds its UPI deep link.
-// CreateOrder records a "created" payment and builds its UPI deep link.
+// Once the technician has completed the job and submitted final_price (the
+// invoice — see BookingService.Complete), that number is the source of
+// truth for what the customer owes: the client-sent amount must match it
+// exactly, so a compromised or buggy app can't quietly pay less (or more)
+// than what was actually invoiced.
 func (s *UpiService) CreateOrder(ctx context.Context, bookingID, userID string, baseAmountRupees float64) (*UpiOrder, error) {
+	booking, err := s.bookingRepo.GetByID(ctx, bookingID)
+	if err != nil {
+		return nil, err
+	}
+	if booking == nil {
+		return nil, errors.New("booking not found")
+	}
+	if booking.FinalPrice != nil {
+		const epsilon = 0.01
+		diff := baseAmountRupees - *booking.FinalPrice
+		if diff < -epsilon || diff > epsilon {
+			return nil, fmt.Errorf("amount does not match invoiced amount of %.2f", *booking.FinalPrice)
+		}
+	}
+
+	// Repeat-customer discount: if this customer has booked THIS technician
+	// before, take repeatDiscountPct off the base (pre-GST) amount. Checked
+	// against the technician actually assigned to the booking, not just any
+	// technician, since the discount is meant to reward loyalty to one pro.
+	var isRepeat bool
+	var repeatDiscountPercent *float64
+	var repeatDiscountAmount *float64
+	effectiveBase := baseAmountRupees
+	if booking.TechnicianID != nil && s.repeatDiscountPct > 0 {
+		priorCount, err := s.bookingRepo.CountPriorBookings(ctx, booking.CustomerID, *booking.TechnicianID)
+		if err != nil {
+			return nil, err
+		}
+		if priorCount > 0 {
+			isRepeat = true
+			pct := s.repeatDiscountPct
+			amt := baseAmountRupees * pct / 100
+			repeatDiscountPercent = &pct
+			repeatDiscountAmount = &amt
+			effectiveBase = baseAmountRupees - amt
+		}
+	}
+
 	ref, err := generateTransactionRef()
 	if err != nil {
 		return nil, fmt.Errorf("upi: failed to generate transaction ref: %w", err)
 	}
 
-	gstAmount := baseAmountRupees * s.gstPct / 100
-	totalAmount := baseAmountRupees + gstAmount
+	gstAmount := effectiveBase * s.gstPct / 100
+	totalAmount := effectiveBase + gstAmount
 
 	p := &models.Payment{
-		BookingID:      bookingID,
-		UserID:         userID,
-		TransactionRef: ref,
-		Amount:         totalAmount,
-		BaseAmount:     &baseAmountRupees,
-		GstAmount:      &gstAmount,
-		GstPercent:     &s.gstPct,
-		Currency:       "INR",
+		BookingID:              bookingID,
+		UserID:                 userID,
+		TransactionRef:         ref,
+		Amount:                 totalAmount,
+		BaseAmount:             &effectiveBase,
+		GstAmount:              &gstAmount,
+		GstPercent:             &s.gstPct,
+		Currency:               "INR",
+		IsRepeatCustomer:       isRepeat,
+		RepeatDiscountPercent:  repeatDiscountPercent,
+		RepeatDiscountAmount:   repeatDiscountAmount,
 	}
 	created, err := s.paymentRepo.Create(ctx, p)
 	if err != nil {

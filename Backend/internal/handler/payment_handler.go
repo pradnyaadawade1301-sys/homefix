@@ -35,7 +35,7 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 	}
 	order, err := h.upi.CreateOrder(c.Request.Context(), body.BookingID, userID, body.Amount)
 	if err != nil {
-		utils.Error(c, http.StatusBadGateway, err.Error())
+		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	utils.Success(c, http.StatusCreated, order)

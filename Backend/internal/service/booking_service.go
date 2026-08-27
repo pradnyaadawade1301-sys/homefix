@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"homefix-backend/internal/models"
 	"homefix-backend/internal/repository"
@@ -12,11 +13,12 @@ type BookingService struct {
 	bookingRepo *repository.BookingRepository
 	catRepo     *repository.CategoryRepository
 	techRepo    *repository.TechnicianRepository
+	paymentRepo *repository.PaymentRepository
 	fcm         *FirebaseService
 }
 
-func NewBookingService(bookingRepo *repository.BookingRepository, catRepo *repository.CategoryRepository, techRepo *repository.TechnicianRepository, fcm *FirebaseService) *BookingService {
-	return &BookingService{bookingRepo: bookingRepo, catRepo: catRepo, techRepo: techRepo, fcm: fcm}
+func NewBookingService(bookingRepo *repository.BookingRepository, catRepo *repository.CategoryRepository, techRepo *repository.TechnicianRepository, paymentRepo *repository.PaymentRepository, fcm *FirebaseService) *BookingService {
+	return &BookingService{bookingRepo: bookingRepo, catRepo: catRepo, techRepo: techRepo, paymentRepo: paymentRepo, fcm: fcm}
 }
 
 // Create makes a new booking. If preferredTechnicianID is non-empty (customer
@@ -138,11 +140,33 @@ func (s *BookingService) UpdateStatus(ctx context.Context, bookingID, status, no
 	return nil
 }
 
+// Complete records the technician's final_price — this IS the invoice, since
+// it's the only number the app ever asks the customer to pay (see
+// UpiService.CreateOrder, which validates the payment amount against it). The
+// FCM push here is the only signal the customer gets that a bill is ready;
+// without it they'd only find out by happening to reopen the booking.
 func (s *BookingService) Complete(ctx context.Context, bookingID string, finalPrice float64) error {
+	b, err := s.bookingRepo.GetByID(ctx, bookingID)
+	if err != nil {
+		return err
+	}
+	if b == nil {
+		return errors.New("booking not found")
+	}
+
 	if err := s.bookingRepo.SetFinalPrice(ctx, bookingID, finalPrice); err != nil {
 		return err
 	}
-	return s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingCompleted, "Job completed")
+	if err := s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingCompleted, "Job completed"); err != nil {
+		return err
+	}
+
+	if s.fcm != nil {
+		_ = s.fcm.SendToUser(ctx, b.CustomerID, "Invoice ready",
+			fmt.Sprintf("Your technician has completed the job. Amount due: \u20b9%.2f. Tap to pay.", finalPrice),
+			map[string]string{"booking_id": bookingID, "type": "invoice_ready", "final_price": fmt.Sprintf("%.2f", finalPrice)})
+	}
+	return nil
 }
 
 func (s *BookingService) Cancel(ctx context.Context, bookingID, reason string) error {
@@ -151,6 +175,40 @@ func (s *BookingService) Cancel(ctx context.Context, bookingID, reason string) e
 
 func (s *BookingService) History(ctx context.Context, bookingID string) ([]models.BookingStatusHistory, error) {
 	return s.bookingRepo.History(ctx, bookingID)
+}
+
+// RepeatCustomers powers the technician's "My Customers" screen — customers who
+// have booked this technician more than once.
+func (s *BookingService) RepeatCustomers(ctx context.Context, technicianID string) ([]models.RepeatCustomer, error) {
+	return s.bookingRepo.ListRepeatCustomersByTechnician(ctx, technicianID)
+}
+
+// ServiceHistory returns every past booking a specific customer has made with a
+// specific technician, each with its payment/pricing-tier info attached — reached
+// from the technician's repeat-customers list by tapping a customer.
+func (s *BookingService) ServiceHistory(ctx context.Context, technicianID, customerID string) ([]models.ServiceHistoryEntry, error) {
+	bookings, err := s.bookingRepo.ListByCustomerAndTechnicianDetailed(ctx, customerID, technicianID)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]models.ServiceHistoryEntry, 0, len(bookings))
+	for _, b := range bookings {
+		entry := models.ServiceHistoryEntry{BookingDetail: b}
+		if s.paymentRepo != nil {
+			if p, err := s.paymentRepo.GetByBookingID(ctx, b.ID); err == nil && p != nil {
+				entry.Payment = &models.ServiceHistoryPayment{
+					Amount:                p.Amount,
+					Status:                p.Status,
+					IsRepeatCustomer:      p.IsRepeatCustomer,
+					RepeatDiscountPercent: p.RepeatDiscountPercent,
+					RepeatDiscountAmount:  p.RepeatDiscountAmount,
+				}
+			}
+		}
+		out = append(out, entry)
+	}
+	return out, nil
 }
 
 // --- Booking chat ---

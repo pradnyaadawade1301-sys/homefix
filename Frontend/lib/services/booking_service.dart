@@ -61,6 +61,34 @@ class BookingService {
     }
   }
 
+  /// Customers who have booked this technician more than once — GET
+  /// /technicians/:id/repeat-customers. `technicianId` is the technician
+  /// RECORD id (from TechnicianProfile.id / GET /technicians/me), not the user id.
+  Future<List<RepeatCustomer>> getRepeatCustomers(String technicianId) async {
+    try {
+      final response = await _httpClient.get(
+          '${ApiConfig.technicianRepeatCustomers}/$technicianId/repeat-customers');
+      final list = ApiEnvelope.unwrap(response) as List? ?? [];
+      return list.map((e) => RepeatCustomer.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// A specific customer's past bookings with this technician, with pricing/tier
+  /// info attached — GET /technicians/:id/customers/:customerId/history. Reached
+  /// by tapping a customer on the "My Customers" (repeat customers) screen.
+  Future<List<ServiceHistoryEntry>> getServiceHistory(String technicianId, String customerId) async {
+    try {
+      final response = await _httpClient.get(
+          '${ApiConfig.technicianRepeatCustomers}/$technicianId/customers/$customerId/history');
+      final list = ApiEnvelope.unwrap(response) as List? ?? [];
+      return list.map((e) => ServiceHistoryEntry.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
   Future<Booking> getBookingDetail(String bookingId) async {
     try {
       final response = await _httpClient.get('${ApiConfig.bookingDetail}/$bookingId');

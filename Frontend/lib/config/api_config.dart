@@ -1,11 +1,21 @@
 class ApiConfig {
+  // Google Places / Geocoding API key.
+  // Get one from https://console.cloud.google.com/ :
+  //   1. Create/select a project.
+  //   2. APIs & Services -> Library -> enable "Places API" AND "Geocoding API".
+  //   3. APIs & Services -> Credentials -> Create Credentials -> API key.
+  //   4. (Recommended) Restrict the key to Android/iOS app + the 2 APIs above.
+  // Billing must be enabled on the project (Google gives $200/month free credit,
+  // more than enough for an address-autocomplete feature).
+  static const String googlePlacesApiKey = 'PASTE_YOUR_GOOGLE_PLACES_API_KEY_HERE';
+
   // Backend Base URL - matches homefix_backend router (internal/router/router.go)
   // NOTE: backend is mapped to host port 8090 (see docker-compose.yml), not 8080,
   // to avoid clashing with other local projects.
   // Running on a REAL Android device over Wi-Fi: phone and PC must be on the same
   // network. Update the IP below any time your PC's Wi-Fi IP changes (check via
   // `ipconfig` -> IPv4 Address under your active Wi-Fi adapter).
-  static const String baseUrl = 'http://192.168.1.8:8090/api/v1'; // Real device via LAN Wi-Fi
+  static const String baseUrl = 'http://192.168.1.23:8090/api/v1'; // Real device via LAN Wi-Fi
   // static const String baseUrl = 'http://10.0.2.2:8090/api/v1'; // Android emulator
   // static const String baseUrl = 'https://api.homefixlive.com/api/v1'; // Production
 
@@ -32,6 +42,7 @@ class ApiConfig {
   static const String technicianMe = '/technicians/me';
   static const String technicianAvailable = '/technicians/available';
   static const String technicianBookings = '/technicians'; // + /:id/bookings
+  static const String technicianRepeatCustomers = '/technicians'; // + /:id/repeat-customers
 
   static const String uploads = '/uploads'; // POST multipart "file" -> {url}
 

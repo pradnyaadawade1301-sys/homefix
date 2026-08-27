@@ -9,6 +9,7 @@ import '../notifications/notifications_screen.dart';
 import '../technician/technician_jobs_screen.dart';
 import '../technician/technician_settlement_screen.dart';
 import '../technician/technician_status_screen.dart';
+import '../technician/repeat_customers_screen.dart';
 import '../personal_info_screen.dart';
 import '../saved_addresses_screen.dart';
 import '../legal_screens.dart';
@@ -565,6 +566,13 @@ class _TechnicianProfileBody extends StatelessWidget {
                   label: 'Earnings & Settlement',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const TechnicianSettlementScreen()),
+                  ),
+                ),
+                _ActionTile(
+                  icon: Icons.people_alt_outlined,
+                  label: 'My Customers',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const RepeatCustomersScreen()),
                   ),
                 ),
                 _ActionTile(

@@ -47,6 +47,16 @@ type TechnicianNearby struct {
 	DistanceKm *float64 `json:"distance_km,omitempty"`
 }
 
+// RepeatCustomer is a customer who has booked a given technician more than once —
+// powers the technician's "My Customers" / repeat-customer screen.
+type RepeatCustomer struct {
+	CustomerID    string    `json:"customer_id"`
+	Name          string    `json:"name"`
+	Phone         string    `json:"phone"`
+	TotalBookings int       `json:"total_bookings"`
+	LastBookingAt time.Time `json:"last_booking_at"`
+}
+
 type Technician struct {
 	ID              string `json:"id"`
 	UserID          string `json:"user_id"`

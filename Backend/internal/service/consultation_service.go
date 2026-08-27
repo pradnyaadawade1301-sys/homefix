@@ -63,7 +63,7 @@ func (s *ConsultationService) Request(ctx context.Context, customerID, categoryI
 	}
 
 	// Fallback: old nearest-available-by-category matching
-	candidates, err := s.techRepo.ListAvailableByCategory(ctx, categoryID, lat, lng)
+	candidates, err := s.techRepo.ListAvailableByCategory(ctx, categoryID, lat, lng, nil)
 	if err != nil {
 		return nil, err
 	}

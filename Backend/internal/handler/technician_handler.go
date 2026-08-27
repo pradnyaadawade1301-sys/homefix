@@ -104,7 +104,13 @@ func (h *TechnicianHandler) FindAvailable(c *gin.Context) {
 			lng = &v
 		}
 	}
-	techs, err := h.techService.FindAvailable(c.Request.Context(), categoryID, lat, lng)
+	var radiusKm *float64
+	if radiusStr := c.Query("radius_km"); radiusStr != "" {
+		if v, err := strconv.ParseFloat(radiusStr, 64); err == nil {
+			radiusKm = &v
+		}
+	}
+	techs, err := h.techService.FindAvailable(c.Request.Context(), categoryID, lat, lng, radiusKm)
 	if err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
 		return

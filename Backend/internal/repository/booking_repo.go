@@ -168,6 +168,48 @@ func (r *BookingRepository) History(ctx context.Context, bookingID string) ([]mo
 	return out, nil
 }
 
+// CountPriorBookings returns how many bookings this customer has previously made
+// with this technician — used to decide first-time vs repeat-customer pricing at
+// checkout (see UpiService.CreateOrder). A booking's own row isn't excluded by ID
+// here since this is meant to be called BEFORE the booking being paid for is
+// counted as "prior".
+func (r *BookingRepository) CountPriorBookings(ctx context.Context, customerID, technicianID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM bookings WHERE customer_id = $1 AND technician_id = $2
+	`, customerID, technicianID).Scan(&count)
+	return count, err
+}
+
+// ListRepeatCustomersByTechnician returns customers who have booked this technician
+// more than once, most-frequent first — powers the technician's "My Customers" /
+// repeat-customer screen.
+func (r *BookingRepository) ListRepeatCustomersByTechnician(ctx context.Context, technicianID string) ([]models.RepeatCustomer, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT b.customer_id, COALESCE(u.name,''), COALESCE(u.phone,''), COUNT(*) AS total_bookings, MAX(b.created_at) AS last_booking_at
+		FROM bookings b
+		JOIN users u ON u.id = b.customer_id
+		WHERE b.technician_id = $1
+		GROUP BY b.customer_id, u.name, u.phone
+		HAVING COUNT(*) > 1
+		ORDER BY total_bookings DESC, last_booking_at DESC
+	`, technicianID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []models.RepeatCustomer
+	for rows.Next() {
+		var rc models.RepeatCustomer
+		if err := rows.Scan(&rc.CustomerID, &rc.Name, &rc.Phone, &rc.TotalBookings, &rc.LastBookingAt); err != nil {
+			return nil, err
+		}
+		out = append(out, rc)
+	}
+	return out, rows.Err()
+}
+
 // --- Booking chat (customer <-> assigned technician) ---
 
 func (r *BookingRepository) CreateMessage(ctx context.Context, m *models.BookingMessage) (*models.BookingMessage, error) {
@@ -338,6 +380,27 @@ func (r *BookingRepository) ListAllDetailed(ctx context.Context, status string) 
 
 func (r *BookingRepository) ListByTechnicianDetailed(ctx context.Context, technicianID string) ([]models.BookingDetail, error) {
 	return r.listDetailedByColumn(ctx, "b.technician_id", technicianID)
+}
+
+// ListByCustomerAndTechnicianDetailed returns every booking between a specific
+// customer and technician, newest first — powers the technician's per-customer
+// Service History screen (reached from the repeat-customers list).
+func (r *BookingRepository) ListByCustomerAndTechnicianDetailed(ctx context.Context, customerID, technicianID string) ([]models.BookingDetail, error) {
+	rows, err := r.db.Query(ctx, detailedSelect+" WHERE b.customer_id = $1 AND b.technician_id = $2 ORDER BY b.created_at DESC", customerID, technicianID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []models.BookingDetail
+	for rows.Next() {
+		d, err := scanBookingDetail(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *d)
+	}
+	return out, rows.Err()
 }
 
 func (r *BookingRepository) listDetailedByColumn(ctx context.Context, col, val string) ([]models.BookingDetail, error) {

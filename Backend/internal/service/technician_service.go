@@ -73,8 +73,8 @@ func (s *TechnicianService) GetByUser(ctx context.Context, userID string) (*mode
 // FindAvailable powers the customer-facing nearby/tracking screen — returns available,
 // approved technicians for a category with name + category name already joined in, and
 // a distance_km when the caller supplies its own lat/lng.
-func (s *TechnicianService) FindAvailable(ctx context.Context, categoryID string, lat, lng *float64) ([]models.TechnicianNearby, error) {
-	return s.techRepo.ListAvailableByCategory(ctx, categoryID, lat, lng)
+func (s *TechnicianService) FindAvailable(ctx context.Context, categoryID string, lat, lng, radiusKm *float64) ([]models.TechnicianNearby, error) {
+	return s.techRepo.ListAvailableByCategory(ctx, categoryID, lat, lng, radiusKm)
 }
 
 func (s *TechnicianService) SetAvailability(ctx context.Context, technicianID string, available bool) error {
