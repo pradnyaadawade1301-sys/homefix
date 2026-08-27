@@ -772,10 +772,10 @@ class _TechnicianCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF4C6BF5), Color(0xFF2541D6)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+  colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+),
           borderRadius: BorderRadius.circular(18),
           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, 4))],
         ),

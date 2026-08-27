@@ -5,6 +5,7 @@ import '../../core/contact_actions.dart';
 import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
 import '../payment/payment_screen.dart';
+import '../chat/booking_chat_screen.dart';
 
 /// Step 9 of the customer flow ("Booking Tracking").
 ///
@@ -316,25 +317,21 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
               ],
             ),
           ),
-          if (tech.phone.isNotEmpty) ...[
-            Container(
-              decoration: const BoxDecoration(color: AppTheme.primaryColor, shape: BoxShape.circle),
-              child: IconButton(
-                icon: const Icon(Icons.call, color: Colors.white, size: 18),
-                tooltip: 'Call',
-                onPressed: () => callContact(context, tech.phone),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              decoration: const BoxDecoration(color: Color(0xFF25D366), shape: BoxShape.circle),
-              child: IconButton(
-                icon: const Icon(Icons.chat, color: Colors.white, size: 18),
-                tooltip: 'WhatsApp',
-                onPressed: () => openWhatsApp(context, tech.phone),
-              ),
-            ),
-          ],
+     Container(
+  decoration: const BoxDecoration(color: AppTheme.primaryColor, shape: BoxShape.circle),
+  child: IconButton(
+    icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 18),
+    tooltip: 'Chat',
+    onPressed: () {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => BookingChatScreen(
+          bookingId: widget.bookingId,
+          peerName: tech.name.isNotEmpty ? tech.name : 'Technician',
+        ),
+      ));
+    },
+  ),
+),
         ],
       ),
     );

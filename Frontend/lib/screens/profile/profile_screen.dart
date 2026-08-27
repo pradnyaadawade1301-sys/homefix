@@ -6,8 +6,6 @@ import '../../providers/category_provider.dart';
 import '../../models/user_model.dart';
 import '../booking/bookings_screen.dart';
 import '../notifications/notifications_screen.dart';
-import '../technician/technician_jobs_screen.dart';
-import '../technician/technician_settlement_screen.dart';
 import '../technician/technician_status_screen.dart';
 import '../personal_info_screen.dart';
 import '../saved_addresses_screen.dart';
@@ -19,14 +17,9 @@ import '../payment/transaction_history_screen.dart';
 import '../privacy_security_screen.dart';
 import '../help_center_screen.dart';
 import '../contact_support_screen.dart';
-import '../availability_toggle_screen.dart';
 import '../service_radius_screen.dart';
-import '../working_hours_screen.dart';
-import '../pricing_settings_screen.dart';
-import '../performance_screen.dart';
-import '../certificates_screen.dart';
-import '../license_screen.dart';
 import '../bank_details_screen.dart';
+import '../technician/repeat_customers_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -311,7 +304,7 @@ class _CustomerProfileBody extends StatelessWidget {
 // TECHNICIAN PROFILE
 // ============================================================================
 
-class _TechnicianProfileBody extends StatelessWidget {
+class _TechnicianProfileBody extends StatefulWidget {
   final User user;
   final VoidCallback onLogout;
   final VoidCallback onDelete;
@@ -329,6 +322,26 @@ class _TechnicianProfileBody extends StatelessWidget {
   });
 
   @override
+  State<_TechnicianProfileBody> createState() => _TechnicianProfileBodyState();
+}
+
+class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
+  bool _togglingAvailability = false;
+
+  Future<void> _onToggleAvailability(bool value) async {
+    if (_togglingAvailability) return;
+    setState(() => _togglingAvailability = true);
+    final ok = await context.read<TechnicianKycProvider>().setAvailability(value);
+    if (mounted) setState(() => _togglingAvailability = false);
+    if (!ok && mounted) {
+      final error = context.read<TechnicianKycProvider>().error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error ?? 'Could not update availability. Please try again.')),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Consumer2<TechnicianKycProvider, CategoryProvider>(
       builder: (context, kycProvider, categoryProvider, _) {
@@ -343,11 +356,11 @@ class _TechnicianProfileBody extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             children: [
               _ProfileHeader(
-                name: user.name.isNotEmpty ? user.name : 'Technician',
-                subtitle: user.phone,
+                name: widget.user.name.isNotEmpty ? widget.user.name : 'Technician',
+                subtitle: widget.user.phone,
                 roleLabel: 'Technician',
-                photoUrl: (user.photoUrl != null && user.photoUrl!.isNotEmpty) ? user.photoUrl : null,
-                verifiedBadge: user.phoneVerified,
+                photoUrl: (widget.user.photoUrl != null && widget.user.photoUrl!.isNotEmpty) ? widget.user.photoUrl : null,
+                verifiedBadge: widget.user.phoneVerified,
               ),
               const SizedBox(height: 20),
               Container(
@@ -378,7 +391,7 @@ class _TechnicianProfileBody extends StatelessWidget {
                 width: double.infinity,
                 height: 52,
                 child: OutlinedButton.icon(
-                  onPressed: onLogout,
+                  onPressed: widget.onLogout,
                   icon: const Icon(Icons.logout_rounded, color: AppTheme.errorColor),
                   label: const Text('Log Out', style: TextStyle(color: AppTheme.errorColor)),
                   style: OutlinedButton.styleFrom(side: const BorderSide(color: AppTheme.errorColor)),
@@ -396,12 +409,15 @@ class _TechnicianProfileBody extends StatelessWidget {
           }
         }
 
+        final isOnline = profile.isAvailable;
+        final canGoOnline = profile.isApproved;
+
         return ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
           children: [
             _ProfileHeader(
-              name: user.name.isNotEmpty ? user.name : 'Technician',
-              subtitle: user.phone,
+              name: widget.user.name.isNotEmpty ? widget.user.name : 'Technician',
+              subtitle: widget.user.phone,
               roleLabel: categoryName,
               photoUrl: profile.profilePhotoUrl.isNotEmpty ? profile.profilePhotoUrl : null,
               verifiedBadge: profile.isVerified,
@@ -417,12 +433,57 @@ class _TechnicianProfileBody extends StatelessWidget {
                         : 'No ratings yet',
                     color: Colors.amber[700]!,
                   ),
-                  _StatChip(
-                    icon: profile.isAvailable ? Icons.circle : Icons.circle_outlined,
-                    label: profile.isAvailable ? 'Online' : 'Offline',
-                    color: profile.isAvailable ? AppTheme.successColor : Colors.grey,
-                  ),
                   _ApprovalBadge(status: profile.approvalStatus),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            // --- Online/Offline toggle — directly switchable here, no separate screen ---
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: (isOnline ? AppTheme.successColor : Colors.grey).withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isOnline ? Icons.wifi_tethering_rounded : Icons.wifi_tethering_off_rounded,
+                      color: isOnline ? AppTheme.successColor : Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(isOnline ? 'You are Online' : 'You are Offline',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
+                        const SizedBox(height: 2),
+                        Text(
+                          canGoOnline
+                              ? (isOnline ? 'Customers can book you right now' : "You won't receive new job requests")
+                              : 'Complete KYC approval to go online',
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_togglingAvailability)
+                    const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5))
+                  else
+                    Switch(
+                      value: isOnline,
+                      activeThumbColor: AppTheme.successColor,
+                      onChanged: canGoOnline ? _onToggleAvailability : null,
+                    ),
                 ],
               ),
             ),
@@ -434,27 +495,18 @@ class _TechnicianProfileBody extends StatelessWidget {
                 _InfoRow(label: 'Years of Experience', value: '${profile.experienceYears} yrs'),
                 _InfoRow(label: 'Address', value: profile.address.isNotEmpty ? profile.address : '-'),
                 _ActionTile(
-                  icon: Icons.toggle_on_outlined,
-                  label: 'Availability Toggle',
-                  onTap: () => openScreen(const AvailabilityToggleScreen()),
-                ),
-                _ActionTile(
                   icon: Icons.map_outlined,
                   label: 'Service Radius',
-                  onTap: () => openScreen(const ServiceRadiusScreen()),
+                  onTap: () => widget.openScreen(const ServiceRadiusScreen()),
                 ),
-                _ActionTile(
-                  icon: Icons.access_time_outlined,
-                  label: 'Working Hours',
-                  onTap: () => openScreen(const WorkingHoursScreen()),
-                ),
+               
               ],
             ),
             const SizedBox(height: 16),
             _SectionCard(
               title: 'Trust & Verification',
               children: [
-                _VerificationRow(label: 'Phone Verified', verified: user.phoneVerified),
+                _VerificationRow(label: 'Phone Verified', verified: widget.user.phoneVerified),
                 _VerificationRow(label: 'Profile Verified', verified: profile.isVerified),
                 _VerificationRow(
                   label: 'Government ID Uploaded',
@@ -472,109 +524,44 @@ class _TechnicianProfileBody extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             _SectionCard(
-              title: 'Business Information',
-              children: [
-                _ActionTile(
-                  icon: Icons.currency_rupee_rounded,
-                  label: 'Hourly / Visit Charge',
-                  onTap: () => openScreen(const PricingSettingsScreen()),
-                ),
-                _ActionTile(
-                  icon: Icons.local_shipping_outlined,
-                  label: 'Travel Fee',
-                  onTap: () => openScreen(const PricingSettingsScreen()),
-                ),
-                _ActionTile(
-                  icon: Icons.priority_high_rounded,
-                  label: 'Emergency Service Fee',
-                  onTap: () => openScreen(const PricingSettingsScreen()),
-                ),
-                _ActionTile(
-                  icon: Icons.money_off_csred_outlined,
-                  label: 'Minimum Service Charge',
-                  onTap: () => openScreen(const PricingSettingsScreen()),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _SectionCard(
-              title: 'Performance',
-              children: [
-                _InfoRow(
-                  label: 'Customer Rating',
-                  value: profile.ratingCount > 0
-                      ? '${profile.ratingAvg.toStringAsFixed(1)} ★ (${profile.ratingCount} reviews)'
-                      : 'No reviews yet',
-                ),
-                _ActionTile(
-                  icon: Icons.work_outline_rounded,
-                  label: 'Jobs Completed / Cancelled',
-                  onTap: () => openScreen(const PerformanceScreen()),
-                ),
-                _ActionTile(
-                  icon: Icons.speed_outlined,
-                  label: 'Response Rate & Time',
-                  onTap: () => openScreen(const PerformanceScreen()),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _SectionCard(
               title: 'Documents',
               children: [
                 _VerificationRow(
                   label: 'Government ID',
                   verified: profile.governmentIdUrl.isNotEmpty,
                 ),
-                _ActionTile(
-                  icon: Icons.workspace_premium_outlined,
-                  label: 'Certificates',
-                  onTap: () => openScreen(const CertificatesScreen()),
-                ),
-                _ActionTile(
-                  icon: Icons.badge_outlined,
-                  label: 'License',
-                  onTap: () => openScreen(const LicenseScreen()),
-                ),
+                
                 _ActionTile(
                   icon: Icons.account_balance_outlined,
                   label: 'Bank / UPI Details',
-                  onTap: () => openScreen(const BankDetailsScreen()),
+                  onTap: () => widget.openScreen(const BankDetailsScreen()),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            _SectionCard(
-              title: 'Work',
-              children: [
-                _ActionTile(
-                  icon: Icons.work_outline_rounded,
-                  label: 'My Jobs',
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const TechnicianJobsScreen()),
-                  ),
-                ),
-                _ActionTile(
-                  icon: Icons.account_balance_wallet_outlined,
-                  label: 'Earnings & Settlement',
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const TechnicianSettlementScreen()),
-                  ),
-                ),
-                _ActionTile(
-                  icon: Icons.fact_check_outlined,
-                  label: 'Registration Status',
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const TechnicianStatusScreen()),
-                  ),
-                ),
-                _ActionTile(
-                  icon: Icons.videocam_rounded,
-                  label: 'Live Consultation Requests',
-                  onTap: () => Navigator.of(context).pushNamed('/consultation-requests'),
-                ),
-              ],
-            ),
+          _SectionCard(
+  title: 'Work',
+  children: [
+    _ActionTile(
+      icon: Icons.fact_check_outlined,
+      label: 'Registration Status',
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const TechnicianStatusScreen()),
+      ),
+    ),
+    _ActionTile(
+      icon: Icons.people_alt_outlined,
+      label: 'My Customers',
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const RepeatCustomersScreen()),
+      ),
+    ),
+    _ActionTile(
+      icon: Icons.videocam_rounded,
+      label: 'Live Consultation Requests',
+      onTap: () => Navigator.of(context).pushNamed('/consultation-requests'),
+    ),
+  ],
+),
             const SizedBox(height: 16),
             _SectionCard(
               title: 'App Settings',
@@ -582,22 +569,22 @@ class _TechnicianProfileBody extends StatelessWidget {
                 _ActionTile(
                   icon: Icons.notifications_outlined,
                   label: 'Notification Settings',
-                  onTap: () => openPlaceholder('Notification Settings', Icons.notifications_outlined),
+                  onTap: () => widget.openPlaceholder('Notification Settings', Icons.notifications_outlined),
                 ),
                 _ActionTile(
                   icon: Icons.payment_outlined,
                   label: 'Payment Settings',
-                  onTap: () => openPlaceholder('Payment Settings', Icons.payment_outlined),
+                  onTap: () => widget.openPlaceholder('Payment Settings', Icons.payment_outlined),
                 ),
                 _ActionTile(
                   icon: Icons.privacy_tip_outlined,
                   label: 'Privacy & Security',
-                  onTap: () => openScreen(const PrivacySecurityScreen()),
+                  onTap: () => widget.openScreen(const PrivacySecurityScreen()),
                 ),
                 _ActionTile(
                   icon: Icons.lock_outline_rounded,
                   label: 'Change Password / PIN',
-                  onTap: openChangePassword,
+                  onTap: widget.openChangePassword,
                 ),
               ],
             ),
@@ -608,14 +595,16 @@ class _TechnicianProfileBody extends StatelessWidget {
                 _ActionTile(
                   icon: Icons.help_outline_rounded,
                   label: 'Help Center',
-                  onTap: () => openScreen(const HelpCenterScreen()),
+                  onTap: () => widget.openScreen(const HelpCenterScreen()),
                 ),
                 _ActionTile(
                   icon: Icons.support_agent_outlined,
                   label: 'Contact Support',
-                  onTap: () => openScreen(const ContactSupportScreen()),
+                  onTap: () => widget.openScreen(const ContactSupportScreen()),
                 ),
+                
                 _ActionTile(
+
                   icon: Icons.description_outlined,
                   label: 'Terms & Conditions',
                   onTap: () => Navigator.of(context).push(
@@ -629,7 +618,7 @@ class _TechnicianProfileBody extends StatelessWidget {
               width: double.infinity,
               height: 52,
               child: OutlinedButton.icon(
-                onPressed: onLogout,
+                onPressed: widget.onLogout,
                 icon: const Icon(Icons.logout_rounded, color: AppTheme.errorColor),
                 label: const Text('Log Out', style: TextStyle(color: AppTheme.errorColor)),
                 style: OutlinedButton.styleFrom(side: const BorderSide(color: AppTheme.errorColor)),
@@ -637,7 +626,7 @@ class _TechnicianProfileBody extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             TextButton(
-              onPressed: onDelete,
+              onPressed: widget.onDelete,
               child: const Text('Delete Account', style: TextStyle(color: Colors.grey)),
             ),
           ],

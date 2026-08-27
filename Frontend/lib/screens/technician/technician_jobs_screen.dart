@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
-import '../../core/contact_actions.dart';
 import '../../models/booking_model.dart';
 import '../../models/consultation_model.dart';
 import '../../providers/booking_provider.dart';
@@ -13,6 +12,7 @@ import '../consultation/incoming_consultation_screen.dart';
 import '../profile/profile_screen.dart';
 import 'technician_settlement_screen.dart';
 import 'repeat_customers_screen.dart';
+import '../chat/booking_chat_screen.dart';
 
 /// Technician-facing home screen — the mirror image of the customer's
 /// [BookingsScreen]. A logged-in technician lands here and sees:
@@ -494,18 +494,18 @@ class _JobCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  if (customer.phone.isNotEmpty)
-                    IconButton(
-                      icon: const Icon(Icons.call, color: AppTheme.primaryColor, size: 20),
-                      tooltip: 'Call customer',
-                      onPressed: () => callContact(context, customer.phone),
-                    ),
-                  if (customer.phone.isNotEmpty)
-                    IconButton(
-                      icon: const Icon(Icons.chat, color: Color(0xFF25D366), size: 20),
-                      tooltip: 'WhatsApp customer',
-                      onPressed: () => openWhatsApp(context, customer.phone),
-                    ),
+                 IconButton(
+  icon: const Icon(Icons.forum_outlined, color: AppTheme.primaryColor, size: 20),
+  tooltip: 'Chat with customer',
+  onPressed: () {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => BookingChatScreen(
+        bookingId: booking.id,
+        peerName: customer.name.isNotEmpty ? customer.name : 'Customer',
+      ),
+    ));
+  },
+),
                 ],
               ),
             ),

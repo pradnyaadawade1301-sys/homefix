@@ -4,10 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 /// Professional blue/white theme for HomeFix Live, matching the Day 1 UI reference
 /// (indigo/blue primary, soft off-white backgrounds, rounded Material 3 surfaces).
 class AppTheme {
-  static const Color primaryColor = Color(0xFF3B5BFE); // Indigo-blue
-  static const Color primaryDark = Color(0xFF2541D6);
-  static const Color secondaryColor = Color(0xFF6C63FF); // Purple-blue accent
-  static const Color tertiaryColor = Color(0xFF00BFA6); // Teal accent
+ static const Color primaryColor = Color(0xFF0F766E); // Teal
+static const Color primaryDark = Color(0xFF115E59);
+static const Color secondaryColor = Color(0xFF115E59); // Darker teal accent (used in gradients)
+static const Color tertiaryColor = Color(0xFF14B8A6); // Lighter teal accent // Teal accent
   static const Color errorColor = Color(0xFFE53935);
   static const Color successColor = Color(0xFF2E9E5B);
   static const Color warningColor = Color(0xFFF5A623);

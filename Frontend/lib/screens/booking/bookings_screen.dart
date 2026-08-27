@@ -4,6 +4,7 @@ import '../../core/theme.dart';
 import '../../providers/booking_provider.dart';
 import '../../models/booking_model.dart';
 import 'booking_tracking_screen.dart';
+import '../chat/booking_chat_screen.dart';
 
 /// Customer-facing "My Bookings" list. Shows the assigned technician's
 /// name/phone/rating on each card once one is assigned (b.technician != null).
@@ -148,10 +149,10 @@ class _BookingsScreenState extends State<BookingsScreen> {
                             : 'Booked ${b.createdAt.day}/${b.createdAt.month}/${b.createdAt.year}',
                         style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
                       ),
-                      if (b.technician != null) ...[
-                        const SizedBox(height: 12),
-                        _TechnicianTile(technician: b.technician!),
-                      ],
+                    if (b.technician != null) ...[
+  const SizedBox(height: 12),
+  _TechnicianTile(technician: b.technician!, bookingId: b.id),
+],
                     ],
                   ),
                   ),
@@ -169,8 +170,8 @@ class _BookingsScreenState extends State<BookingsScreen> {
 /// technician has been assigned.
 class _TechnicianTile extends StatelessWidget {
   final BookingTechnicianInfo technician;
-  const _TechnicianTile({required this.technician});
-
+  final String bookingId;
+  const _TechnicianTile({required this.technician, required this.bookingId});
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -211,6 +212,20 @@ class _TechnicianTile extends StatelessWidget {
               ],
             ),
           ),
+
+          IconButton(
+  icon: const Icon(Icons.forum_outlined, color: AppTheme.primaryColor, size: 20),
+  tooltip: 'Chat',
+  onPressed: () {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => BookingChatScreen(
+        bookingId: bookingId,
+        peerName: technician.name.isNotEmpty ? technician.name : 'Technician',
+      ),
+    ));
+  },
+),
+
         ],
       ),
     );

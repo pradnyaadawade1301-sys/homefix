@@ -98,7 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         controller: _identifierController,
                         keyboardType: TextInputType.emailAddress,
                         decoration: const InputDecoration(
-                          hintText: 'Email',
+                          hintText: 'Email              ',
                           prefixIcon: Icon(Icons.person_outline_rounded),
                         ),
                         validator: (value) {
