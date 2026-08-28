@@ -24,48 +24,45 @@ class CategoryService {
   }
 }
 
-// Payment Service — UPI/GPay intent flow (create order -> app launches upi_uri ->
-// customer confirms in-app after paying).
+// Payment Service — Razorpay Checkout flow (create order server-side -> app opens
+// Razorpay's hosted Checkout sheet with that order_id -> Checkout's own success
+// response (payment_id + signature) gets sent back here to confirm/verify).
 class PaymentService {
   final HttpClient _httpClient;
 
   PaymentService({required HttpClient httpClient}) : _httpClient = httpClient;
 
-  Future<UpiOrder> createOrder(String bookingId, double amount) async {
+  Future<RazorpayOrderResponse> createOrder(String bookingId, double amount) async {
     try {
       final response = await _httpClient.post(
         ApiConfig.paymentOrders,
         data: {'booking_id': bookingId, 'amount': amount},
       );
       final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
-      return UpiOrder.fromJson(data);
+      return RazorpayOrderResponse.fromJson(data);
     } catch (e) {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
   }
 
-  /// [upiStatus]/[upiResponseCode]/[upiApprovalRef] must come straight from the UPI
-  /// app's OWN response to the launched intent (see PaymentScreen — upi_india's
-  /// UpiResponse), never something the client invents: the backend only marks a
-  /// payment (and its booking) paid when upiStatus == "SUCCESS" and rejects
-  /// anything else (see UpiService.ConfirmPayment).
+  /// [razorpayPaymentId]/[razorpaySignature] must come straight from Razorpay
+  /// Checkout's OWN success callback (see PaymentScreen), never something the
+  /// client invents: the backend independently re-verifies the signature
+  /// server-side (HMAC-SHA256 with the account's key secret) before ever marking
+  /// a payment (and its booking) paid — see RazorpayService.VerifyAndCapture.
   Future<Payment> confirm(
-    String transactionRef, {
-    String? upiTxnId,
-    required String upiStatus,
-    String? upiResponseCode,
-    String? upiApprovalRef,
-    String method = 'upi',
+    String razorpayOrderId, {
+    required String razorpayPaymentId,
+    required String razorpaySignature,
+    String method = 'razorpay',
   }) async {
     try {
       final response = await _httpClient.post(
         ApiConfig.paymentConfirm,
         data: {
-          'transaction_ref': transactionRef,
-          if (upiTxnId != null && upiTxnId.isNotEmpty) 'upi_txn_id': upiTxnId,
-          'upi_status': upiStatus,
-          if (upiResponseCode != null) 'upi_response_code': upiResponseCode,
-          if (upiApprovalRef != null) 'upi_approval_ref': upiApprovalRef,
+          'razorpay_order_id': razorpayOrderId,
+          'razorpay_payment_id': razorpayPaymentId,
+          'razorpay_signature': razorpaySignature,
           'method': method,
         },
       );
@@ -76,9 +73,9 @@ class PaymentService {
     }
   }
 
-  Future<void> markFailed(String transactionRef) async {
+  Future<void> markFailed(String razorpayOrderId) async {
     try {
-      await _httpClient.post(ApiConfig.paymentFail, data: {'transaction_ref': transactionRef});
+      await _httpClient.post(ApiConfig.paymentFail, data: {'razorpay_order_id': razorpayOrderId});
     } catch (e) {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
@@ -93,9 +90,53 @@ class PaymentService {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
   }
+
+  /// Full GST invoice for a payment — base amount, CGST, SGST, service ID —
+  /// only available once the payment is actually paid (see backend
+  /// RazorpayService.GetInvoice).
+  Future<InvoiceDetail> getInvoice(String paymentId) async {
+    try {
+      final response = await _httpClient.get(ApiConfig.paymentInvoice(paymentId));
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return InvoiceDetail.fromJson(data);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
 }
 
 // Technician KYC Service — authenticated: file upload, profile registration, own profile.
+// Review Service — POST /reviews (create), GET /technicians/:id/reviews (list,
+// called from TechnicianService/technician detail screen).
+class ReviewService {
+  final HttpClient _httpClient;
+
+  ReviewService({required HttpClient httpClient}) : _httpClient = httpClient;
+
+  Future<Review> create({required String bookingId, required int rating, String comment = ''}) async {
+    try {
+      final response = await _httpClient.post(
+        ApiConfig.reviews,
+        data: {'booking_id': bookingId, 'rating': rating, 'comment': comment},
+      );
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return Review.fromJson(data);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  Future<List<Review>> listForTechnician(String technicianId) async {
+    try {
+      final response = await _httpClient.get('${ApiConfig.technicianReviews}/$technicianId/reviews');
+      final list = ApiEnvelope.unwrap(response) as List? ?? [];
+      return list.map((e) => Review.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+}
+
 class TechnicianKycService {
   final HttpClient _httpClient;
 
@@ -410,33 +451,6 @@ class AIService {
       final response = await _httpClient.post(ApiConfig.aiTranscribe, data: formData);
       final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
       return data['text'] as String;
-    } catch (e) {
-      throw Exception(ApiEnvelope.errorMessage(e));
-    }
-  }
-}
-class ReviewService {
-  final HttpClient _httpClient;
-  ReviewService({required HttpClient httpClient}) : _httpClient = httpClient;
-
-  Future<Review> create({required String bookingId, required int rating, String comment = ''}) async {
-    try {
-      final response = await _httpClient.post(
-        ApiConfig.reviewCreate,
-        data: {'booking_id': bookingId, 'rating': rating, if (comment.isNotEmpty) 'comment': comment},
-      );
-      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
-      return Review.fromJson(data);
-    } catch (e) {
-      throw Exception(ApiEnvelope.errorMessage(e));
-    }
-  }
-
-  Future<List<Review>> listForTechnician(String technicianId) async {
-    try {
-      final response = await _httpClient.get('${ApiConfig.technicianReviews}/$technicianId/reviews');
-      final list = ApiEnvelope.unwrap(response) as List? ?? [];
-      return list.map((e) => Review.fromJson(e as Map<String, dynamic>)).toList();
     } catch (e) {
       throw Exception(ApiEnvelope.errorMessage(e));
     }

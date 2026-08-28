@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../providers/payment_provider.dart';
 import '../../models/payment_model.dart';
+import 'invoice_screen.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
   const TransactionHistoryScreen({Key? key}) : super(key: key);
@@ -124,7 +125,14 @@ class _TransactionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: payment.isPaid
+          ? () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => InvoiceScreen(paymentId: payment.id)),
+              )
+          : null,
+      child: Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -175,6 +183,7 @@ class _TransactionCard extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }

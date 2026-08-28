@@ -37,7 +37,7 @@ class NotificationDetailScreen extends StatelessWidget {
                 color: AppTheme.primaryColor.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(Icons.notifications_rounded, color: AppTheme.primaryColor),
+              child: const Icon(Icons.notifications_rounded, color: AppTheme.primaryColor),
             ),
             const SizedBox(height: 16),
             Text(

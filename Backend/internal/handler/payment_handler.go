@@ -10,12 +10,12 @@ import (
 )
 
 type PaymentHandler struct {
-	upi *service.UpiService
-	fcm *service.FirebaseService
+	razorpay *service.RazorpayService
+	fcm      *service.FirebaseService
 }
 
-func NewPaymentHandler(upi *service.UpiService, fcm *service.FirebaseService) *PaymentHandler {
-	return &PaymentHandler{upi: upi, fcm: fcm}
+func NewPaymentHandler(razorpay *service.RazorpayService, fcm *service.FirebaseService) *PaymentHandler {
+	return &PaymentHandler{razorpay: razorpay, fcm: fcm}
 }
 
 type createOrderBody struct {
@@ -23,9 +23,8 @@ type createOrderBody struct {
 	Amount    float64 `json:"amount" binding:"required"`
 }
 
-// CreateOrder returns a upi://pay deep link the app launches with url_launcher —
-// GPay, PhonePe, Paytm etc. all register as handlers for it, so Android shows
-// whichever the customer has installed (or opens GPay directly if it's the only one).
+// CreateOrder creates a real Razorpay order and returns what the app needs to
+// open Razorpay Checkout (order_id + the public key_id + amount).
 func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 	userID := c.GetString("user_id")
 	var body createOrderBody
@@ -33,7 +32,7 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	order, err := h.upi.CreateOrder(c.Request.Context(), body.BookingID, userID, body.Amount)
+	order, err := h.razorpay.CreateOrder(c.Request.Context(), body.BookingID, userID, body.Amount)
 	if err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
@@ -42,32 +41,28 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 }
 
 type confirmPaymentBody struct {
-	TransactionRef string `json:"transaction_ref" binding:"required"`
-	// UpiTxnID/UpiStatus/UpiResponseCode/UpiApprovalRef come straight from the UPI
-	// app's OWN response to the launching app (startActivityForResult) — never a
-	// value the client invents. UpiStatus must be "SUCCESS" for this to ever mark
-	// the payment (and its booking) paid — see UpiService.ConfirmPayment.
-	UpiTxnID        string `json:"upi_txn_id"`
-	UpiStatus       string `json:"upi_status" binding:"required"`
-	UpiResponseCode string `json:"upi_response_code"`
-	UpiApprovalRef  string `json:"upi_approval_ref"`
-	Method          string `json:"method"`
+	// RazorpayOrderID/RazorpayPaymentID/RazorpaySignature come straight from
+	// Razorpay Checkout's OWN success callback on the app — never values the
+	// client invents. The backend independently re-verifies the signature
+	// server-side (see RazorpayService.VerifyAndCapture) before ever marking
+	// this payment (and its booking) paid.
+	RazorpayOrderID   string `json:"razorpay_order_id" binding:"required"`
+	RazorpayPaymentID string `json:"razorpay_payment_id" binding:"required"`
+	RazorpaySignature string `json:"razorpay_signature" binding:"required"`
+	Method            string `json:"method"`
 }
 
-// Confirm marks the payment paid ONLY once the UPI app's own response (reported by
-// the app after the intent returns) indicates a real SUCCESS — see
-// UpiService.ConfirmPayment for why this is the most a raw UPI intent (no
-// PSP/gateway callback) can honestly verify. Generates an invoice number and sends
-// a "Payment success" notification.
+// Confirm marks the payment paid ONLY once the Razorpay signature has been
+// independently re-verified server-side — see RazorpayService.VerifyAndCapture.
+// Generates an invoice number and sends a "Payment success" notification.
 func (h *PaymentHandler) Confirm(c *gin.Context) {
 	var body confirmPaymentBody
 	if err := c.ShouldBindJSON(&body); err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	payment, err := h.upi.ConfirmPayment(
-		c.Request.Context(), body.TransactionRef, body.UpiTxnID, body.Method,
-		body.UpiStatus, body.UpiResponseCode, body.UpiApprovalRef,
+	payment, err := h.razorpay.VerifyAndCapture(
+		c.Request.Context(), body.RazorpayOrderID, body.RazorpayPaymentID, body.RazorpaySignature, body.Method,
 	)
 	if err != nil {
 		status := http.StatusBadRequest
@@ -89,9 +84,10 @@ func (h *PaymentHandler) Confirm(c *gin.Context) {
 
 // Refund — POST /payments/:id/refund (admin only, see router.go). Reverses a
 // verified payment: booking.payment_status -> refunded, technician earning clawed
-// back, customer credited the full amount to their in-app wallet.
+// back, customer credited the full amount to their in-app wallet (and, if the
+// payment actually went through Razorpay, a real gateway refund is also issued).
 func (h *PaymentHandler) Refund(c *gin.Context) {
-	payment, err := h.upi.Refund(c.Request.Context(), c.Param("id"))
+	payment, err := h.razorpay.Refund(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
@@ -99,17 +95,18 @@ func (h *PaymentHandler) Refund(c *gin.Context) {
 
 	if h.fcm != nil {
 		_ = h.fcm.SendToUser(c.Request.Context(), payment.UserID, "Refund processed",
-			"Your payment has been refunded to your HomeFix wallet.",
+			"Your payment has been refunded.",
 			map[string]string{"booking_id": payment.BookingID, "payment_id": payment.ID, "type": "refund"})
 	}
 
 	utils.Success(c, http.StatusOK, payment)
 }
 
-// Fail lets the app tell us a UPI payment was cancelled/failed (e.g. the user backed
-// out of GPay) so the payment record — and any retry UI — reflects that accurately.
+// Fail lets the app tell us a Razorpay payment was cancelled/dismissed/failed
+// (e.g. the user backed out of the payment sheet) so the payment record — and any
+// retry UI — reflects that accurately.
 type failPaymentBody struct {
-	TransactionRef string `json:"transaction_ref" binding:"required"`
+	RazorpayOrderID string `json:"razorpay_order_id" binding:"required"`
 }
 
 func (h *PaymentHandler) Fail(c *gin.Context) {
@@ -118,7 +115,7 @@ func (h *PaymentHandler) Fail(c *gin.Context) {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := h.upi.MarkFailed(c.Request.Context(), body.TransactionRef); err != nil {
+	if err := h.razorpay.MarkFailed(c.Request.Context(), body.RazorpayOrderID); err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -128,10 +125,23 @@ func (h *PaymentHandler) Fail(c *gin.Context) {
 // History powers the customer's Payment History screen.
 func (h *PaymentHandler) History(c *gin.Context) {
 	userID := c.GetString("user_id")
-	list, err := h.upi.ListByUser(c.Request.Context(), userID)
+	list, err := h.razorpay.ListByUser(c.Request.Context(), userID)
 	if err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	utils.Success(c, http.StatusOK, list)
+}
+
+// GetInvoice — GET /payments/:id/invoice. Returns the full GST-compliant
+// invoice (base amount, CGST, SGST, total, service ID) once payment is
+// complete — see RazorpayService.GetInvoice.
+func (h *PaymentHandler) GetInvoice(c *gin.Context) {
+	userID := c.GetString("user_id")
+	invoice, err := h.razorpay.GetInvoice(c.Request.Context(), c.Param("id"), userID)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, invoice)
 }

@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../core/theme.dart';
 
 /// Lets the technician upload professional certificates. Reuses the same
 /// image-picker pattern as the KYC screen. UI-only for now; wire the

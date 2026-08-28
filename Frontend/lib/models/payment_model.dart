@@ -1,27 +1,27 @@
-/// Returned by POST /payments/orders — everything the app needs to launch the
-/// UPI intent (GPay/PhonePe/Paytm all register as handlers for `upi://pay`).
-class UpiOrder {
+/// Returned by POST /payments/orders — everything the app needs to open
+/// Razorpay's Checkout sheet for this order.
+class RazorpayOrderResponse {
   final Payment payment;
-  final String upiUri;
-  final String payeeVpa;
-  final String payeeName;
-  final String transactionRef;
+  final String razorpayOrderId;
+  final String razorpayKeyId;
+  final int amountPaise;
+  final String currency;
 
-  UpiOrder({
+  RazorpayOrderResponse({
     required this.payment,
-    required this.upiUri,
-    required this.payeeVpa,
-    required this.payeeName,
-    required this.transactionRef,
+    required this.razorpayOrderId,
+    required this.razorpayKeyId,
+    required this.amountPaise,
+    required this.currency,
   });
 
-  factory UpiOrder.fromJson(Map<String, dynamic> json) {
-    return UpiOrder(
+  factory RazorpayOrderResponse.fromJson(Map<String, dynamic> json) {
+    return RazorpayOrderResponse(
       payment: Payment.fromJson(json['payment'] as Map<String, dynamic>),
-      upiUri: (json['upi_uri'] as String?) ?? '',
-      payeeVpa: (json['payee_vpa'] as String?) ?? '',
-      payeeName: (json['payee_name'] as String?) ?? '',
-      transactionRef: (json['transaction_ref'] as String?) ?? '',
+      razorpayOrderId: (json['razorpay_order_id'] as String?) ?? '',
+      razorpayKeyId: (json['razorpay_key_id'] as String?) ?? '',
+      amountPaise: (json['amount_paise'] as num?)?.toInt() ?? 0,
+      currency: (json['currency'] as String?) ?? 'INR',
     );
   }
 }
@@ -32,7 +32,6 @@ class Payment {
   final String bookingId;
   final String userId;
   final String transactionRef;
-  final String? upiTxnId;
   final String? invoiceNumber;
   final double amount;
   final double? baseAmount;
@@ -41,7 +40,12 @@ class Payment {
   final String currency;
   final String? method;
   final String status; // created | paid | failed | refunded
-  final bool verified; // true only once the UPI app itself reported SUCCESS
+  final bool verified; // true only once the Razorpay signature was independently re-verified server-side
+  final bool isRepeatCustomer;
+  final double? repeatDiscountPercent;
+  final double? repeatDiscountAmount;
+  final String? razorpayOrderId;
+  final String? razorpayPaymentId;
   final double? platformCommission;
   final double? technicianEarning;
   final DateTime createdAt;
@@ -52,7 +56,6 @@ class Payment {
     required this.bookingId,
     required this.userId,
     required this.transactionRef,
-    this.upiTxnId,
     this.invoiceNumber,
     required this.amount,
     this.baseAmount,
@@ -62,6 +65,11 @@ class Payment {
     this.method,
     required this.status,
     this.verified = false,
+    this.isRepeatCustomer = false,
+    this.repeatDiscountPercent,
+    this.repeatDiscountAmount,
+    this.razorpayOrderId,
+    this.razorpayPaymentId,
     this.platformCommission,
     this.technicianEarning,
     required this.createdAt,
@@ -78,7 +86,6 @@ class Payment {
       bookingId: (json['booking_id'] as String?) ?? '',
       userId: (json['user_id'] as String?) ?? '',
       transactionRef: (json['transaction_ref'] as String?) ?? '',
-      upiTxnId: json['upi_txn_id'] as String?,
       invoiceNumber: json['invoice_number'] as String?,
       amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
       baseAmount: (json['base_amount'] as num?)?.toDouble(),
@@ -88,10 +95,95 @@ class Payment {
       method: json['method'] as String?,
       status: (json['status'] as String?) ?? 'created',
       verified: json['verified'] as bool? ?? false,
+      isRepeatCustomer: json['is_repeat_customer'] as bool? ?? false,
+      repeatDiscountPercent: (json['repeat_discount_percent'] as num?)?.toDouble(),
+      repeatDiscountAmount: (json['repeat_discount_amount'] as num?)?.toDouble(),
+      razorpayOrderId: json['razorpay_order_id'] as String?,
+      razorpayPaymentId: json['razorpay_payment_id'] as String?,
       platformCommission: (json['platform_commission'] as num?)?.toDouble(),
       technicianEarning: (json['technician_earning'] as num?)?.toDouble(),
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : DateTime.now(),
       updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'] as String) : DateTime.now(),
+    );
+  }
+}
+
+/// Matches backend `models.InvoiceDetail` — the full GST-compliant invoice
+/// for one paid booking, everything the invoice screen/PDF needs in one
+/// response. Returned by GET /payments/:id/invoice, only once a payment has
+/// actually gone through.
+class InvoiceDetail {
+  final Payment payment;
+  final String invoiceNumber;
+  final String serviceCode;
+  final String bookingId;
+  final String categoryName;
+  final String problemDescription;
+  final String customerName;
+  final String customerPhone;
+  final String technicianName;
+  final String technicianPhone;
+  final String addressFormatted;
+  final DateTime paidAt;
+  final double baseAmount;
+  final double cgstPercent;
+  final double cgstAmount;
+  final double sgstPercent;
+  final double sgstAmount;
+  final double totalAmount;
+  final bool isRepeatCustomer;
+  final double? repeatDiscountPercent;
+  final double? repeatDiscountAmount;
+
+  InvoiceDetail({
+    required this.payment,
+    required this.invoiceNumber,
+    required this.serviceCode,
+    required this.bookingId,
+    required this.categoryName,
+    this.problemDescription = '',
+    required this.customerName,
+    required this.customerPhone,
+    this.technicianName = '',
+    this.technicianPhone = '',
+    this.addressFormatted = '',
+    required this.paidAt,
+    required this.baseAmount,
+    required this.cgstPercent,
+    required this.cgstAmount,
+    required this.sgstPercent,
+    required this.sgstAmount,
+    required this.totalAmount,
+    this.isRepeatCustomer = false,
+    this.repeatDiscountPercent,
+    this.repeatDiscountAmount,
+  });
+
+  double get gstTotal => cgstAmount + sgstAmount;
+
+  factory InvoiceDetail.fromJson(Map<String, dynamic> json) {
+    return InvoiceDetail(
+      payment: Payment.fromJson(json['payment'] as Map<String, dynamic>),
+      invoiceNumber: (json['invoice_number'] as String?) ?? '',
+      serviceCode: (json['service_code'] as String?) ?? '',
+      bookingId: (json['booking_id'] as String?) ?? '',
+      categoryName: (json['category_name'] as String?) ?? '',
+      problemDescription: (json['problem_description'] as String?) ?? '',
+      customerName: (json['customer_name'] as String?) ?? '',
+      customerPhone: (json['customer_phone'] as String?) ?? '',
+      technicianName: (json['technician_name'] as String?) ?? '',
+      technicianPhone: (json['technician_phone'] as String?) ?? '',
+      addressFormatted: (json['address_formatted'] as String?) ?? '',
+      paidAt: json['paid_at'] != null ? DateTime.parse(json['paid_at'] as String) : DateTime.now(),
+      baseAmount: (json['base_amount'] as num?)?.toDouble() ?? 0.0,
+      cgstPercent: (json['cgst_percent'] as num?)?.toDouble() ?? 0.0,
+      cgstAmount: (json['cgst_amount'] as num?)?.toDouble() ?? 0.0,
+      sgstPercent: (json['sgst_percent'] as num?)?.toDouble() ?? 0.0,
+      sgstAmount: (json['sgst_amount'] as num?)?.toDouble() ?? 0.0,
+      totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0.0,
+      isRepeatCustomer: json['is_repeat_customer'] as bool? ?? false,
+      repeatDiscountPercent: (json['repeat_discount_percent'] as num?)?.toDouble(),
+      repeatDiscountAmount: (json['repeat_discount_amount'] as num?)?.toDouble(),
     );
   }
 }

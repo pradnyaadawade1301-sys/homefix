@@ -17,6 +17,7 @@ type Booking struct {
 	CategoryID         string     `json:"category_id"`
 	AddressID          string     `json:"address_id"`
 	Status             string     `json:"status"`
+	ServiceCode        string     `json:"service_code,omitempty"` // e.g. "SRV-001042" — a stable, human-readable ID for invoices/receipts, distinct from the internal UUID
 	PaymentStatus      string     `json:"payment_status"` // pending | paid | refunded — set only via verified UpiService.ConfirmPayment
 	ProblemDescription string     `json:"problem_description,omitempty"`
 	Notes              *string    `json:"notes,omitempty"`

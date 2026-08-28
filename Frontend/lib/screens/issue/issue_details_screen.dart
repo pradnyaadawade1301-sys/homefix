@@ -53,7 +53,7 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
   }
 
   Future<void> _pickVideo() async {
-    if (_videos.length >= 1) {
+    if (_videos.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('You can add up to 1 video')),
       );
@@ -258,9 +258,9 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: Colors.grey[300]!, style: BorderStyle.solid),
                         ),
-                        child: Column(
+                        child: const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
+                          children: [
                             Icon(Icons.camera_alt_outlined, color: Colors.grey),
                             SizedBox(height: 4),
                             Text('Camera', style: TextStyle(color: Colors.grey, fontSize: 11)),
@@ -279,9 +279,9 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: Colors.grey[300]!, style: BorderStyle.solid),
                         ),
-                        child: Column(
+                        child: const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
+                          children: [
                             Icon(Icons.add_a_photo_outlined, color: Colors.grey),
                             SizedBox(height: 4),
                             Text('Gallery', style: TextStyle(color: Colors.grey, fontSize: 11)),
@@ -329,9 +329,9 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: Colors.grey[300]!, style: BorderStyle.solid),
                         ),
-                        child: Column(
+                        child: const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
+                          children: [
                             Icon(Icons.videocam_outlined, color: Colors.grey),
                             SizedBox(height: 4),
                             Text('Video', style: TextStyle(color: Colors.grey, fontSize: 11)),

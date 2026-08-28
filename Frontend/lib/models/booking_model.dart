@@ -567,10 +567,11 @@ class RepeatTechnician {
     );
   }
 }
+// Review — a customer's rating + comment for a completed booking. Matches
+// backend internal/models/payment.go -> Review.
 class Review {
   final String id;
-  final String? bookingId;
-  final String? consultationId;
+  final String bookingId;
   final String customerId;
   final String technicianId;
   final int rating;
@@ -579,27 +580,23 @@ class Review {
 
   Review({
     required this.id,
-    this.bookingId,
-    this.consultationId,
+    required this.bookingId,
     required this.customerId,
     required this.technicianId,
     required this.rating,
-    this.comment = '',
+    required this.comment,
     required this.createdAt,
   });
 
   factory Review.fromJson(Map<String, dynamic> json) {
     return Review(
       id: (json['id'] as String?) ?? '',
-      bookingId: json['booking_id'] as String?,
-      consultationId: json['consultation_id'] as String?,
+      bookingId: (json['booking_id'] as String?) ?? '',
       customerId: (json['customer_id'] as String?) ?? '',
       technicianId: (json['technician_id'] as String?) ?? '',
-      rating: json['rating'] as int? ?? 0,
+      rating: (json['rating'] as num?)?.toInt() ?? 0,
       comment: (json['comment'] as String?) ?? '',
-      createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'] as String) ?? DateTime.now()
-          : DateTime.now(),
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : DateTime.now(),
     );
   }
 }

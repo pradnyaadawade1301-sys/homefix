@@ -66,12 +66,12 @@ class _LicenseScreenState extends State<LicenseScreen> {
                         borderRadius: BorderRadius.circular(16),
                         child: Image.file(_licenseFile!, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
                       )
-                    : Column(
+                    : const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.upload_file_rounded, size: 36, color: AppTheme.primaryColor),
-                          const SizedBox(height: 8),
-                          const Text('Tap to upload license photo', style: TextStyle(fontWeight: FontWeight.w600)),
+                          SizedBox(height: 8),
+                          Text('Tap to upload license photo', style: TextStyle(fontWeight: FontWeight.w600)),
                         ],
                       ),
               ),

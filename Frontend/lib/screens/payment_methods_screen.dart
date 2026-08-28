@@ -126,7 +126,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
   }
 }
 
-enum _MethodType { upi, card }
+enum _MethodType { upi }
 
 class _PaymentMethod {
   final _MethodType type;

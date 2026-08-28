@@ -32,6 +32,8 @@ dependencies:
   permission_handler: ^12.0.3
   flutter_ringtone_player: ^4.0.0 # Plays the device's default ringtone while
   # IncomingCallScreen is showing (loops until accepted/rejected/disposed).
+  razorpay_flutter: ^1.4.0 # Opens Razorpay's own hosted Checkout sheet (cards,
+  # UPI, netbanking, wallets) for a given order_id — see payment_screen.dart.
 
   # Firebase & Notifications — FCM push notifications
   firebase_core: ^3.6.0
@@ -78,6 +80,10 @@ dependencies:
   # Utilities
   uuid: ^4.0.0
   shared_preferences: ^2.2.0
+
+  # Invoice PDF generation/download/share — see lib/screens/payment/invoice_screen.dart
+  pdf: ^3.11.1
+  printing: ^5.13.1
   connectivity_plus: ^7.3.1
   
 

@@ -55,6 +55,7 @@ func New(pool *pgxpool.Pool) *Server {
 
 	groqService := service.NewGroqService([]string{"test-key"}, "test-model", "http://127.0.0.1:0/unused", aiRepo)
 	upiService := service.NewUpiService("test@upi", "Test Payee", 15, 18, 5, paymentRepo, bookingRepo, techRepo, walletRepo)
+	razorpayService := service.NewRazorpayService("rzp_test_dummy", "dummy_secret", 15, 18, 5, paymentRepo, bookingRepo, techRepo, walletRepo)
 
 	authService := service.NewAuthService(userRepo, service.NewMailService("", 0, "", "", ""), JWTAccessSecret, JWTRefreshSecret, 15, 720)
 	userService := service.NewUserService(userRepo)
@@ -63,7 +64,7 @@ func New(pool *pgxpool.Pool) *Server {
 	consultService := service.NewConsultationService(consultRepo, techRepo, bookingService, reviewRepo, nil)
 	walletService := service.NewWalletService(walletRepo)
 	reviewService := service.NewReviewService(reviewRepo, bookingRepo)
-	disputeService := service.NewDisputeService(disputeRepo, bookingRepo, upiService, paymentRepo)
+	disputeService := service.NewDisputeService(disputeRepo, bookingRepo, razorpayService, paymentRepo)
 	inventoryService := service.NewInventoryService(inventoryRepo)
 	cmsService := service.NewCmsService(cmsRepo)
 	analyticsService := service.NewAnalyticsService(analyticsRepo)
@@ -75,7 +76,7 @@ func New(pool *pgxpool.Pool) *Server {
 		Category:     handler.NewCategoryHandler(catRepo),
 		Technician:   handler.NewTechnicianHandler(techService),
 		Booking:      handler.NewBookingHandler(bookingService),
-		Payment:      handler.NewPaymentHandler(upiService, nil),
+		Payment:      handler.NewPaymentHandler(razorpayService, nil),
 		Wallet:       handler.NewWalletHandler(walletService),
 		Review:       handler.NewReviewHandler(reviewService),
 		AI:           handler.NewAIHandler(groqService),

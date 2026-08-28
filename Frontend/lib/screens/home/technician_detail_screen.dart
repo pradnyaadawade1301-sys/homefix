@@ -290,9 +290,9 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                           borderRadius: BorderRadius.circular(18),
                           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10)],
                         ),
-                        child: Row(
+                        child: const Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: const [
+                          children: [
                             _TrustBadge(icon: Icons.verified_user_outlined, title: 'Background', subtitle: 'Verified'),
                             _TrustBadge(icon: Icons.support_agent_rounded, title: '24/7', subtitle: 'Support'),
                             _TrustBadge(icon: Icons.lock_outline_rounded, title: 'Secure', subtitle: 'Booking'),

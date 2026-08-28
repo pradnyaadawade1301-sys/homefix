@@ -25,7 +25,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _SectionLabel('Login Security'),
+          const _SectionLabel('Login Security'),
           _SettingsCard(
             children: [
               SwitchListTile(
@@ -46,7 +46,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
             ],
           ),
           const SizedBox(height: 20),
-          _SectionLabel('Data & Privacy'),
+          const _SectionLabel('Data & Privacy'),
           _SettingsCard(
             children: [
               SwitchListTile(
@@ -67,7 +67,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
             ],
           ),
           const SizedBox(height: 20),
-          _SectionLabel('Account'),
+          const _SectionLabel('Account'),
           _SettingsCard(
             children: [
               ListTile(

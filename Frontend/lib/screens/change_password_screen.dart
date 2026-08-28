@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../core/theme.dart';
 
 /// Change password screen — UI-only for now.
 /// Backend note: /auth/set-password endpoint is OTP-flow only (sets a new

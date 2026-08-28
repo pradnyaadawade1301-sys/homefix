@@ -2,6 +2,9 @@ package integration_test
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"testing"
 
@@ -10,6 +13,18 @@ import (
 
 	"homefix-backend/internal/testserver"
 )
+
+// testRazorpaySecret must match the dummy key secret testserver.New() configures
+// its RazorpayService with (see internal/testserver/testserver.go) — it's how
+// these tests can compute a signature that VerifyAndCapture will accept, the
+// exact same way the real Razorpay Checkout SDK would on the device.
+const testRazorpaySecret = "dummy_secret"
+
+func razorpaySignature(orderID, paymentID string) string {
+	mac := hmac.New(sha256.New, []byte(testRazorpaySecret))
+	mac.Write([]byte(orderID + "|" + paymentID))
+	return hex.EncodeToString(mac.Sum(nil))
+}
 
 // fixture is everything a booking+payment test needs: a signed-up, approved
 // technician and a signed-up customer with a saved address, plus a category id
@@ -83,8 +98,8 @@ func setUpBookingFixture(t *testing.T, srv *testserver.Server) fixture {
 
 // TestPaymentConfirm_RejectsUnverifiedStatus is the single most important test in
 // this project: it proves a booking cannot become "paid" from a bare client claim
-// — only a UPI app's own reported SUCCESS status can do that (see
-// UpiService.ConfirmPayment).
+// — only a signature that independently re-verifies against Razorpay's own
+// HMAC-SHA256 scheme can do that (see RazorpayService.VerifyAndCapture).
 func TestPaymentConfirm_RejectsUnverifiedStatus(t *testing.T) {
 	pool := requireDB(t)
 	truncateAll(t, pool)
@@ -105,11 +120,11 @@ func TestPaymentConfirm_RejectsUnverifiedStatus(t *testing.T) {
 	orderRec := doJSON(t, srv.Engine, http.MethodPost, "/api/v1/payments/orders",
 		map[string]interface{}{"booking_id": bookingID, "amount": 500.0}, fx.customerToken)
 	require.Equal(t, http.StatusCreated, orderRec.Code, orderRec.Body.String())
-	txnRef := decodeEnvelope(t, orderRec)["data"].(map[string]interface{})["transaction_ref"].(string)
+	orderID := decodeEnvelope(t, orderRec)["data"].(map[string]interface{})["razorpay_order_id"].(string)
 
-	// The client claims success with no real UPI status — must be rejected.
+	// The client claims success but the signature is just made up — must be rejected.
 	badConfirm := doJSON(t, srv.Engine, http.MethodPost, "/api/v1/payments/confirm", map[string]interface{}{
-		"transaction_ref": txnRef, "upi_status": "submitted",
+		"razorpay_order_id": orderID, "razorpay_payment_id": "pay_fakeFakeFake", "razorpay_signature": "not-a-real-signature",
 	}, fx.customerToken)
 	assert.Equal(t, http.StatusUnprocessableEntity, badConfirm.Code, badConfirm.Body.String())
 
@@ -118,11 +133,13 @@ func TestPaymentConfirm_RejectsUnverifiedStatus(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "pending", b.PaymentStatus)
 
-	// A FAILURE report must also never mark it paid.
-	failConfirm := doJSON(t, srv.Engine, http.MethodPost, "/api/v1/payments/confirm", map[string]interface{}{
-		"transaction_ref": txnRef, "upi_status": "failure",
+	// A signature computed against the WRONG payment id must also never verify.
+	wrongPaymentID := "pay_wrongPaymentId"
+	badSig := razorpaySignature(orderID, "pay_differentFromWhatWeSend")
+	badConfirm2 := doJSON(t, srv.Engine, http.MethodPost, "/api/v1/payments/confirm", map[string]interface{}{
+		"razorpay_order_id": orderID, "razorpay_payment_id": wrongPaymentID, "razorpay_signature": badSig,
 	}, fx.customerToken)
-	assert.Equal(t, http.StatusUnprocessableEntity, failConfirm.Code)
+	assert.Equal(t, http.StatusUnprocessableEntity, badConfirm2.Code)
 
 	b, err = srv.BookingRepo.GetByID(ctx, bookingID)
 	require.NoError(t, err)
@@ -130,7 +147,7 @@ func TestPaymentConfirm_RejectsUnverifiedStatus(t *testing.T) {
 }
 
 // TestPaymentConfirm_VerifiedSuccessPaysBookingAndCreditsTechnician exercises the
-// full happy path: a real SUCCESS response from the UPI app marks the payment (and
+// full happy path: a correctly-signed Razorpay response marks the payment (and
 // booking) paid, and splits the amount into platform commission + technician
 // wallet credit.
 func TestPaymentConfirm_VerifiedSuccessPaysBookingAndCreditsTechnician(t *testing.T) {
@@ -153,11 +170,13 @@ func TestPaymentConfirm_VerifiedSuccessPaysBookingAndCreditsTechnician(t *testin
 	orderRec := doJSON(t, srv.Engine, http.MethodPost, "/api/v1/payments/orders",
 		map[string]interface{}{"booking_id": bookingID, "amount": 1000.0}, fx.customerToken)
 	require.Equal(t, http.StatusCreated, orderRec.Code, orderRec.Body.String())
-	txnRef := decodeEnvelope(t, orderRec)["data"].(map[string]interface{})["transaction_ref"].(string)
+	orderID := decodeEnvelope(t, orderRec)["data"].(map[string]interface{})["razorpay_order_id"].(string)
+
+	paymentID := "pay_test123456789"
+	signature := razorpaySignature(orderID, paymentID)
 
 	confirmRec := doJSON(t, srv.Engine, http.MethodPost, "/api/v1/payments/confirm", map[string]interface{}{
-		"transaction_ref": txnRef, "upi_txn_id": "UPI123456789", "upi_status": "SUCCESS",
-		"upi_response_code": "00",
+		"razorpay_order_id": orderID, "razorpay_payment_id": paymentID, "razorpay_signature": signature,
 	}, fx.customerToken)
 	require.Equal(t, http.StatusOK, confirmRec.Code, confirmRec.Body.String())
 	payment := decodeEnvelope(t, confirmRec)["data"].(map[string]interface{})
@@ -173,13 +192,13 @@ func TestPaymentConfirm_VerifiedSuccessPaysBookingAndCreditsTechnician(t *testin
 	require.NoError(t, err)
 	assert.Equal(t, 850.0, wallet.Balance)
 
-	// Re-confirming the same transaction ref must be a no-op, never double-credit.
+	// Re-confirming the same order must be a no-op, never double-credit.
 	confirmAgain := doJSON(t, srv.Engine, http.MethodPost, "/api/v1/payments/confirm", map[string]interface{}{
-		"transaction_ref": txnRef, "upi_txn_id": "UPI123456789", "upi_status": "SUCCESS",
+		"razorpay_order_id": orderID, "razorpay_payment_id": paymentID, "razorpay_signature": signature,
 	}, fx.customerToken)
 	require.Equal(t, http.StatusOK, confirmAgain.Code)
 
 	wallet, err = srv.WalletRepo.GetOrCreate(ctx, fx.techUserID)
 	require.NoError(t, err)
-	assert.Equal(t, 850.0, wallet.Balance, "confirming an already-paid transaction must not credit the wallet twice")
+	assert.Equal(t, 850.0, wallet.Balance, "confirming an already-paid order must not credit the wallet twice")
 }

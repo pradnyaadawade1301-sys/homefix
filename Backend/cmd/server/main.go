@@ -55,6 +55,14 @@ func main() {
 		cfg.UpiPayeeVPA, cfg.UpiPayeeName, cfg.PlatformCommissionPercent, cfg.GSTPercent, cfg.RepeatCustomerDiscountPercent,
 		paymentRepo, bookingRepo, techRepo, walletRepo,
 	)
+	// Razorpay replaces the UpiService above for the customer-facing payment flow
+	// (order creation / confirm / refund / dispute-refund / admin refund).
+	// upiService itself is kept around only in case anything elsewhere still
+	// references it directly, but it's no longer wired into any handler below.
+	razorpayService := service.NewRazorpayService(
+		cfg.RazorpayKeyID, cfg.RazorpayKeySecret, cfg.PlatformCommissionPercent, cfg.GSTPercent, cfg.RepeatCustomerDiscountPercent,
+		paymentRepo, bookingRepo, techRepo, walletRepo,
+	)
 
 	// fcmService is never nil: in-app notification rows must always be written even
 	// when Firebase/push isn't configured. When push isn't available, SendToUser
@@ -72,7 +80,7 @@ func main() {
 	consultService := service.NewConsultationService(consultRepo, techRepo, bookingService, reviewRepo, fcmService)
 	walletService := service.NewWalletService(walletRepo)
 	reviewService := service.NewReviewService(reviewRepo, bookingRepo)
-	disputeService := service.NewDisputeService(disputeRepo, bookingRepo, upiService, paymentRepo)
+	disputeService := service.NewDisputeService(disputeRepo, bookingRepo, razorpayService, paymentRepo)
 	inventoryService := service.NewInventoryService(inventoryRepo)
 	cmsService := service.NewCmsService(cmsRepo)
 	analyticsService := service.NewAnalyticsService(analyticsRepo)
@@ -85,7 +93,7 @@ func main() {
 		Category:     handler.NewCategoryHandler(catRepo),
 		Technician:   handler.NewTechnicianHandler(techService),
 		Booking:      handler.NewBookingHandler(bookingService),
-		Payment:      handler.NewPaymentHandler(upiService, fcmService),
+		Payment:      handler.NewPaymentHandler(razorpayService, fcmService),
 		Wallet:       handler.NewWalletHandler(walletService),
 		Review:       handler.NewReviewHandler(reviewService),
 		AI:           handler.NewAIHandler(groqService),
@@ -108,7 +116,7 @@ func main() {
 		Inventory: inventoryService,
 		Cms:       cmsService,
 		Analytics: analyticsService,
-		Upi:       upiService,
+		Upi:       upiService, // admin panel legacy field; kept pointing at UpiService, unused for new payments
 		Category:  catRepo,
 		Audit:     auditRepo,
 		JWTSecret: cfg.JWTAccessSecret,

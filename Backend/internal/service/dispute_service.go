@@ -10,14 +10,14 @@ import (
 )
 
 type DisputeService struct {
-	disputeRepo *repository.DisputeRepository
-	bookingRepo *repository.BookingRepository
-	upiService  *UpiService
-	paymentRepo *repository.PaymentRepository
+	disputeRepo    *repository.DisputeRepository
+	bookingRepo    *repository.BookingRepository
+	razorpayService *RazorpayService
+	paymentRepo    *repository.PaymentRepository
 }
 
-func NewDisputeService(disputeRepo *repository.DisputeRepository, bookingRepo *repository.BookingRepository, upiService *UpiService, paymentRepo *repository.PaymentRepository) *DisputeService {
-	return &DisputeService{disputeRepo: disputeRepo, bookingRepo: bookingRepo, upiService: upiService, paymentRepo: paymentRepo}
+func NewDisputeService(disputeRepo *repository.DisputeRepository, bookingRepo *repository.BookingRepository, razorpayService *RazorpayService, paymentRepo *repository.PaymentRepository) *DisputeService {
+	return &DisputeService{disputeRepo: disputeRepo, bookingRepo: bookingRepo, razorpayService: razorpayService, paymentRepo: paymentRepo}
 }
 
 // Raise — a customer or technician opens a dispute against a booking/consultation.
@@ -86,7 +86,7 @@ func (s *DisputeService) Resolve(ctx context.Context, id, status, adminNotes, re
 		if paymentID == "" {
 			return nil, errors.New("no paid payment found for this booking to refund")
 		}
-		if _, err := s.upiService.Refund(ctx, paymentID); err != nil {
+		if _, err := s.razorpayService.Refund(ctx, paymentID); err != nil {
 			return nil, err
 		}
 	}

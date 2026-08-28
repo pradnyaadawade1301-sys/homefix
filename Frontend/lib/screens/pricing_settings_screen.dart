@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../core/theme.dart';
 
 /// Combined pricing settings for a technician: hourly/visit charge, travel
 /// fee, emergency service fee, and minimum service charge. UI-only for now;

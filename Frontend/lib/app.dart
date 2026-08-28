@@ -61,8 +61,8 @@ class _MyAppState extends State<MyApp> {
   late UploadService _uploadService;
   late AIService _aiService;
   late PaymentService _paymentService;
-  late ReviewService _reviewService;
   late AddressService _addressService;
+  late ReviewService _reviewService;
 
   @override
   void initState() {
@@ -84,8 +84,8 @@ class _MyAppState extends State<MyApp> {
     _uploadService = UploadService(httpClient: _httpClient);
     _aiService = AIService(httpClient: _httpClient);
     _paymentService = PaymentService(httpClient: _httpClient);
-    _reviewService = ReviewService(httpClient: _httpClient);
     _addressService = AddressService(httpClient: _httpClient);
+    _reviewService = ReviewService(httpClient: _httpClient);
 
     // Wire up FCM token registration: whenever Firebase issues a new token,
     // send it to the backend.
@@ -166,13 +166,13 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(
           create: (_) => PaymentProvider(paymentService: _paymentService),
         ),
-        Provider<ReviewService>.value(value: _reviewService),
         ChangeNotifierProvider(
           create: (_) => AddressProvider(addressService: _addressService),
         ),
         ChangeNotifierProvider(
           create: (_) => LocationProvider(locationService: LocationService()),
         ),
+        Provider<ReviewService>.value(value: _reviewService),
       ],
       child: MaterialApp(
         navigatorKey: app.navigatorKey,

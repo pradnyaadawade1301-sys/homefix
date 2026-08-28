@@ -7,23 +7,29 @@ class PaymentProvider extends ChangeNotifier {
 
   PaymentProvider({required PaymentService paymentService}) : _paymentService = paymentService;
 
-  UpiOrder? _order;
+  RazorpayOrderResponse? _order;
   Payment? _confirmedPayment;
   List<Payment> _history = [];
+  InvoiceDetail? _invoice;
   bool _isCreatingOrder = false;
   bool _isConfirming = false;
   bool _isLoadingHistory = false;
+  bool _isLoadingInvoice = false;
   String? _error;
 
-  UpiOrder? get order => _order;
+  RazorpayOrderResponse? get order => _order;
   Payment? get confirmedPayment => _confirmedPayment;
   List<Payment> get history => _history;
+  InvoiceDetail? get invoice => _invoice;
   bool get isCreatingOrder => _isCreatingOrder;
   bool get isConfirming => _isConfirming;
   bool get isLoadingHistory => _isLoadingHistory;
+  bool get isLoadingInvoice => _isLoadingInvoice;
   String? get error => _error;
 
-  /// Step 1 — ask the backend for a upi://pay deep link for this booking's amount.
+  /// Step 1 — ask the backend to create a real Razorpay order for this booking's
+  /// amount. Returns everything PaymentScreen needs to open Razorpay Checkout
+  /// (razorpay_order_id + the public key_id + amount in paise).
   Future<bool> createOrder(String bookingId, double amount) async {
     _isCreatingOrder = true;
     _error = null;
@@ -42,19 +48,17 @@ class PaymentProvider extends ChangeNotifier {
     }
   }
 
-  /// Step 2 — after GPay (via upi_india's startTransaction) returns control to the
-  /// app, its OWN response (status/txnId/responseCode/approvalRefNo) is what gets
-  /// sent here — never a client-invented "yes I paid". The backend only marks the
-  /// payment (and its booking) paid when upiStatus is a real SUCCESS.
+  /// Step 2 — after Razorpay Checkout's success callback fires, its OWN response
+  /// (razorpay_payment_id + razorpay_signature) is what gets sent here — never a
+  /// client-invented "yes I paid". The backend independently re-verifies the
+  /// signature server-side before ever marking the payment (and its booking) paid.
   Future<bool> confirmPayment({
-    String? upiTxnId,
-    required String upiStatus,
-    String? upiResponseCode,
-    String? upiApprovalRef,
-    String method = 'upi',
+    required String razorpayPaymentId,
+    required String razorpaySignature,
+    String method = 'razorpay',
   }) async {
-    final ref = _order?.transactionRef;
-    if (ref == null) {
+    final orderId = _order?.razorpayOrderId;
+    if (orderId == null || orderId.isEmpty) {
       _error = 'No active payment to confirm';
       notifyListeners();
       return false;
@@ -64,11 +68,9 @@ class PaymentProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _confirmedPayment = await _paymentService.confirm(
-        ref,
-        upiTxnId: upiTxnId,
-        upiStatus: upiStatus,
-        upiResponseCode: upiResponseCode,
-        upiApprovalRef: upiApprovalRef,
+        orderId,
+        razorpayPaymentId: razorpayPaymentId,
+        razorpaySignature: razorpaySignature,
         method: method,
       );
       return true;
@@ -81,12 +83,13 @@ class PaymentProvider extends ChangeNotifier {
     }
   }
 
-  /// If the customer backs out of their UPI app without paying.
+  /// If Checkout is dismissed, cancelled, or reports failure without the
+  /// customer paying.
   Future<void> cancelPayment() async {
-    final ref = _order?.transactionRef;
-    if (ref == null) return;
+    final orderId = _order?.razorpayOrderId;
+    if (orderId == null || orderId.isEmpty) return;
     try {
-      await _paymentService.markFailed(ref);
+      await _paymentService.markFailed(orderId);
     } catch (_) {
       // best-effort — the payment just stays "created" if this fails, which is fine
     }
@@ -111,5 +114,24 @@ class PaymentProvider extends ChangeNotifier {
     _confirmedPayment = null;
     _error = null;
     notifyListeners();
+  }
+
+  /// Loads the full GST invoice for a payment — call right after a successful
+  /// confirmPayment() to drive the auto-shown Invoice screen, or later from
+  /// Payment History to view/re-download a past invoice.
+  Future<bool> loadInvoice(String paymentId) async {
+    _isLoadingInvoice = true;
+    _error = null;
+    notifyListeners();
+    try {
+      _invoice = await _paymentService.getInvoice(paymentId);
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+      return false;
+    } finally {
+      _isLoadingInvoice = false;
+      notifyListeners();
+    }
   }
 }

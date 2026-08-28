@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../core/theme.dart';
 
 /// Technician bank/UPI details for settlement payouts. UI-only for now;
 /// wire the save action to your settlement/payouts API once ready.

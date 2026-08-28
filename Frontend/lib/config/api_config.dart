@@ -15,7 +15,7 @@ class ApiConfig {
   // Running on a REAL Android device over Wi-Fi: phone and PC must be on the same
   // network. Update the IP below any time your PC's Wi-Fi IP changes (check via
   // `ipconfig` -> IPv4 Address under your active Wi-Fi adapter).
-  static const String baseUrl = 'http://192.168.1.9:8090/api/v1'; // Real device via LAN Wi-Fi
+  static const String baseUrl = 'http://192.168.1.19:8090/api/v1'; // Real device via LAN Wi-Fi
   // static const String baseUrl = 'http://10.0.2.2:8090/api/v1'; // Android emulator
   // static const String baseUrl = 'https://api.homefixlive.com/api/v1'; // Production
 
@@ -29,8 +29,6 @@ class ApiConfig {
   static const String authRefresh = '/auth/refresh';
   static const String authSetPassword = '/auth/set-password';
   static const String authLogout = '/auth/logout';
-    static const String reviewCreate = '/reviews';
-  static const String technicianReviews = '/technicians'; // + /:id/reviews
 
   static const String userProfile = '/users/me';
   static const String userAddresses = '/users/me/addresses';
@@ -44,6 +42,8 @@ class ApiConfig {
   static const String technicianMe = '/technicians/me';
   static const String technicianAvailable = '/technicians/available';
   static const String technicianBookings = '/technicians'; // + /:id/bookings
+  static const String technicianReviews = '/technicians'; // + /:id/reviews
+  static const String reviews = '/reviews';
   static const String technicianRepeatCustomers = '/technicians'; // + /:id/repeat-customers
   static const String myRepeatTechnicians = '/me/repeat-technicians';
 
@@ -61,6 +61,7 @@ class ApiConfig {
   static const String paymentConfirm = '/payments/confirm';
   static const String paymentFail = '/payments/fail';
   static const String paymentHistory = '/payments/history';
+  static String paymentInvoice(String paymentId) => '/payments/$paymentId/invoice';
 
   static const String walletBalance = '/wallet';
   static const String walletTransactions = '/wallet/transactions';
