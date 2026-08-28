@@ -87,6 +87,9 @@ func main() {
 	adminService := service.NewAdminService(userRepo, techRepo, techService, bookingRepo, paymentRepo)
 
 	// ---- Handlers ----
+	financeHandler := handler.NewFinanceHandler(paymentRepo, walletRepo, upiService)
+	adminAPIHandler := handler.NewAdminAPIHandler(userRepo, bookingRepo, techRepo, paymentRepo)
+
 	handlers := &router.Handlers{
 		Auth:         handler.NewAuthHandler(authService, cfg.Env),
 		User:         handler.NewUserHandler(userService),
@@ -104,6 +107,8 @@ func main() {
 		WebRTC:       handler.NewWebRTCHandler(cfg.StunURLs, cfg.TurnURL, cfg.TurnSecret, cfg.TurnTTLSecond),
 		Dispute:      handler.NewDisputeHandler(disputeService),
 		Cms:          handler.NewCmsHandler(cmsService),
+		Finance:      financeHandler,
+		AdminAPI:     adminAPIHandler,
 	}
 
 	r := router.Setup(handlers, cfg.JWTAccessSecret, cfg.UploadDir, rdb)

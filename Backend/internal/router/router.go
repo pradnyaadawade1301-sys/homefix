@@ -27,6 +27,8 @@ type Handlers struct {
 	WebRTC       *handler.WebRTCHandler
 	Dispute      *handler.DisputeHandler
 	Cms          *handler.CmsHandler
+	Finance      *handler.FinanceHandler
+	AdminAPI     *handler.AdminAPIHandler
 }
 
 func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.Engine {
@@ -115,8 +117,8 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.PATCH("/bookings/:id/status", middleware.RequireRole("technician", "admin"), h.Booking.UpdateStatus)
 		authed.POST("/bookings/:id/complete", middleware.RequireRole("technician", "admin"), h.Booking.Complete)
 		authed.POST("/bookings/:id/cancel", h.Booking.Cancel)
-        authed.POST("/bookings/:id/messages", h.Booking.SendMessage)
-        authed.GET("/bookings/:id/messages", h.Booking.ListMessages)
+		authed.POST("/bookings/:id/messages", h.Booking.SendMessage)
+		authed.GET("/bookings/:id/messages", h.Booking.ListMessages)
 		// Live Video Consultation (on-demand, peer-to-peer) — see consultation_service.go
 		// for the matching flow. The actual call media reuses the same /ws/call/:id
 		// signaling relay as booking calls (CallHandler.Signal accepts either a booking
@@ -161,9 +163,33 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.POST("/ai/sessions", h.AI.StartSession)
 		authed.POST("/ai/sessions/:id/messages", h.AI.SendMessage)
 		authed.GET("/ai/sessions/:id/messages", h.AI.History)
-        authed.POST("/ai/transcribe", h.AI.Transcribe)
+		authed.POST("/ai/transcribe", h.AI.Transcribe)
 		authed.GET("/notifications", h.Notification.List)
 		authed.PATCH("/notifications/:id/read", h.Notification.MarkRead)
+
+		// ---- New React Admin Panel (JSON API) — separate from the older
+		// cookie-session /admin panel (internal/admin), which still owns CMS,
+		// disputes, and inventory. ----
+		adminAPI := authed.Group("/admin")
+		adminAPI.Use(middleware.RequireRole("admin"))
+		{
+			adminAPI.GET("/dashboard", h.AdminAPI.Dashboard)
+			adminAPI.GET("/orders", h.AdminAPI.Orders)
+			adminAPI.GET("/customers", h.AdminAPI.Customers)
+			adminAPI.GET("/bookings", h.AdminAPI.Bookings)
+			adminAPI.GET("/technicians", h.AdminAPI.Technicians)
+		}
+
+		// ---- New React Finance Panel (JSON API) ----
+		finance := authed.Group("/finance")
+		finance.Use(middleware.RequireRole("finance"))
+		{
+			finance.GET("/collections", h.Finance.Collections)
+			finance.GET("/payouts", h.Finance.Payouts)
+			finance.GET("/gst-report", h.Finance.GSTReport)
+			finance.GET("/refunds", h.Finance.Refunds)
+			finance.POST("/payments/:id/refund", h.Finance.RefundPayment)
+		}
 	}
 
 	return r
