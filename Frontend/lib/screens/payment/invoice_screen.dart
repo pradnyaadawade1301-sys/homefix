@@ -1,9 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
 import '../../core/theme.dart';
 import '../../models/payment_model.dart';
 import '../../providers/payment_provider.dart';
@@ -87,9 +90,32 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     );
   }
 
+  /// Actually saves the PDF to the device (app's document storage, which
+  /// needs no runtime permission on any Android version) and immediately
+  /// opens it in the phone's default PDF viewer — a real "download", not
+  /// just the OS print-preview dialog the old implementation showed.
   Future<void> _downloadPdf(InvoiceDetail invoice) async {
-    final doc = await _buildPdf(invoice);
-    await Printing.layoutPdf(onLayout: (_) => doc.save(), name: 'Invoice-${invoice.invoiceNumber}.pdf');
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final doc = await _buildPdf(invoice);
+      final bytes = await doc.save();
+      final dir = await getApplicationDocumentsDirectory();
+      final fileName = 'Invoice-${invoice.invoiceNumber}.pdf';
+      final file = File('${dir.path}/$fileName');
+      await file.writeAsBytes(bytes, flush: true);
+
+      final result = await OpenFile.open(file.path);
+      if (result.type != ResultType.done) {
+        // No PDF viewer could open it directly — fall back to the share
+        // sheet so the customer can still save/view it another way.
+        if (!mounted) return;
+        messenger.showSnackBar(SnackBar(content: Text('Saved as $fileName. Opening it needs a PDF viewer app.')));
+        await Printing.sharePdf(bytes: bytes, filename: fileName);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text('Could not download invoice: $e')));
+    }
   }
 
   Future<void> _sharePdf(InvoiceDetail invoice) async {
@@ -195,26 +221,26 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                   ),
                   pw.TableRow(children: [
                     _pdfCell(inv.categoryName.isNotEmpty ? inv.categoryName : 'Service charge'),
-                    _pdfCell('\u20B9${inv.baseAmount.toStringAsFixed(2)}', alignRight: true),
+                    _pdfCell('Rs. ${inv.baseAmount.toStringAsFixed(2)}', alignRight: true),
                   ]),
                   if (inv.isRepeatCustomer && inv.repeatDiscountAmount != null)
                     pw.TableRow(children: [
                       _pdfCell('Repeat customer discount (${inv.repeatDiscountPercent?.toStringAsFixed(0) ?? ''}%)'),
-                      _pdfCell('-\u20B9${inv.repeatDiscountAmount!.toStringAsFixed(2)}', alignRight: true),
+                      _pdfCell('-Rs. ${inv.repeatDiscountAmount!.toStringAsFixed(2)}', alignRight: true),
                     ]),
                   pw.TableRow(children: [
                     _pdfCell('CGST (${inv.cgstPercent.toStringAsFixed(1)}%)'),
-                    _pdfCell('\u20B9${inv.cgstAmount.toStringAsFixed(2)}', alignRight: true),
+                    _pdfCell('Rs. ${inv.cgstAmount.toStringAsFixed(2)}', alignRight: true),
                   ]),
                   pw.TableRow(children: [
                     _pdfCell('SGST (${inv.sgstPercent.toStringAsFixed(1)}%)'),
-                    _pdfCell('\u20B9${inv.sgstAmount.toStringAsFixed(2)}', alignRight: true),
+                    _pdfCell('Rs. ${inv.sgstAmount.toStringAsFixed(2)}', alignRight: true),
                   ]),
                   pw.TableRow(
                     decoration: pw.BoxDecoration(color: PdfColors.grey100),
                     children: [
                       _pdfCell('Total Paid', bold: true),
-                      _pdfCell('\u20B9${inv.totalAmount.toStringAsFixed(2)}', bold: true, alignRight: true),
+                      _pdfCell('Rs. ${inv.totalAmount.toStringAsFixed(2)}', bold: true, alignRight: true),
                     ],
                   ),
                 ],
@@ -223,7 +249,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               pw.Align(
                 alignment: pw.Alignment.centerRight,
                 child: pw.Text(
-                  'Total GST: \u20B9${inv.gstTotal.toStringAsFixed(2)}',
+                  'Total GST: Rs. ${inv.gstTotal.toStringAsFixed(2)}',
                   style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey600),
                 ),
               ),

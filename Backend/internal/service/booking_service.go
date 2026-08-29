@@ -53,6 +53,9 @@ func (s *BookingService) Create(ctx context.Context, b *models.Booking, preferre
 			return nil, errors.New("selected technician not found")
 		}
 		if err := s.bookingRepo.AssignTechnician(ctx, created.ID, preferredTechnicianID); err != nil {
+			if errors.Is(err, repository.ErrBookingAlreadyAssigned) {
+				return nil, errors.New("this booking has already been assigned")
+			}
 			return nil, err
 		}
 		created.TechnicianID = &preferredTechnicianID
@@ -85,6 +88,19 @@ func (s *BookingService) ListForTechnician(ctx context.Context, technicianID str
 	return s.bookingRepo.ListByTechnician(ctx, technicianID)
 }
 
+// TechnicianOwnedByUser reports whether the given technician record belongs to userID —
+// used to stop one technician from viewing another technician's bookings via URL param.
+func (s *BookingService) TechnicianOwnedByUser(ctx context.Context, technicianID, userID string) (bool, error) {
+	tech, err := s.techRepo.GetByID(ctx, technicianID)
+	if err != nil {
+		return false, err
+	}
+	if tech == nil {
+		return false, nil
+	}
+	return tech.UserID == userID, nil
+}
+
 // ListForCustomerDetailed powers the customer's "My Bookings" screen — each booking
 // carries the assigned technician's name/phone/rating once one is assigned.
 func (s *BookingService) ListForCustomerDetailed(ctx context.Context, customerID string) ([]models.BookingDetail, error) {
@@ -110,7 +126,14 @@ func (s *BookingService) Accept(ctx context.Context, bookingID, technicianID str
 		return errors.New("booking is not in a requested state")
 	}
 
+	// AssignTechnician re-checks status='requested' atomically inside its own
+	// UPDATE, so even if two technicians pass the check above at the same
+	// instant, only one of them can actually win here — the other gets
+	// ErrBookingAlreadyAssigned instead of silently overwriting the first.
 	if err := s.bookingRepo.AssignTechnician(ctx, bookingID, technicianID); err != nil {
+		if errors.Is(err, repository.ErrBookingAlreadyAssigned) {
+			return errors.New("this booking has already been accepted by another technician")
+		}
 		return err
 	}
 
@@ -278,13 +301,15 @@ func (s *BookingService) ListMessages(ctx context.Context, bookingID, userID, us
 // resolveBookingParticipantRole confirms userID is actually a party to
 // booking b (its customer, or its assigned technician) and returns which
 // side they're on ("customer" | "technician"). Admins may also read/send for
-// support purposes, recorded as "technician" side.
+// support purposes — recorded as "admin" (its own distinct role) rather than
+// impersonating "technician", so the customer isn't misled about who they're
+// actually talking to.
 func (s *BookingService) resolveBookingParticipantRole(ctx context.Context, b *models.Booking, userID, userRole string) (string, error) {
 	if userID == b.CustomerID {
 		return "customer", nil
 	}
 	if userRole == "admin" {
-		return "technician", nil
+		return "admin", nil
 	}
 	if b.TechnicianID != nil {
 		tech, err := s.techRepo.GetByID(ctx, *b.TechnicianID)

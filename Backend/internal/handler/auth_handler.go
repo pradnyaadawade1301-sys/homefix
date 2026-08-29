@@ -34,12 +34,11 @@ func (h *AuthHandler) RequestOTP(c *gin.Context) {
 		return
 	}
 
+	// The OTP must never be returned in the API response, in any environment —
+	// doing so makes the OTP flow trivially bypassable. It is only ever sent
+	// via the actual SMS channel.
+	_ = otp
 	resp := gin.H{"message": "OTP sent"}
-	// Only echo the OTP back in non-production so the flow is testable before an SMS
-	// gateway is wired in. Never do this once ENV=production.
-	if h.env != "production" {
-		resp["debug_otp"] = otp
-	}
 	utils.Success(c, http.StatusOK, resp)
 }
 
@@ -166,12 +165,10 @@ func (h *AuthHandler) RequestEmailOTP(c *gin.Context) {
 		return
 	}
 
+	// Same as phone OTP — never echo the OTP back in the response, in any
+	// environment. It is only ever delivered via the actual email channel.
+	_ = otp
 	resp := gin.H{"message": "OTP sent to your email"}
-	// Same non-production debug echo as phone OTP — lets the flow be tested
-	// before Gmail SMTP credentials are configured.
-	if h.env != "production" {
-		resp["debug_otp"] = otp
-	}
 	utils.Success(c, http.StatusOK, resp)
 }
 

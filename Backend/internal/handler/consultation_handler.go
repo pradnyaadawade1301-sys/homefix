@@ -89,8 +89,9 @@ func (h *ConsultationHandler) Reject(c *gin.Context) {
 
 // Start - POST /consultations/:id/start.
 func (h *ConsultationHandler) Start(c *gin.Context) {
-    if err := h.consultSvc.MarkStarted(c.Request.Context(), c.Param("id")); err != nil {
-        utils.Error(c, http.StatusInternalServerError, err.Error())
+    userID := c.GetString("user_id")
+    if err := h.consultSvc.MarkStarted(c.Request.Context(), c.Param("id"), userID); err != nil {
+        utils.Error(c, http.StatusForbidden, err.Error())
         return
     }
     utils.Success(c, http.StatusOK, gin.H{"status": "in_call"})
@@ -184,8 +185,9 @@ func (h *ConsultationHandler) Rating(c *gin.Context) {
 
 // Pay - POST /consultations/:id/payment.
 func (h *ConsultationHandler) Pay(c *gin.Context) {
-    if err := h.consultSvc.MarkPaid(c.Request.Context(), c.Param("id")); err != nil {
-        utils.Error(c, http.StatusInternalServerError, err.Error())
+    userID := c.GetString("user_id")
+    if err := h.consultSvc.MarkPaid(c.Request.Context(), c.Param("id"), userID); err != nil {
+        utils.Error(c, http.StatusForbidden, err.Error())
         return
     }
     utils.Success(c, http.StatusOK, gin.H{"payment_status": "paid"})

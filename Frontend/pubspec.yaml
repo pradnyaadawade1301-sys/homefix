@@ -84,6 +84,7 @@ dependencies:
   # Invoice PDF generation/download/share — see lib/screens/payment/invoice_screen.dart
   pdf: ^3.11.1
   printing: ^5.13.1
+  open_file: ^3.3.2
   connectivity_plus: ^7.3.1
   
 

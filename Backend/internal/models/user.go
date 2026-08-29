@@ -11,6 +11,11 @@ type User struct {
 	Role          string     `json:"role"`
 	OTPCode       *string    `json:"-"`
 	OTPExpiresAt  *time.Time `json:"-"`
+	// EmailOTPCode/EmailOTPExpiresAt are separate from OTPCode/OTPExpiresAt
+	// (phone OTP) so requesting one kind of OTP doesn't invalidate the other —
+	// see 016_email_otp_columns.sql.
+	EmailOTPCode      *string    `json:"-"`
+	EmailOTPExpiresAt *time.Time `json:"-"`
 	PhoneVerified bool       `json:"phone_verified"`
 	EmailVerified bool       `json:"email_verified"`
 	PhotoURL      *string    `json:"photo_url,omitempty"`

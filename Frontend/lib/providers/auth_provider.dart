@@ -64,12 +64,12 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Signup with name/phone/password, optional email, and role (customer/technician).
+  /// Signup with name/phone/password/email (required) and role (customer/technician).
   Future<bool> signup({
     required String name,
     required String phone,
     required String password,
-    String? email,
+    required String email,
     String role = 'customer',
   }) async {
     _isLoading = true;

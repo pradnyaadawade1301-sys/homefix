@@ -35,11 +35,13 @@ class AuthService {
 
   /// Signup with name/email/phone/password/role ("customer" or "technician").
   /// Backend: POST /auth/signup { name, email, phone, password, role }
+  /// Email is required — backend enforces `binding:"required,email"` since every
+  /// new account must go through email verification (see VerifyEmailScreen).
   Future<AuthResponse> signup({
     required String name,
     required String phone,
     required String password,
-    String? email,
+    required String email,
     String role = 'customer',
   }) async {
     try {

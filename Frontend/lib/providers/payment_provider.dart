@@ -116,6 +116,30 @@ class PaymentProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Recovery check for when the app process was killed mid-checkout (Razorpay
+  /// Checkout runs as a separate external activity, so Android can reclaim the
+  /// Flutter process while it's in the background) — the customer may have
+  /// actually been charged even though this in-memory provider's `_order` is
+  /// gone and Checkout's success callback never reached us. Called when
+  /// PaymentScreen opens, before showing "Pay Now" again, so we don't charge
+  /// the customer a second time for an already-paid booking.
+  Future<bool> checkExistingPayment(String bookingId) async {
+    try {
+      final payments = await _paymentService.history();
+      for (final p in payments) {
+        if (p.bookingId == bookingId && p.isPaid) {
+          _confirmedPayment = p;
+          notifyListeners();
+          return true;
+        }
+      }
+    } catch (_) {
+      // Best-effort — if this check fails (e.g. offline), fall through to the
+      // normal review/pay flow rather than blocking the screen.
+    }
+    return false;
+  }
+
   /// Loads the full GST invoice for a payment — call right after a successful
   /// confirmPayment() to drive the auto-shown Invoice screen, or later from
   /// Payment History to view/re-download a past invoice.

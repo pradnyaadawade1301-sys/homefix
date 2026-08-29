@@ -179,7 +179,27 @@ func (s *ConsultationService) Get(ctx context.Context, consultationID string) (*
 // MarkStarted flips status to "in_call" the moment both sides have actually joined
 // the WebRTC room (see CallHandler in call_handler.go, which relays the signaling
 // for both booking calls and consultation calls the same way).
-func (s *ConsultationService) MarkStarted(ctx context.Context, consultationID string) error {
+func (s *ConsultationService) MarkStarted(ctx context.Context, consultationID, userID string) error {
+	c, err := s.consultRepo.GetByID(ctx, consultationID)
+	if err != nil {
+		return err
+	}
+	if c == nil {
+		return errors.New("consultation not found")
+	}
+	authorized := c.CustomerID == userID
+	if !authorized && c.TechnicianID != nil {
+		tech, err := s.techRepo.GetByID(ctx, *c.TechnicianID)
+		if err != nil {
+			return err
+		}
+		if tech != nil && tech.UserID == userID {
+			authorized = true
+		}
+	}
+	if !authorized {
+		return errors.New("not authorized to start this consultation")
+	}
 	return s.consultRepo.MarkStarted(ctx, consultationID)
 }
 
@@ -204,7 +224,21 @@ func (s *ConsultationService) End(ctx context.Context, consultationID string) (*
 	return s.consultRepo.GetWithDetails(ctx, consultationID)
 }
 
-func (s *ConsultationService) MarkPaid(ctx context.Context, consultationID string) error {
+// MarkPaid marks a consultation's payment as complete. Only the consultation's
+// own customer can do this — without this check, any authenticated user could
+// mark an arbitrary consultation "paid" via its ID with no actual payment
+// having happened.
+func (s *ConsultationService) MarkPaid(ctx context.Context, consultationID, userID string) error {
+	c, err := s.consultRepo.GetByID(ctx, consultationID)
+	if err != nil {
+		return err
+	}
+	if c == nil {
+		return errors.New("consultation not found")
+	}
+	if c.CustomerID != userID {
+		return errors.New("not authorized to pay for this consultation")
+	}
 	return s.consultRepo.SetPaymentStatus(ctx, consultationID, "paid")
 }
 
@@ -265,6 +299,13 @@ func (s *ConsultationService) Rate(ctx context.Context, consultationID, customer
 	}
 	if c.TechnicianID == nil {
 		return errors.New("no technician was assigned to this consultation")
+	}
+	alreadyReviewed, err := s.reviewRepo.ExistsForConsultation(ctx, consultationID)
+	if err != nil {
+		return err
+	}
+	if alreadyReviewed {
+		return errors.New("this consultation has already been rated")
 	}
 	if err := s.consultRepo.SetRating(ctx, consultationID, rating, comment); err != nil {
 		return err

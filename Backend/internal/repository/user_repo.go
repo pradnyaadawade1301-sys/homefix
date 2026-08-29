@@ -114,15 +114,17 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, 
 }
 
 // GetByEmail is used by the post-signup email-verification flow (RequestEmailOTP /
-// VerifyEmailOTP) to look the account up by email rather than phone.
+// VerifyEmailOTP) to look the account up by email rather than phone. Populates
+// EmailOTPCode/EmailOTPExpiresAt (not OTPCode/OTPExpiresAt) since email
+// verification has its own OTP columns, separate from phone OTP.
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	var u models.User
 	err := r.db.QueryRow(ctx, `
 		SELECT id, phone, COALESCE(name,''), email, COALESCE(password_hash,''), role,
-		       otp_code, otp_expires_at, phone_verified, email_verified, photo_url, fcm_token, is_active, created_at, updated_at
+		       email_otp_code, email_otp_expires_at, phone_verified, email_verified, photo_url, fcm_token, is_active, created_at, updated_at
 		FROM users WHERE email = $1
 	`, email).Scan(&u.ID, &u.Phone, &u.Name, &u.Email, &u.PasswordHash, &u.Role,
-		&u.OTPCode, &u.OTPExpiresAt, &u.PhoneVerified, &u.EmailVerified, &u.PhotoURL, &u.FCMToken, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+		&u.EmailOTPCode, &u.EmailOTPExpiresAt, &u.PhoneVerified, &u.EmailVerified, &u.PhotoURL, &u.FCMToken, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -132,11 +134,12 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 	return &u, nil
 }
 
-// MarkEmailVerified flips email_verified to true and clears the OTP, mirroring
-// VerifyOTPAndActivate's handling of phone_verified.
+// MarkEmailVerified flips email_verified to true and clears the email OTP
+// (email_otp_code/email_otp_expires_at) — separate columns from phone OTP,
+// so this can never accidentally invalidate a pending phone OTP.
 func (r *UserRepository) MarkEmailVerified(ctx context.Context, userID string) error {
 	_, err := r.db.Exec(ctx, `
-		UPDATE users SET email_verified = true, otp_code = NULL, otp_expires_at = NULL, updated_at = now()
+		UPDATE users SET email_verified = true, email_otp_code = NULL, email_otp_expires_at = NULL, updated_at = now()
 		WHERE id = $1
 	`, userID)
 	return err
@@ -144,6 +147,14 @@ func (r *UserRepository) MarkEmailVerified(ctx context.Context, userID string) e
 
 func (r *UserRepository) SetOTP(ctx context.Context, userID, otp string, expiresAt time.Time) error {
 	_, err := r.db.Exec(ctx, `UPDATE users SET otp_code = $1, otp_expires_at = $2, updated_at = now() WHERE id = $3`,
+		otp, expiresAt, userID)
+	return err
+}
+
+// SetEmailOTP stores a pending email-verification code in its own columns,
+// distinct from SetOTP's phone-OTP columns.
+func (r *UserRepository) SetEmailOTP(ctx context.Context, userID, otp string, expiresAt time.Time) error {
+	_, err := r.db.Exec(ctx, `UPDATE users SET email_otp_code = $1, email_otp_expires_at = $2, updated_at = now() WHERE id = $3`,
 		otp, expiresAt, userID)
 	return err
 }

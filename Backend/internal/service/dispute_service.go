@@ -72,20 +72,17 @@ func (s *DisputeService) Resolve(ctx context.Context, id, status, adminNotes, re
 		if d.BookingID == nil {
 			return nil, errors.New("refund resolution requires a booking-linked dispute")
 		}
-		payments, err := s.paymentRepo.ListByUser(ctx, d.RaisedBy)
+		// Look up the payment by booking ID directly, not by the disputing
+		// user's own payment list — RaisedBy can be the technician, whose
+		// payments have nothing to do with this booking's customer payment.
+		payment, err := s.paymentRepo.GetByBookingID(ctx, *d.BookingID)
 		if err != nil {
 			return nil, err
 		}
-		var paymentID string
-		for _, p := range payments {
-			if p.BookingID == *d.BookingID && p.Status == models.PaymentPaid {
-				paymentID = p.ID
-				break
-			}
-		}
-		if paymentID == "" {
+		if payment == nil || payment.Status != models.PaymentPaid {
 			return nil, errors.New("no paid payment found for this booking to refund")
 		}
+		paymentID := payment.ID
 		if _, err := s.razorpayService.Refund(ctx, paymentID); err != nil {
 			return nil, err
 		}

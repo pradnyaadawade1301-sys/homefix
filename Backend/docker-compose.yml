@@ -51,7 +51,7 @@ services:
     environment:
       DATABASE_URL: postgres://homefix:homefix_pass@postgres:5432/homefix?sslmode=disable
     ports:
-      - "8090:8080"
+      - "8090:8090"
     volumes:
       - ./secrets:/app/secrets:ro
       - uploads_data:/app/uploads

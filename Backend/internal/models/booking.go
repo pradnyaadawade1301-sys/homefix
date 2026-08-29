@@ -36,7 +36,7 @@ type BookingMessage struct {
 	ID         string    `json:"id"`
 	BookingID  string    `json:"booking_id"`
 	SenderID   string    `json:"sender_id"`
-	SenderRole string    `json:"sender_role"` // "customer" | "technician"
+	SenderRole string    `json:"sender_role"` // "customer" | "technician" | "admin"
 	Content    string    `json:"content"`
 	CreatedAt  time.Time `json:"created_at"`
 }

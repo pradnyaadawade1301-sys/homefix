@@ -109,14 +109,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           TextFormField(
                             controller: _identifierController,
-                            keyboardType: TextInputType.emailAddress,
+                            keyboardType: TextInputType.text,
                             decoration: const InputDecoration(
-                              hintText: 'Email address',
-                              prefixIcon: Icon(Icons.mail_outline_rounded),
+                              hintText: 'Email or phone number',
+                              prefixIcon: Icon(Icons.person_outline_rounded),
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'Email required';
+                                return 'Email or phone number required';
                               }
                               return null;
                             },

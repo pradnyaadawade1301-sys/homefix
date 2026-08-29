@@ -4,7 +4,7 @@ import '../core/theme.dart';
 import '../models/booking_model.dart';
 import '../providers/booking_provider.dart';
 import '../screens/booking/book_technician_screen.dart';
-import '../write_review_screen.dart';
+import 'write_review_screen.dart';
 
 /// Shows the customer's past service bookings (completed / cancelled), with a
 /// "Book Again" action that pre-fills the same technician + category for a

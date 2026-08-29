@@ -17,5 +17,5 @@ FROM alpine:3.19
 RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 COPY --from=builder /homefix-server /app/homefix-server
-EXPOSE 8080
+EXPOSE 8090
 ENTRYPOINT ["/app/homefix-server"]

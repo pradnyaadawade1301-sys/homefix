@@ -2,12 +2,19 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"homefix-backend/internal/models"
 )
+
+// ErrBookingAlreadyAssigned is returned by AssignTechnician when the booking's
+// status was no longer "requested" at the moment of the (atomic) DB update —
+// i.e. another technician already grabbed it. Callers should surface this as
+// a "someone else already accepted this booking" error, not a generic 500.
+var ErrBookingAlreadyAssigned = errors.New("booking already assigned to another technician")
 
 type BookingRepository struct {
 	db *pgxpool.Pool
@@ -103,6 +110,11 @@ func (r *BookingRepository) SetPaymentStatus(ctx context.Context, bookingID, sta
 	return err
 }
 
+// AssignTechnician atomically assigns a technician only if the booking is still
+// "requested" — the WHERE status='requested' guard + RowsAffected check is what
+// actually prevents double-booking when two technicians accept at the same time;
+// the row lock inside this single UPDATE statement means only one of two
+// concurrent callers can win, unlike a separate read-then-write.
 func (r *BookingRepository) AssignTechnician(ctx context.Context, bookingID, technicianID string) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -110,10 +122,13 @@ func (r *BookingRepository) AssignTechnician(ctx context.Context, bookingID, tec
 	}
 	defer tx.Rollback(ctx)
 
-	_, err = tx.Exec(ctx, `UPDATE bookings SET technician_id = $1, status = 'accepted', updated_at = now() WHERE id = $2`,
+	tag, err := tx.Exec(ctx, `UPDATE bookings SET technician_id = $1, status = 'accepted', updated_at = now() WHERE id = $2 AND status = 'requested'`,
 		technicianID, bookingID)
 	if err != nil {
 		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrBookingAlreadyAssigned
 	}
 	_, err = tx.Exec(ctx, `INSERT INTO booking_status_history (booking_id, status, note) VALUES ($1,'accepted','Technician assigned')`,
 		bookingID)

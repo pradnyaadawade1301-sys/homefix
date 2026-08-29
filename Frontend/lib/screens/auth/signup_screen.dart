@@ -51,7 +51,7 @@ class _SignupScreenState extends State<SignupScreen> {
       name: _nameController.text.trim(),
       phone: _phoneController.text.trim(),
       password: _passwordController.text,
-      email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
+      email: _emailController.text.trim(),
       role: _role,
     );
 

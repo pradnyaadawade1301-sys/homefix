@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"log"
 	"time"
 
 	"homefix-backend/internal/models"
@@ -162,10 +163,9 @@ func (s *AuthService) issueTokens(userID, role string) (string, string, error) {
 }
 
 // RequestEmailOTP sends a 6-digit verification code to an existing account's email —
-// used for the "verify your email" step after signup. Reuses the same otp_code/
-// otp_expires_at columns as phone OTP, so requesting a new one invalidates any
-// pending phone OTP for that user (and vice versa); acceptable since only one
-// verification step is normally in flight at a time.
+// used for the "verify your email" step after signup. Uses its own
+// email_otp_code/email_otp_expires_at columns (separate from phone OTP), so
+// requesting one never invalidates a pending OTP of the other kind.
 func (s *AuthService) RequestEmailOTP(ctx context.Context, email string) (string, error) {
 	u, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil {
@@ -183,11 +183,21 @@ func (s *AuthService) RequestEmailOTP(ctx context.Context, email string) (string
 		return "", err
 	}
 	expiresAt := time.Now().Add(10 * time.Minute)
-	if err := s.userRepo.SetOTP(ctx, u.ID, otp, expiresAt); err != nil {
+	if err := s.userRepo.SetEmailOTP(ctx, u.ID, otp, expiresAt); err != nil {
 		return "", err
 	}
 	if s.mailService != nil {
-		_ = s.mailService.SendOTPEmail(email, otp) // fail-open — see MailService doc comment
+		// Sent in the background: net/smtp.SendMail has no built-in timeout, so
+		// if the SMTP server is slow/unreachable (common on restrictive
+		// networks) this used to hang the whole HTTP request until the
+		// client's own connect timeout aborted it. The result was already
+		// ignored (fail-open), so making it async changes nothing except
+		// letting the request return immediately.
+		go func() {
+			if err := s.mailService.SendOTPEmail(email, otp); err != nil {
+				log.Printf("warning: async OTP email send failed for %s: %v", email, err)
+			}
+		}()
 	}
 	return otp, nil
 }
@@ -202,10 +212,10 @@ func (s *AuthService) VerifyEmailOTP(ctx context.Context, email, otp string) err
 	if u == nil {
 		return errors.New("no account found with this email")
 	}
-	if u.OTPCode == nil || *u.OTPCode != otp {
+	if u.EmailOTPCode == nil || *u.EmailOTPCode != otp {
 		return errors.New("invalid OTP")
 	}
-	if u.OTPExpiresAt == nil || time.Now().After(*u.OTPExpiresAt) {
+	if u.EmailOTPExpiresAt == nil || time.Now().After(*u.EmailOTPExpiresAt) {
 		return errors.New("OTP has expired")
 	}
 	return s.userRepo.MarkEmailVerified(ctx, u.ID)

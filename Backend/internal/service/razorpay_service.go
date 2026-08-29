@@ -219,8 +219,17 @@ func (s *RazorpayService) VerifyAndCapture(ctx context.Context, razorpayOrderID,
 		return nil, errors.New("razorpay: booking not found for this payment")
 	}
 
-	platformCommission := p.Amount * s.commissionPct / 100
-	technicianEarning := p.Amount - platformCommission
+	// Commission is calculated on the base (pre-GST) amount, not the GST-inclusive
+	// total — GST is the government's share, not revenue the platform or
+	// technician split. p.BaseAmount is the effective base computed at
+	// CreateOrder time (post repeat-customer discount); fall back to the total
+	// only for legacy payments that predate the BaseAmount column.
+	commissionBase := p.Amount
+	if p.BaseAmount != nil {
+		commissionBase = *p.BaseAmount
+	}
+	platformCommission := commissionBase * s.commissionPct / 100
+	technicianEarning := commissionBase - platformCommission
 
 	// CGST/SGST split — India intra-state GST is always divided 50/50 between
 	// the two. p.GstAmount was already computed at CreateOrder time (post
@@ -330,10 +339,11 @@ func (s *RazorpayService) Refund(ctx context.Context, paymentID string) (*models
 	if p.RazorpayPaymentID != nil && *p.RazorpayPaymentID != "" {
 		amountPaise := int(p.Amount*100 + 0.5)
 		if _, err := s.client.Payment.Refund(*p.RazorpayPaymentID, amountPaise, nil, nil); err != nil {
-			// Log-and-continue: still reverse it on our side (booking/wallet) so the
-			// customer isn't left in limbo just because the gateway call hiccuped —
-			// an ops admin can reconcile the actual Razorpay-side refund manually.
-			fmt.Printf("[razorpay] refund API call failed for payment %s (%s): %v\n", paymentID, *p.RazorpayPaymentID, err)
+			// The gateway call actually failed — real money has NOT gone back to
+			// the customer. Stop here instead of marking "refunded" and crediting
+			// the wallet, which would let a customer believe (and use) money that
+			// was never actually returned. Caller/admin should retry the refund.
+			return nil, fmt.Errorf("razorpay: gateway refund failed, payment not marked refunded: %w", err)
 		}
 	}
 

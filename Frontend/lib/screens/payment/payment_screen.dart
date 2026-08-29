@@ -32,7 +32,10 @@ class PaymentScreen extends StatefulWidget {
 enum _Stage { review, opening, verifying, success, notVerified }
 
 class _PaymentScreenState extends State<PaymentScreen> {
-  _Stage _stage = _Stage.review;
+  // Starts as "verifying" (not "review") so we never show the Pay button
+  // until we've confirmed this booking isn't already paid from a previous,
+  // interrupted session — see _initPaymentState.
+  _Stage _stage = _Stage.verifying;
   String? _statusMessage;
   late final Razorpay _razorpay;
 
@@ -43,7 +46,26 @@ class _PaymentScreenState extends State<PaymentScreen> {
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess);
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError);
     _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _onExternalWallet);
-    WidgetsBinding.instance.addPostFrameCallback((_) => context.read<PaymentProvider>().reset());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initPaymentState());
+  }
+
+  /// Runs once when the screen opens. Checks first whether this booking was
+  /// already paid in a previous app session (see checkExistingPayment doc) —
+  /// if the OS killed the app mid-Razorpay-checkout, the customer may have
+  /// been charged without the app ever finding out. Only if there's no
+  /// existing paid payment do we reset into a fresh "review/pay" state.
+  Future<void> _initPaymentState() async {
+    if (!mounted) return;
+    final provider = context.read<PaymentProvider>();
+    setState(() => _stage = _Stage.verifying);
+    final alreadyPaid = await provider.checkExistingPayment(widget.bookingId);
+    if (!mounted) return;
+    if (alreadyPaid) {
+      setState(() => _stage = _Stage.success);
+      return;
+    }
+    provider.reset();
+    setState(() => _stage = _Stage.review);
   }
 
   @override

@@ -189,6 +189,7 @@ class BookingProvider extends ChangeNotifier {
       rethrow;
     } finally {
       _isLoading = false;
+      notifyListeners();
     }
   }
 

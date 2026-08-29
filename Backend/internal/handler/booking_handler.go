@@ -83,6 +83,19 @@ func (h *BookingHandler) MyBookings(c *gin.Context) {
 
 func (h *BookingHandler) TechnicianBookings(c *gin.Context) {
 	technicianID := c.Param("id")
+	userID := c.GetString("user_id")
+	userRole := c.GetString("role")
+	if userRole != "admin" {
+		owner, err := h.bookingService.TechnicianOwnedByUser(c.Request.Context(), technicianID, userID)
+		if err != nil {
+			utils.Error(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !owner {
+			utils.Error(c, http.StatusForbidden, "not authorized to view this technician's bookings")
+			return
+		}
+	}
 	list, err := h.bookingService.ListForTechnicianDetailed(c.Request.Context(), technicianID)
 	if err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
