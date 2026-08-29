@@ -12,12 +12,9 @@ class ApiConfig {
   // Backend Base URL - matches homefix_backend router (internal/router/router.go)
   // NOTE: backend is mapped to host port 8090 (see docker-compose.yml), not 8080,
   // to avoid clashing with other local projects.
-  // Running on a REAL Android device over Wi-Fi: phone and PC must be on the same
-  // network. Update the IP below any time your PC's Wi-Fi IP changes (check via
-  // `ipconfig` -> IPv4 Address under your active Wi-Fi adapter).
-  static const String baseUrl = 'http://192.168.1.19:8090/api/v1'; // Real device via LAN Wi-Fi
+  // static const String baseUrl = 'http://192.168.1.19:8090/api/v1'; // Real device via LAN Wi-Fi
   // static const String baseUrl = 'http://10.0.2.2:8090/api/v1'; // Android emulator
-  // static const String baseUrl = 'https://api.homefixlive.com/api/v1'; // Production
+  static const String baseUrl = 'https://homefix-b61f.onrender.com/api/v1'; // Render production
 
   // Auth endpoints (backend: internal/router/router.go -> auth group)
   static const String authSignup = '/auth/signup';

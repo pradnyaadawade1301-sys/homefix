@@ -4,7 +4,6 @@ import '../../core/theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/booking_provider.dart';
-import '../payment/payment_screen.dart';
 import 'bookings_screen.dart';
 
 /// Step 7 of the customer flow ("Book Technician Flow"): pick/add an address,
@@ -93,7 +92,7 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
 
     setState(() => _isSubmitting = true);
     try {
-      final booking = await context.read<BookingProvider>().createBooking(
+      await context.read<BookingProvider>().createBooking(
             categoryId: widget.categoryId,
             addressId: _selectedAddressId!,
             problemDescription: [
@@ -105,22 +104,10 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
           );
       if (!mounted) return;
 
-      // Booking is created — take the customer straight to GPay to pay the
-      // estimated price (set server-side from the category's base price)
-      // before landing on "My Bookings". `paid` is true only if PaymentScreen's
-      // GPay flow actually confirmed the payment; the customer can also back
-      // out of payment and still keep the booking.
-      final paid = await Navigator.of(context).push<bool>(
-        MaterialPageRoute(
-          builder: (_) => PaymentScreen(
-            bookingId: booking.id,
-            amount: booking.displayPrice ?? 0,
-            bookingTitle: widget.categoryName,
-          ),
-        ),
-      );
-      if (!mounted) return;
-
+      // Booking is created — that's it for now. Payment isn't collected
+      // upfront; it happens later once the technician completes the job and
+      // raises an invoice (see booking_tracking_screen.dart's "Pay Now" card,
+      // shown when booking.isInvoiced && !booking.isPaid).
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const BookingsScreen()),
         (route) => route.isFirst,
@@ -128,11 +115,9 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            paid == true
-                ? 'Payment received — booking confirmed!'
-                : (widget.preferredTechnician != null
-                    ? 'Booking confirmed with ${widget.preferredTechnician!.name}'
-                    : 'Booking created — searching for a nearby technician...'),
+            widget.preferredTechnician != null
+                ? 'Booking confirmed with ${widget.preferredTechnician!.name}'
+                : 'Booking created — searching for a nearby technician...',
           ),
         ),
       );

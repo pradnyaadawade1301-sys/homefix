@@ -38,21 +38,20 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   bool _cameraOn = true;
   bool _ringing = false;
 
-  /// Ringback tone for the caller (customer) — plays while we're waiting for
-  /// the other side to accept, stops the moment the remote stream arrives
-  /// (call connected) or the call ends. Only the caller rings here; the
-  /// receiver's ring happens on the incoming-request screen before they even
-  /// open this screen.
+  /// One-shot "calling..." feedback for the caller (customer) — a single
+  /// short tone (NOT the looping incoming-call ringtone) so the caller gets
+  /// light audio confirmation without it sounding like their own phone is
+  /// receiving an incoming call. Only the technician (receiver) gets the
+  /// real looping ring, on the incoming-request screen before they even open
+  /// this screen — see incoming_consultation_screen.dart / app.dart.
   void _startRingback() {
     if (!widget.isCaller || _ringing) return;
     _ringing = true;
-    FlutterRingtonePlayer().playRingtone(looping: true, volume: 1.0, asAlarm: false);
+    FlutterRingtonePlayer().playNotification();
   }
 
   void _stopRingback() {
-    if (!_ringing) return;
     _ringing = false;
-    FlutterRingtonePlayer().stop();
   }
 
   @override

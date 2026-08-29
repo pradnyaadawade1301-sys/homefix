@@ -63,7 +63,7 @@ class FcmNotificationService {
 
       _messaging = FirebaseMessaging.instance;
 
-      // 2. Android notification channel (required for Android 8+)
+      // 2. Android notification channels (required for Android 8+)
       const androidChannel = AndroidNotificationChannel(
         'homefix_notifications',
         'HomeFix Notifications',
@@ -73,11 +73,29 @@ class FcmNotificationService {
         enableVibration: true,
         enableLights: true,
       );
+      // Separate, higher-priority channel just for incoming consultation call
+      // requests — Importance.max forces a heads-up (pop-over) banner with
+      // sound even while the app is backgrounded, which the shared
+      // 'homefix_notifications' channel (Importance.high) doesn't guarantee
+      // on all OEMs. The backend tags consultation_request pushes with this
+      // channel id (see internal/service/firebase_service.go AndroidConfig),
+      // so Android itself displays + sounds the alert in background/killed
+      // state without any Dart code needing to run.
+      const incomingCallChannel = AndroidNotificationChannel(
+        'incoming_calls',
+        'Incoming Consultation Calls',
+        description: 'Alerts for incoming live video consultation requests',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+        enableLights: true,
+      );
       final flutterPlugin = _localNotifications.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       if (flutterPlugin != null) {
         await flutterPlugin.createNotificationChannel(androidChannel);
-        debugPrint('[FCM] Notification channel created');
+        await flutterPlugin.createNotificationChannel(incomingCallChannel);
+        debugPrint('[FCM] Notification channels created');
       }
 
       // 3. Initialize local notifications plugin

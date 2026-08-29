@@ -9,6 +9,11 @@ import '../../providers/auth_provider.dart';
 /// POST /auth/verify-email-otp. Skippable: email verification doesn't block
 /// using the app, it's a nice-to-have trust signal (see backend's
 /// EmailVerified field).
+///
+/// TEMPORARY: "Skip for now" was re-added because Render's free tier blocks
+/// outbound SMTP (port 587), so OTP emails currently can't be delivered in
+/// production. Remove this button once email sending is switched to an
+/// HTTPS-based provider (e.g. Resend/SendGrid) or moved off Render's free tier.
 class VerifyEmailScreen extends StatefulWidget {
   final String email;
   final String destinationRoute;
@@ -97,6 +102,10 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     }
   }
 
+  void _skip() {
+    Navigator.of(context).pushNamedAndRemoveUntil(widget.destinationRoute, (route) => false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -182,6 +191,16 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                   child: Text(
                     _resendCooldown > 0 ? 'Resend code in ${_resendCooldown}s' : "Didn't get it? Resend code",
                     style: TextStyle(color: _resendCooldown > 0 ? Colors.grey : AppTheme.primaryColor, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: TextButton(
+                  onPressed: _skip,
+                  child: Text(
+                    'Skip for now',
+                    style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
