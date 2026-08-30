@@ -9,7 +9,12 @@ import '../chat/booking_chat_screen.dart';
 /// Customer-facing "My Bookings" list. Shows the assigned technician's
 /// name/phone/rating on each card once one is assigned (b.technician != null).
 class BookingsScreen extends StatefulWidget {
-  const BookingsScreen({Key? key}) : super(key: key);
+  /// Optional anchor the Guided Tour can spotlight when it walks onto this
+  /// screen. Attached to the AppBar title so it's always present, even
+  /// while the bookings list itself is still loading or empty.
+  final GlobalKey? tourKey;
+
+  const BookingsScreen({Key? key, this.tourKey}) : super(key: key);
 
   @override
   State<BookingsScreen> createState() => _BookingsScreenState();
@@ -22,6 +27,55 @@ class _BookingsScreenState extends State<BookingsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<BookingProvider>().fetchUserBookings();
     });
+  }
+
+  bool _canCancel(String status) {
+    return !['in_progress', 'completed', 'cancelled'].contains(status);
+  }
+
+  Future<void> _cancelFromList(BuildContext context, String bookingId) async {
+    final controller = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancel this booking?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'This will cancel your booking and notify the technician, if one has been assigned.',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Reason (optional)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Keep Booking')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text.trim()),
+            child: const Text('Yes, Cancel'),
+          ),
+        ],
+      ),
+    );
+    if (reason == null || !context.mounted) return;
+    final provider = context.read<BookingProvider>();
+    final ok = await provider.cancelBooking(bookingId, reason);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(ok ? 'Booking cancelled' : (provider.error ?? 'Could not cancel booking'))),
+    );
   }
 
   Color _statusColor(String status) {
@@ -58,7 +112,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My Bookings')),
+      appBar: AppBar(title: Text('My Bookings', key: widget.tourKey)),
       body: RefreshIndicator(
         onRefresh: () => context.read<BookingProvider>().fetchUserBookings(),
         child: Consumer<BookingProvider>(
@@ -131,6 +185,17 @@ class _BookingsScreenState extends State<BookingsScreen> {
                               style: TextStyle(fontSize: 11, color: _statusColor(b.status), fontWeight: FontWeight.w600),
                             ),
                           ),
+                          if (_canCancel(b.status)) ...[
+                            const SizedBox(width: 6),
+                            InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () => _cancelFromList(context, b.id),
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(Icons.cancel_outlined, size: 18, color: Colors.grey[500]),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                       if (b.problemDescription.isNotEmpty) ...[

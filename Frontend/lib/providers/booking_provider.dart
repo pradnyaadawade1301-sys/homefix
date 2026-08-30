@@ -152,6 +152,7 @@ class BookingProvider extends ChangeNotifier {
     try {
       _selectedBooking = await _bookingService.getBookingDetail(bookingId);
       _history = await _bookingService.getBookingHistory(bookingId);
+      _currentEstimate = await _bookingService.getLatestEstimate(bookingId);
       _error = null;
     } catch (e) {
       _error = e.toString();
@@ -193,17 +194,33 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> cancelBooking(String bookingId, String reason) async {
+  /// Customer cancels a booking that hasn't started yet (see the backend's
+  /// own guard — already in_progress/completed/cancelled bookings are
+  /// rejected with a clear error message in [_error]). Rather than dropping
+  /// the booking from the list, it's refreshed in place so it shows up as
+  /// "Cancelled" — same as Uber keeps a cancelled trip in your history
+  /// instead of hiding it. Returns true on success so callers can drive a
+  /// confirmation snackbar / dialog.
+  Future<bool> cancelBooking(String bookingId, String reason) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
       await _bookingService.cancelBooking(bookingId, reason);
-      _bookings.removeWhere((b) => b.id == bookingId);
       _error = null;
+      final idx = _bookings.indexWhere((b) => b.id == bookingId);
+      final refreshed = await _bookingService.getBookingDetail(bookingId);
+      if (idx != -1) {
+        _bookings[idx] = refreshed;
+      }
+      if (_selectedBooking?.id == bookingId) {
+        _selectedBooking = refreshed;
+      }
+      return true;
     } catch (e) {
-      _error = e.toString();
+      _error = e.toString().replaceFirst('Exception: ', '');
+      return false;
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -250,6 +267,56 @@ class BookingProvider extends ChangeNotifier {
   }
 }
 
+/// Technician taps "I've arrived" — backend generates an OTP and sends it to
+/// the customer only. Refreshes the selected/local booking so the technician
+/// side re-renders into the "arrived, waiting for OTP" state.
+Future<void> markArrived(String bookingId, String technicianId) async {
+  _isLoading = true;
+  _error = null;
+  notifyListeners();
+
+  try {
+    await _bookingService.markArrived(bookingId, technicianId);
+    _error = null;
+    final idx = _bookings.indexWhere((b) => b.id == bookingId);
+    if (idx != -1) {
+      _selectedBooking = await _bookingService.getBookingDetail(bookingId);
+      _bookings[idx] = _selectedBooking!;
+    }
+  } catch (e) {
+    _error = e.toString();
+  } finally {
+    _isLoading = false;
+    notifyListeners();
+  }
+}
+
+/// Technician submits the OTP the customer read out to them. Returns true on
+/// success (wrong/expired OTP surfaces via [error] and returns false so the
+/// UI can show an inline message without throwing).
+Future<bool> verifyArrivalOtp(String bookingId, String technicianId, String otp) async {
+  _isLoading = true;
+  _error = null;
+  notifyListeners();
+
+  try {
+    await _bookingService.verifyArrivalOtp(bookingId, technicianId, otp);
+    _error = null;
+    final idx = _bookings.indexWhere((b) => b.id == bookingId);
+    if (idx != -1) {
+      _selectedBooking = await _bookingService.getBookingDetail(bookingId);
+      _bookings[idx] = _selectedBooking!;
+    }
+    return true;
+  } catch (e) {
+    _error = e.toString();
+    return false;
+  } finally {
+    _isLoading = false;
+    notifyListeners();
+  }
+}
+
 Future<void> completeBooking(String bookingId, double finalPrice) async {
   _isLoading = true;
   _error = null;
@@ -269,4 +336,174 @@ Future<void> completeBooking(String bookingId, double finalPrice) async {
     _isLoading = false;
     notifyListeners();
   }
-}}
+}
+
+// --- Physical Inspection -> Estimate -> Approval ---
+
+BookingEstimate? _currentEstimate;
+List<BookingEstimate> _estimateHistory = [];
+bool _isLoadingEstimate = false;
+
+BookingEstimate? get currentEstimate => _currentEstimate;
+List<BookingEstimate> get estimateHistory => _estimateHistory;
+bool get isLoadingEstimate => _isLoadingEstimate;
+
+/// Loads the most recent estimate for a booking (any status) — call this
+/// whenever a booking detail screen opens so the estimate card can render
+/// alongside the normal tracking view.
+Future<void> fetchLatestEstimate(String bookingId) async {
+  _isLoadingEstimate = true;
+  notifyListeners();
+
+  try {
+    _currentEstimate = await _bookingService.getLatestEstimate(bookingId);
+  } catch (e) {
+    _error = e.toString();
+  } finally {
+    _isLoadingEstimate = false;
+    notifyListeners();
+  }
+}
+
+/// Full negotiation history for a booking (every submitted estimate).
+Future<void> fetchEstimateHistory(String bookingId) async {
+  _isLoadingEstimate = true;
+  notifyListeners();
+
+  try {
+    _estimateHistory = await _bookingService.listEstimates(bookingId);
+  } catch (e) {
+    _error = e.toString();
+  } finally {
+    _isLoadingEstimate = false;
+    notifyListeners();
+  }
+}
+
+/// Technician submits a labour+parts estimate after inspecting the job.
+/// Returns true on success; on failure [error] is set and the UI can show
+/// it inline without a throw.
+Future<bool> submitEstimate({
+  required String bookingId,
+  required String technicianId,
+  required List<BookingEstimateItem> items,
+  String? note,
+}) async {
+  _isLoading = true;
+  _error = null;
+  notifyListeners();
+
+  try {
+    _currentEstimate = await _bookingService.submitEstimate(
+      bookingId: bookingId,
+      technicianId: technicianId,
+      items: items,
+      note: note,
+    );
+    final idx = _bookings.indexWhere((b) => b.id == bookingId);
+    if (idx != -1) {
+      _selectedBooking = await _bookingService.getBookingDetail(bookingId);
+      _bookings[idx] = _selectedBooking!;
+    }
+    return true;
+  } catch (e) {
+    _error = e.toString();
+    return false;
+  } finally {
+    _isLoading = false;
+    notifyListeners();
+  }
+}
+
+/// Customer approves or declines the currently pending estimate. Returns
+/// true on success.
+Future<bool> respondToEstimate({
+  required String bookingId,
+  required String estimateId,
+  required String action, // 'approve' | 'decline'
+  String? note,
+}) async {
+  _isLoading = true;
+  _error = null;
+  notifyListeners();
+
+  try {
+    await _bookingService.respondToEstimate(
+      bookingId: bookingId,
+      estimateId: estimateId,
+      action: action,
+      note: note,
+    );
+    _currentEstimate = await _bookingService.getLatestEstimate(bookingId);
+    final idx = _bookings.indexWhere((b) => b.id == bookingId);
+    if (idx != -1) {
+      _selectedBooking = await _bookingService.getBookingDetail(bookingId);
+      _bookings[idx] = _selectedBooking!;
+    }
+    return true;
+  } catch (e) {
+    _error = e.toString();
+    return false;
+  } finally {
+    _isLoading = false;
+    notifyListeners();
+  }
+}
+
+// --- Before/After job proof photos ---
+
+List<BookingJobPhoto> _jobPhotos = [];
+bool _isLoadingJobPhotos = false;
+
+List<BookingJobPhoto> get jobPhotos => _jobPhotos;
+List<BookingJobPhoto> get beforePhotos => _jobPhotos.where((p) => p.isBefore).toList();
+List<BookingJobPhoto> get afterPhotos => _jobPhotos.where((p) => p.isAfter).toList();
+bool get isLoadingJobPhotos => _isLoadingJobPhotos;
+
+/// Loads every before/after photo for a booking — call whenever a booking
+/// detail/tracking screen opens so the gallery can render alongside status.
+Future<void> fetchJobPhotos(String bookingId) async {
+  _isLoadingJobPhotos = true;
+  notifyListeners();
+
+  try {
+    _jobPhotos = await _bookingService.listJobPhotos(bookingId);
+  } catch (e) {
+    _error = e.toString();
+  } finally {
+    _isLoadingJobPhotos = false;
+    notifyListeners();
+  }
+}
+
+/// Technician attaches a before/after proof photo. The file must already be
+/// uploaded (see UploadService.uploadFile) — this just records its URL
+/// against the booking. Returns true on success.
+Future<bool> addJobPhoto({
+  required String bookingId,
+  required String photoType, // 'before' | 'after'
+  required String imageUrl,
+  String? caption,
+}) async {
+  _isLoading = true;
+  _error = null;
+  notifyListeners();
+
+  try {
+    final photo = await _bookingService.addJobPhoto(
+      bookingId: bookingId,
+      photoType: photoType,
+      imageUrl: imageUrl,
+      caption: caption,
+    );
+    _jobPhotos = [..._jobPhotos, photo];
+    return true;
+  } catch (e) {
+    _error = e.toString();
+    return false;
+  } finally {
+    _isLoading = false;
+    notifyListeners();
+  }
+}
+}

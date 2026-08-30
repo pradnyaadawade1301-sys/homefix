@@ -73,7 +73,7 @@ func main() {
 	}
 
 	// ---- Domain services ----
-	authService := service.NewAuthService(userRepo, mailService, cfg.JWTAccessSecret, cfg.JWTRefreshSecret, cfg.JWTAccessTTLMin, cfg.JWTRefreshTTLHrs)
+	authService := service.NewAuthService(userRepo, mailService, cfg.JWTAccessSecret, cfg.JWTRefreshSecret, cfg.JWTAccessTTLMin, cfg.JWTRefreshTTLHrs, cfg.GoogleClientID)
 	userService := service.NewUserService(userRepo)
 	techService := service.NewTechnicianService(techRepo, catRepo, reviewRepo)
 	bookingService := service.NewBookingService(bookingRepo, catRepo, techRepo, paymentRepo, fcmService)

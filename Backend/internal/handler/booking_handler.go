@@ -287,3 +287,215 @@ func (h *BookingHandler) ListMessages(c *gin.Context) {
 	}
 	utils.Success(c, http.StatusOK, msgs)
 }
+
+// --- OTP verification ---
+
+type bookingOTPVerifyBody struct {
+	OTP string `json:"otp" binding:"required"`
+}
+
+// GetOTP powers the customer's own Booking Tracking screen — shows the
+// on-screen code they read out to the technician, exactly like a
+// ride-hailing app's start-ride PIN. Only the booking's own customer (or an
+// admin) may see it.
+func (h *BookingHandler) GetOTP(c *gin.Context) {
+	bookingID := c.Param("id")
+	userID := c.GetString("user_id")
+	userRole := c.GetString("role")
+
+	b, err := h.bookingService.Get(c.Request.Context(), bookingID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if b == nil {
+		utils.Error(c, http.StatusNotFound, "booking not found")
+		return
+	}
+	if userRole != "admin" && b.CustomerID != userID {
+		utils.Error(c, http.StatusForbidden, "not authorized to view this booking's OTP")
+		return
+	}
+
+	otp, err := h.bookingService.GetOTP(c.Request.Context(), bookingID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"otp": otp})
+}
+
+// VerifyOTP is called by the technician's app after the customer reads out
+// the code shown on their screen. Success moves the booking into
+// "inspecting" so the technician can start diagnosing on record.
+func (h *BookingHandler) VerifyOTP(c *gin.Context) {
+	bookingID := c.Param("id")
+	var body bookingOTPVerifyBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	ok, err := h.bookingService.VerifyOTP(c.Request.Context(), bookingID, body.OTP)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if !ok {
+		utils.Error(c, http.StatusBadRequest, "incorrect OTP")
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"message": "OTP verified, service started"})
+}
+
+// --- Live technician location ---
+
+// GetTechnicianLocation powers the customer's live tracking map. Only the
+// booking's own customer (or an admin) may see it.
+func (h *BookingHandler) GetTechnicianLocation(c *gin.Context) {
+	bookingID := c.Param("id")
+	userID := c.GetString("user_id")
+	userRole := c.GetString("role")
+
+	b, err := h.bookingService.Get(c.Request.Context(), bookingID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if b == nil {
+		utils.Error(c, http.StatusNotFound, "booking not found")
+		return
+	}
+	if userRole != "admin" && b.CustomerID != userID {
+		utils.Error(c, http.StatusForbidden, "not authorized to view this booking's location")
+		return
+	}
+
+	lat, lng, updatedAt, err := h.bookingService.TechnicianLocation(c.Request.Context(), bookingID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{
+		"latitude":   lat,
+		"longitude":  lng,
+		"updated_at": updatedAt,
+	})
+}
+
+// --- Service estimate ---
+
+type estimateItemBody struct {
+	Description string  `json:"description" binding:"required"`
+	Amount      float64 `json:"amount" binding:"required"`
+}
+
+type submitEstimateBody struct {
+	Items []estimateItemBody `json:"items" binding:"required"`
+	Note  string             `json:"note"`
+}
+
+// SubmitEstimate is called by the technician (directly, or again after the
+// customer asked to "discuss") to raise or revise the itemised quote.
+func (h *BookingHandler) SubmitEstimate(c *gin.Context) {
+	bookingID := c.Param("id")
+	var body submitEstimateBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	items := make([]models.BookingEstimateItem, 0, len(body.Items))
+	for _, it := range body.Items {
+		items = append(items, models.BookingEstimateItem{Description: it.Description, Amount: it.Amount})
+	}
+	est, err := h.bookingService.SubmitEstimate(c.Request.Context(), bookingID, items, body.Note)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, est)
+}
+
+// GetEstimate lets either side (customer waiting for a decision, or
+// technician checking status) view the current estimate.
+func (h *BookingHandler) GetEstimate(c *gin.Context) {
+	bookingID := c.Param("id")
+	est, err := h.bookingService.GetEstimate(c.Request.Context(), bookingID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if est == nil {
+		utils.Error(c, http.StatusNotFound, "no estimate found for this booking")
+		return
+	}
+	utils.Success(c, http.StatusOK, est)
+}
+
+type estimateDecisionBody struct {
+	Decision string `json:"decision" binding:"required"` // "approve" | "decline"
+}
+
+// RespondToEstimate is the customer's Approve / Decline button. "Discuss" is
+// intentionally not a decision here — it's just opening chat with the
+// technician, who then resubmits a revised estimate via SubmitEstimate.
+func (h *BookingHandler) RespondToEstimate(c *gin.Context) {
+	bookingID := c.Param("id")
+	userID := c.GetString("user_id")
+
+	b, err := h.bookingService.Get(c.Request.Context(), bookingID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if b == nil {
+		utils.Error(c, http.StatusNotFound, "booking not found")
+		return
+	}
+	if b.CustomerID != userID {
+		utils.Error(c, http.StatusForbidden, "not authorized to respond to this booking's estimate")
+		return
+	}
+
+	var body estimateDecisionBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.bookingService.RespondToEstimate(c.Request.Context(), bookingID, body.Decision); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"message": "estimate " + body.Decision + "d"})
+}
+
+// --- Before/after service photos ---
+
+type addPhotoBody struct {
+	PhotoURL  string `json:"photo_url" binding:"required"`
+	PhotoType string `json:"photo_type" binding:"required"` // "before" | "after"
+}
+
+func (h *BookingHandler) AddServicePhoto(c *gin.Context) {
+	bookingID := c.Param("id")
+	var body addPhotoBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	photo, err := h.bookingService.AddServicePhoto(c.Request.Context(), bookingID, body.PhotoURL, body.PhotoType)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusCreated, photo)
+}
+
+func (h *BookingHandler) ListServicePhotos(c *gin.Context) {
+	bookingID := c.Param("id")
+	photos, err := h.bookingService.ListServicePhotos(c.Request.Context(), bookingID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, photos)
+}

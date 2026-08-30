@@ -79,18 +79,6 @@ func (f *FirebaseService) SendToUser(ctx context.Context, userID, title, body st
 	case u == nil || u.FCMToken == nil || *u.FCMToken == "":
 		log.Printf("[fcm] SendToUser: user %s has no FCM token registered — writing in-app notification only: %q", userID, title)
 	default:
-		// Android delivery config: "high" priority so FCM/the device doesn't
-		// defer delivery in Doze/battery-saver mode, and a channel id matching
-		// one of the channels the app registers in notification_service.dart —
-		// this is what makes the OS show a heads-up banner + play sound even
-		// while the app is backgrounded/killed, with zero Dart code needing to
-		// run. Incoming consultation requests get the higher-importance
-		// 'incoming_calls' channel so they can't get lost among ordinary
-		// booking/payment notifications on the shared channel.
-		channelID := "homefix_notifications"
-		if data["type"] == "consultation_request" {
-			channelID = "incoming_calls"
-		}
 		msg := &messaging.Message{
 			Token: *u.FCMToken,
 			Notification: &messaging.Notification{
@@ -98,12 +86,6 @@ func (f *FirebaseService) SendToUser(ctx context.Context, userID, title, body st
 				Body:  body,
 			},
 			Data: data,
-			Android: &messaging.AndroidConfig{
-				Priority: "high",
-				Notification: &messaging.AndroidNotification{
-					ChannelID: channelID,
-				},
-			},
 		}
 		if _, err := f.client.Send(ctx, msg); err != nil {
 			// Push failed (e.g. stale/invalid token, revoked credentials) - still

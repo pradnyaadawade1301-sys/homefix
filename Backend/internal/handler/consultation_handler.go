@@ -89,9 +89,8 @@ func (h *ConsultationHandler) Reject(c *gin.Context) {
 
 // Start - POST /consultations/:id/start.
 func (h *ConsultationHandler) Start(c *gin.Context) {
-    userID := c.GetString("user_id")
-    if err := h.consultSvc.MarkStarted(c.Request.Context(), c.Param("id"), userID); err != nil {
-        utils.Error(c, http.StatusForbidden, err.Error())
+    if err := h.consultSvc.MarkStarted(c.Request.Context(), c.Param("id")); err != nil {
+        utils.Error(c, http.StatusInternalServerError, err.Error())
         return
     }
     utils.Success(c, http.StatusOK, gin.H{"status": "in_call"})
@@ -185,28 +184,43 @@ func (h *ConsultationHandler) Rating(c *gin.Context) {
 
 // Pay - POST /consultations/:id/payment.
 func (h *ConsultationHandler) Pay(c *gin.Context) {
-    userID := c.GetString("user_id")
-    if err := h.consultSvc.MarkPaid(c.Request.Context(), c.Param("id"), userID); err != nil {
-        utils.Error(c, http.StatusForbidden, err.Error())
+    if err := h.consultSvc.MarkPaid(c.Request.Context(), c.Param("id")); err != nil {
+        utils.Error(c, http.StatusInternalServerError, err.Error())
         return
     }
     utils.Success(c, http.StatusOK, gin.H{"payment_status": "paid"})
 }
 
-// Escalate - POST /consultations/:id/escalate.
+// Escalate - POST /consultations/:id/escalate. "Book a slot" step after a video
+// call: address_id is always required; scheduled_at is optional — omitted/absent
+// means "ASAP" (technician comes as soon as possible), present means the customer
+// picked a specific date/time slot for the on-site visit.
 func (h *ConsultationHandler) Escalate(c *gin.Context) {
     var body struct {
-        AddressID          string `json:"address_id" binding:"required"`
-        ProblemDescription string `json:"problem_description"`
+        AddressID          string     `json:"address_id" binding:"required"`
+        ProblemDescription string     `json:"problem_description"`
+        ScheduledAt        *time.Time `json:"scheduled_at"`
     }
     if err := c.ShouldBindJSON(&body); err != nil {
         utils.Error(c, http.StatusBadRequest, err.Error())
         return
     }
-    booking, err := h.consultSvc.Escalate(c.Request.Context(), c.Param("id"), body.AddressID, body.ProblemDescription)
+    booking, err := h.consultSvc.Escalate(c.Request.Context(), c.Param("id"), body.AddressID, body.ProblemDescription, body.ScheduledAt)
     if err != nil {
         utils.Error(c, http.StatusInternalServerError, err.Error())
         return
     }
     utils.Success(c, http.StatusCreated, booking)
+}
+
+// Mine - GET /consultations/mine. Customer's own consultation history (all
+// statuses — the app's history screen splits these into tabs client-side).
+func (h *ConsultationHandler) Mine(c *gin.Context) {
+    userID := c.GetString("user_id")
+    result, err := h.consultSvc.MyConsultations(c.Request.Context(), userID)
+    if err != nil {
+        utils.Error(c, http.StatusInternalServerError, err.Error())
+        return
+    }
+    utils.Success(c, http.StatusOK, result)
 }

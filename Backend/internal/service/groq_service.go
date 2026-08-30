@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -288,6 +289,17 @@ func (s *GroqService) History(ctx context.Context, sessionID string) ([]models.A
 // Issue Details screen — reuses the same GROQ_API_KEY already configured for
 // chat diagnosis, just a different Groq endpoint (audio/transcriptions
 // instead of chat/completions).
+//
+// Whisper is well known to "hallucinate" plausible-sounding but unrelated
+// text (stock phrases like "Thank you.", random other-language snippets,
+// etc.) when it's given very short or near-silent audio instead of real
+// speech. To avoid feeding that straight into the issue description, this
+// asks Groq for verbose_json (which includes a no_speech_prob per segment)
+// and a temperature of 0, and returns ErrNoSpeechDetected when the audio
+// doesn't look like it actually contained speech instead of returning
+// whatever text Whisper made up.
+var ErrNoSpeechDetected = errors.New("no clear speech detected in the recording")
+
 func (s *GroqService) TranscribeAudio(ctx context.Context, audioData []byte, filename string) (string, error) {
 	const transcribeURL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
@@ -305,6 +317,24 @@ func (s *GroqService) TranscribeAudio(ctx context.Context, audioData []byte, fil
 			return "", fmt.Errorf("groq transcribe: failed to write audio data: %w", err)
 		}
 		if err := writer.WriteField("model", "whisper-large-v3"); err != nil {
+			return "", err
+		}
+		// verbose_json gives us per-segment no_speech_prob so we can detect
+		// hallucinated output instead of trusting any text Whisper returns.
+		if err := writer.WriteField("response_format", "verbose_json"); err != nil {
+			return "", err
+		}
+		// temperature 0 = least "creative"/most deterministic decoding,
+		// which noticeably cuts down on invented text for weak audio.
+		if err := writer.WriteField("temperature", "0"); err != nil {
+			return "", err
+		}
+		// Nudges Whisper's vocabulary toward what these recordings are
+		// actually about, and away from generic hallucinated filler —
+		// users describe home-repair problems (AC, plumbing, electrical,
+		// appliances, carpentry) often in Hindi/Hinglish.
+		if err := writer.WriteField("prompt",
+			"Customer describing a home repair problem such as AC, plumbing, electrical, appliance, or carpentry issue. May be spoken in Hindi, English, or Hinglish."); err != nil {
 			return "", err
 		}
 		if err := writer.Close(); err != nil {
@@ -334,7 +364,12 @@ func (s *GroqService) TranscribeAudio(ctx context.Context, audioData []byte, fil
 		}
 
 		var result struct {
-			Text  string `json:"text"`
+			Text     string `json:"text"`
+			Duration float64 `json:"duration"`
+			Segments []struct {
+				Text         string  `json:"text"`
+				NoSpeechProb float64 `json:"no_speech_prob"`
+			} `json:"segments"`
 			Error *struct {
 				Message string `json:"message"`
 			} `json:"error,omitempty"`
@@ -355,7 +390,37 @@ func (s *GroqService) TranscribeAudio(ctx context.Context, audioData []byte, fil
 			return "", fmt.Errorf("groq transcribe: api error: %s", result.Error.Message)
 		}
 
-		return result.Text, nil
+		text := strings.TrimSpace(result.Text)
+
+		// Very short clips (accidental taps, cut-off recordings) are the
+		// single biggest source of hallucinated Whisper output — Groq
+		// itself can't reliably flag these via no_speech_prob because a
+		// half-second of real speech still looks "speech-like" segment by
+		// segment. Reject on duration first, before even looking at text.
+		if result.Duration > 0 && result.Duration < 0.8 {
+			return "", ErrNoSpeechDetected
+		}
+
+		// If every segment is mostly "not speech" (or there's no text /
+		// no segments at all), treat it as silence rather than trust
+		// whatever filler text came back.
+		if text == "" {
+			return "", ErrNoSpeechDetected
+		}
+		if len(result.Segments) > 0 {
+			allLikelySilence := true
+			for _, seg := range result.Segments {
+				if seg.NoSpeechProb < 0.6 {
+					allLikelySilence = false
+					break
+				}
+			}
+			if allLikelySilence {
+				return "", ErrNoSpeechDetected
+			}
+		}
+
+		return text, nil
 	}
 	return "", fmt.Errorf("groq transcribe: all configured API keys exhausted: %w", lastErr)
 }

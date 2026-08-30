@@ -2,8 +2,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../models/booking_model.dart';
 import '../../providers/ai_provider.dart';
+import '../../providers/category_provider.dart';
 import '../home/technician_list_screen.dart';
+import '../home/technician_detail_screen.dart';
+import '../consultation/searching_technician_screen.dart';
 
 /// Steps 4-5 of the customer flow: AI Diagnosis chat (backed by the real Groq
 /// endpoint) followed by the customer's decision to Book a Technician Visit.
@@ -25,9 +29,31 @@ class AIDiagnosisScreen extends StatefulWidget {
   State<AIDiagnosisScreen> createState() => _AIDiagnosisScreenState();
 }
 
+/// The three ways a customer can proceed once the AI has given its first
+/// read on the problem (mirrors the "Possible Options" step of the product
+/// spec: Get Instant AI Guidance / Talk to an Expert / Book Technician
+/// Directly).
+enum _NextStepChoice { aiGuidance, talkToExpert, bookDirect }
+
 class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
+  bool _techniciansRequested = false;
+
+  // Once the AI has replied at least once, we show the "Possible Options"
+  // card and wait for the customer to pick a path. Staying null keeps the
+  // options card visible; picking "Get Instant AI Guidance" just dismisses
+  // it and lets the customer keep chatting on this same screen. The other
+  // two choices navigate away immediately.
+  _NextStepChoice? _choice;
+
+  void _maybeFetchTechnicians() {
+    if (_techniciansRequested) return;
+    _techniciansRequested = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<TechnicianProvider>().fetchTechnicians(categoryId: widget.categoryId);
+    });
+  }
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -55,6 +81,7 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
   // assigns a technician today, since automatic nearest-technician assignment
   // isn't implemented on the backend yet.
   void _bookTechnician() {
+    setState(() => _choice = _NextStepChoice.bookDirect);
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => TechnicianListScreen(
         categoryId: widget.categoryId,
@@ -62,6 +89,26 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
         problemDescription: widget.problemDescription,
       ),
     ));
+  }
+
+  // "Talk to an Expert" opens the live video consultation flow: it requests
+  // a consultation and shows a searching/matching state while a technician
+  // accepts, then drops the customer straight into the WebRTC call.
+  void _talkToExpert() {
+    setState(() => _choice = _NextStepChoice.talkToExpert);
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => SearchingTechnicianScreen(
+        categoryId: widget.categoryId,
+        categoryName: widget.categoryName,
+        note: widget.problemDescription,
+      ),
+    ));
+  }
+
+  // "Get Instant AI Guidance" just dismisses the options card so the
+  // customer can keep chatting with the AI right here on this screen.
+  void _continueWithAI() {
+    setState(() => _choice = _NextStepChoice.aiGuidance);
   }
 
   @override
@@ -90,10 +137,6 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
     final fault = data['possible_fault']?.toString();
     final causes = (data['causes'] as List?)?.map((e) => e.toString()).toList() ?? [];
     final followUps = (data['follow_up_questions'] as List?)?.map((e) => e.toString()).toList() ?? [];
-    final confidence = data['confidence_score'];
-    final costMin = data['estimated_cost_min'];
-    final costMax = data['estimated_cost_max'];
-    final timeMinutes = data['estimated_time_minutes'];
     final canSolveRemotely = data['can_solve_remotely'];
     final recommendation = data['recommendation']?.toString();
 
@@ -108,23 +151,22 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (fault != null) ...[
-            Row(
+            const Row(
               children: [
-                const Icon(Icons.build_circle_outlined, size: 18, color: AppTheme.primaryColor),
-                const SizedBox(width: 6),
+                Icon(Icons.build_circle_outlined, size: 18, color: AppTheme.primaryColor),
+                SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    fault,
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                    'Here\'s what we found',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                   ),
                 ),
-                if (confidence != null) _confidenceBadge(confidence),
               ],
             ),
             const SizedBox(height: 10),
           ],
           if (causes.isNotEmpty) ...[
-            const Text('Likely causes', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5, color: Colors.black54)),
+            const Text('What the issue is', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5, color: Colors.black54)),
             const SizedBox(height: 4),
             ...causes.map((c) => Padding(
                   padding: const EdgeInsets.only(bottom: 3),
@@ -136,19 +178,6 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
                     ],
                   ),
                 )),
-            const SizedBox(height: 10),
-          ],
-          if (costMin != null && costMax != null || timeMinutes != null) ...[
-            Row(
-              children: [
-                if (costMin != null && costMax != null)
-                  Expanded(child: _infoChip(Icons.currency_rupee, '₹$costMin - ₹$costMax')),
-                if (costMin != null && costMax != null && timeMinutes != null)
-                  const SizedBox(width: 8),
-                if (timeMinutes != null)
-                  Expanded(child: _infoChip(Icons.schedule, '~$timeMinutes min')),
-              ],
-            ),
             const SizedBox(height: 10),
           ],
           if (followUps.isNotEmpty) ...[
@@ -183,28 +212,100 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
     );
   }
 
-  Widget _confidenceBadge(dynamic confidence) {
-    final value = confidence is num ? confidence.toInt() : 0;
-    Color color = value >= 70 ? Colors.green : (value >= 40 ? Colors.orange : Colors.red);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20)),
-      child: Text('$value%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+  /// "Possible Options" card shown right after the AI's first response:
+  /// three clear next steps, colour-coded (green/orange/blue) to match the
+  /// product spec.
+  Widget _buildOptionsCard() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10)],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Possible Options', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+            const SizedBox(height: 10),
+            _OptionRow(
+              color: const Color(0xFF4CAF50),
+              icon: Icons.bolt_rounded,
+              title: 'Get Instant AI Guidance',
+              subtitle: 'Keep chatting with AI to try fixing it yourself',
+              onTap: _continueWithAI,
+            ),
+            const SizedBox(height: 10),
+            _OptionRow(
+              color: const Color(0xFFFF9800),
+              icon: Icons.support_agent_rounded,
+              title: 'Talk to an Expert',
+              subtitle: 'Live video call with a technician right now',
+              onTap: _talkToExpert,
+            ),
+            const SizedBox(height: 10),
+            _OptionRow(
+              color: const Color(0xFF2196F3),
+              icon: Icons.build_rounded,
+              title: 'Book Technician Directly',
+              subtitle: 'Schedule a visit at a time that works for you',
+              onTap: _bookTechnician,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'This gives you the flexibility to choose what works best.',
+              style: TextStyle(fontSize: 11.5, color: Colors.grey[500]),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _infoChip(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: AppTheme.primaryColor),
-          const SizedBox(width: 4),
-          Flexible(child: Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600))),
-        ],
-      ),
+  Widget _buildTechnicianSuggestions() {
+    return Consumer<TechnicianProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading && provider.technicians.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: SizedBox(
+                height: 18, width: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryColor),
+              ),
+            ),
+          );
+        }
+        final techs = provider.technicians.take(3).toList();
+        if (techs.isEmpty) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Suggested technicians', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  TextButton(
+                    onPressed: _bookTechnician,
+                    child: const Text('View all', style: TextStyle(fontSize: 12.5)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              ...techs.map((t) => _SuggestedTechCard(
+                    technician: t,
+                    problemDescription: widget.problemDescription,
+                  )),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -295,23 +396,43 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
                     },
                   ),
                 ),
-                // Decision buttons — step 5 of the spec. Shown once the AI has
-                // replied at least once, so the customer has something to act on.
-                if (ai.messages.any((m) => !m.isUser))
+                // Step 1 of the spec: once the AI has replied at least once,
+                // let the customer choose how to proceed.
+                if (ai.messages.any((m) => !m.isUser) && _choice == null)
+                  _buildOptionsCard(),
+                // After "Get Instant AI Guidance" is picked, keep helping —
+                // surface suggested technicians inline too, in case the
+                // customer changes their mind mid-chat.
+                if (_choice == _NextStepChoice.aiGuidance) ...[
+                  Builder(builder: (context) {
+                    _maybeFetchTechnicians();
+                    return _buildTechnicianSuggestions();
+                  }),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _bookTechnician,
-                        icon: const Icon(Icons.build_rounded, size: 18),
-                        label: const Text('Book Technician', style: TextStyle(fontSize: 13.5)),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _talkToExpert,
+                            icon: const Icon(Icons.support_agent_rounded, size: 18),
+                            label: const Text('Talk to an Expert', style: TextStyle(fontSize: 13)),
+                            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _bookTechnician,
+                            icon: const Icon(Icons.build_rounded, size: 18),
+                            label: const Text('Book Directly', style: TextStyle(fontSize: 13)),
+                            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                ],
                 SafeArea(
                   top: false,
                   child: Padding(
@@ -344,6 +465,118 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+/// One row inside the "Possible Options" card: a coloured dot/icon, a
+/// title + subtitle, and a chevron — the whole row is tappable.
+class _OptionRow extends StatelessWidget {
+  final Color color;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _OptionRow({
+    required this.color,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              child: Icon(icon, color: Colors.white, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: TextStyle(fontSize: 11.5, color: Colors.grey[500])),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SuggestedTechCard extends StatelessWidget {
+  final Technician technician;
+  final String? problemDescription;
+  const _SuggestedTechCard({required this.technician, this.problemDescription});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () {
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => TechnicianDetailScreen(technician: technician, problemDescription: problemDescription),
+        ));
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
+              child: Text(
+                technician.name.isNotEmpty ? technician.name[0].toUpperCase() : '?',
+                style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(technician.name.isNotEmpty ? technician.name : 'Technician',
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      const Icon(Icons.star_rounded, size: 14, color: Color(0xFFF5A623)),
+                      const SizedBox(width: 2),
+                      Text('${technician.ratingAvg.toStringAsFixed(1)} (${technician.ratingCount})',
+                          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                      const SizedBox(width: 8),
+                      Text('${technician.experienceYears} yrs exp',
+                          style: TextStyle(fontSize: 11.5, color: Colors.grey[500])),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
+          ],
         ),
       ),
     );

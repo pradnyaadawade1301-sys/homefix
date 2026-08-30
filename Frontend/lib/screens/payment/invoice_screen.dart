@@ -126,7 +126,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   Future<pw.Document> _buildPdf(InvoiceDetail inv) async {
     final doc = pw.Document();
     final dateFmt = DateFormat('d MMM yyyy, h:mm a');
-    final teal = PdfColor.fromInt(0xFF0F766E);
+    const teal = PdfColor.fromInt(0xFF0F766E);
 
     doc.addPage(
       pw.Page(
@@ -150,7 +150,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.end,
                     children: [
-                      pw.Text('TAX INVOICE', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                      pw.Text('TAX INVOICE', style: const pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
                       pw.SizedBox(height: 2),
                       pw.Text(inv.invoiceNumber, style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
                     ],
@@ -179,9 +179,9 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        pw.Text('Billed to', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey600, fontWeight: pw.FontWeight.bold)),
+                        pw.Text('Billed to', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600, fontWeight: pw.FontWeight.bold)),
                         pw.SizedBox(height: 3),
-                        pw.Text(inv.customerName, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                        pw.Text(inv.customerName, style: const pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
                         if (inv.customerPhone.isNotEmpty) pw.Text(inv.customerPhone, style: const pw.TextStyle(fontSize: 10)),
                         if (inv.addressFormatted.isNotEmpty)
                           pw.Padding(
@@ -196,9 +196,9 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                       child: pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
-                          pw.Text('Service by', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey600, fontWeight: pw.FontWeight.bold)),
+                          pw.Text('Service by', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600, fontWeight: pw.FontWeight.bold)),
                           pw.SizedBox(height: 3),
-                          pw.Text(inv.technicianName, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                          pw.Text(inv.technicianName, style: const pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
                           if (inv.technicianPhone.isNotEmpty) pw.Text(inv.technicianPhone, style: const pw.TextStyle(fontSize: 10)),
                         ],
                       ),
@@ -213,7 +213,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                 columnWidths: const {0: pw.FlexColumnWidth(3), 1: pw.FlexColumnWidth(1.4)},
                 children: [
                   pw.TableRow(
-                    decoration: pw.BoxDecoration(color: PdfColors.grey100),
+                    decoration: const pw.BoxDecoration(color: PdfColors.grey100),
                     children: [
                       _pdfCell('Description', bold: true),
                       _pdfCell('Amount', bold: true, alignRight: true),
@@ -237,7 +237,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                     _pdfCell('Rs. ${inv.sgstAmount.toStringAsFixed(2)}', alignRight: true),
                   ]),
                   pw.TableRow(
-                    decoration: pw.BoxDecoration(color: PdfColors.grey100),
+                    decoration: const pw.BoxDecoration(color: PdfColors.grey100),
                     children: [
                       _pdfCell('Total Paid', bold: true),
                       _pdfCell('Rs. ${inv.totalAmount.toStringAsFixed(2)}', bold: true, alignRight: true),
@@ -256,7 +256,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
 
               pw.SizedBox(height: 24),
               if (inv.problemDescription.isNotEmpty) ...[
-                pw.Text('Issue reported', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey600, fontWeight: pw.FontWeight.bold)),
+                pw.Text('Issue reported', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600, fontWeight: pw.FontWeight.bold)),
                 pw.SizedBox(height: 3),
                 pw.Text(inv.problemDescription, style: const pw.TextStyle(fontSize: 10)),
                 pw.SizedBox(height: 16),
@@ -286,7 +286,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text(label, style: pw.TextStyle(fontSize: 9, color: PdfColors.grey600, fontWeight: pw.FontWeight.bold)),
+        pw.Text(label, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600, fontWeight: pw.FontWeight.bold)),
         pw.SizedBox(height: 2),
         pw.Text(value, style: const pw.TextStyle(fontSize: 11)),
       ],

@@ -180,6 +180,46 @@ func (r *ConsultationRepository) ListPendingForTechnician(ctx context.Context, t
 	return out, nil
 }
 
+// ListForCustomer returns every consultation the customer has ever started, most
+// recent first — powers the "My Consultations" / call-history screen (GET
+// /consultations/mine). Unlike ListPendingForTechnician this is NOT filtered by
+// status: the history screen itself splits into upcoming/completed/cancelled tabs.
+func (r *ConsultationRepository) ListForCustomer(ctx context.Context, customerID string) ([]models.ConsultationWithDetails, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.started_at,
+		       co.ended_at, co.created_at, co.updated_at,
+		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''),
+		       COALESCE(tu.name, ''), COALESCE(tu.phone, '')
+		FROM consultations co
+		LEFT JOIN categories cat ON cat.id = co.category_id
+		LEFT JOIN users cu ON cu.id = co.customer_id
+		LEFT JOIN technicians t ON t.id = co.technician_id
+		LEFT JOIN users tu ON tu.id = t.user_id
+		WHERE co.customer_id = $1
+		ORDER BY co.created_at DESC
+	`, customerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []models.ConsultationWithDetails
+	for rows.Next() {
+		var d models.ConsultationWithDetails
+		if err := rows.Scan(
+			&d.ID, &d.CustomerID, &d.TechnicianID, &d.CategoryID, &d.Status, &d.Fee,
+			&d.DurationSeconds, &d.PaymentStatus, &d.EscalatedBookingID, &d.StartedAt,
+			&d.EndedAt, &d.CreatedAt, &d.UpdatedAt,
+			&d.CategoryName, &d.CustomerName, &d.CustomerPhone, &d.TechnicianName, &d.TechnicianPhone,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, nil
+}
+
 // MarkEndedWithStats is MarkEnded plus the client-reported session-analytics fields
 // gathered during the call (see RtcService in the app: reconnect attempts and a
 // coarse connection-quality sample from getStats()).

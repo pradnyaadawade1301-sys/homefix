@@ -179,27 +179,7 @@ func (s *ConsultationService) Get(ctx context.Context, consultationID string) (*
 // MarkStarted flips status to "in_call" the moment both sides have actually joined
 // the WebRTC room (see CallHandler in call_handler.go, which relays the signaling
 // for both booking calls and consultation calls the same way).
-func (s *ConsultationService) MarkStarted(ctx context.Context, consultationID, userID string) error {
-	c, err := s.consultRepo.GetByID(ctx, consultationID)
-	if err != nil {
-		return err
-	}
-	if c == nil {
-		return errors.New("consultation not found")
-	}
-	authorized := c.CustomerID == userID
-	if !authorized && c.TechnicianID != nil {
-		tech, err := s.techRepo.GetByID(ctx, *c.TechnicianID)
-		if err != nil {
-			return err
-		}
-		if tech != nil && tech.UserID == userID {
-			authorized = true
-		}
-	}
-	if !authorized {
-		return errors.New("not authorized to start this consultation")
-	}
+func (s *ConsultationService) MarkStarted(ctx context.Context, consultationID string) error {
 	return s.consultRepo.MarkStarted(ctx, consultationID)
 }
 
@@ -224,21 +204,7 @@ func (s *ConsultationService) End(ctx context.Context, consultationID string) (*
 	return s.consultRepo.GetWithDetails(ctx, consultationID)
 }
 
-// MarkPaid marks a consultation's payment as complete. Only the consultation's
-// own customer can do this — without this check, any authenticated user could
-// mark an arbitrary consultation "paid" via its ID with no actual payment
-// having happened.
-func (s *ConsultationService) MarkPaid(ctx context.Context, consultationID, userID string) error {
-	c, err := s.consultRepo.GetByID(ctx, consultationID)
-	if err != nil {
-		return err
-	}
-	if c == nil {
-		return errors.New("consultation not found")
-	}
-	if c.CustomerID != userID {
-		return errors.New("not authorized to pay for this consultation")
-	}
+func (s *ConsultationService) MarkPaid(ctx context.Context, consultationID string) error {
 	return s.consultRepo.SetPaymentStatus(ctx, consultationID, "paid")
 }
 
@@ -281,6 +247,12 @@ func (s *ConsultationService) PendingForUser(ctx context.Context, userID string)
 	return s.consultRepo.ListPendingForTechnician(ctx, tech.ID)
 }
 
+// MyConsultations is the customer-facing call history (GET /consultations/mine) —
+// every consultation they've ever requested, most recent first.
+func (s *ConsultationService) MyConsultations(ctx context.Context, customerID string) ([]models.ConsultationWithDetails, error) {
+	return s.consultRepo.ListForCustomer(ctx, customerID)
+}
+
 // Rate records the customer's rating for a consultation that resolved remotely (no
 // escalated booking). Only allowed once the call has actually ended.
 func (s *ConsultationService) Rate(ctx context.Context, consultationID, customerID string, rating int, comment string) error {
@@ -300,13 +272,6 @@ func (s *ConsultationService) Rate(ctx context.Context, consultationID, customer
 	if c.TechnicianID == nil {
 		return errors.New("no technician was assigned to this consultation")
 	}
-	alreadyReviewed, err := s.reviewRepo.ExistsForConsultation(ctx, consultationID)
-	if err != nil {
-		return err
-	}
-	if alreadyReviewed {
-		return errors.New("this consultation has already been rated")
-	}
 	if err := s.consultRepo.SetRating(ctx, consultationID, rating, comment); err != nil {
 		return err
 	}
@@ -318,7 +283,7 @@ func (s *ConsultationService) Rate(ctx context.Context, consultationID, customer
 // into a real booking for the SAME technician (reusing the normal booking-creation
 // path, so it shows up in the technician's job list exactly like any other booking),
 // and links the two records together.
-func (s *ConsultationService) Escalate(ctx context.Context, consultationID, addressID, problemDescription string) (*models.Booking, error) {
+func (s *ConsultationService) Escalate(ctx context.Context, consultationID, addressID, problemDescription string, scheduledAt *time.Time) (*models.Booking, error) {
 	c, err := s.consultRepo.GetByID(ctx, consultationID)
 	if err != nil {
 		return nil, err
@@ -333,6 +298,7 @@ func (s *ConsultationService) Escalate(ctx context.Context, consultationID, addr
 		AddressID:          addressID,
 		TechnicianID:       c.TechnicianID,
 		ProblemDescription: problemDescription,
+		ScheduledAt:        scheduledAt, // nil = ASAP; set = customer picked a date/time slot
 	}
 
 	var preferredTechnicianID string

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -467,6 +468,202 @@ func (r *BookingRepository) listDetailedByColumn(ctx context.Context, col, val s
 			return nil, err
 		}
 		out = append(out, *d)
+	}
+	return out, rows.Err()
+}
+
+// --- OTP verification (customer confirms technician identity on-site) ---
+
+// SetOTP stores a freshly generated OTP for the booking, clearing any
+// previous verification — called when the technician marks themselves
+// "arrived" so the customer's app can display a fresh code.
+func (r *BookingRepository) SetOTP(ctx context.Context, bookingID, otp string) error {
+	_, err := r.db.Exec(ctx, `UPDATE bookings SET otp_code = $1, otp_verified_at = NULL, updated_at = now() WHERE id = $2`,
+		otp, bookingID)
+	return err
+}
+
+// GetOTP returns the currently-stored (unverified) OTP for a booking, or ""
+// if none has been generated yet or it's already been verified. This is
+// what the customer's app polls/fetches to show the code on-screen.
+func (r *BookingRepository) GetOTP(ctx context.Context, bookingID string) (string, error) {
+	var otp *string
+	var verifiedAt *time.Time
+	err := r.db.QueryRow(ctx, `SELECT otp_code, otp_verified_at FROM bookings WHERE id = $1`, bookingID).Scan(&otp, &verifiedAt)
+	if err != nil {
+		return "", err
+	}
+	if otp == nil || verifiedAt != nil {
+		return "", nil
+	}
+	return *otp, nil
+}
+
+// VerifyOTP checks the code the technician entered against the one stored
+// for the booking. On success it stamps otp_verified_at so the service
+// layer can safely allow the "inspecting" status transition.
+func (r *BookingRepository) VerifyOTP(ctx context.Context, bookingID, otp string) (bool, error) {
+	var stored *string
+	err := r.db.QueryRow(ctx, `SELECT otp_code FROM bookings WHERE id = $1`, bookingID).Scan(&stored)
+	if err != nil {
+		return false, err
+	}
+	if stored == nil || *stored == "" || *stored != otp {
+		return false, nil
+	}
+	_, err = r.db.Exec(ctx, `UPDATE bookings SET otp_verified_at = now(), updated_at = now() WHERE id = $1`, bookingID)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// --- Live technician location for a booking's tracking screen ---
+
+// TechnicianLocationForBooking returns the assigned technician's last known
+// lat/lng (reusing technicians.current_lat/current_lng, already kept fresh
+// by PATCH /technicians/:id/location) plus when it was last updated. Returns
+// nil, nil, nil, nil if no technician is assigned yet.
+func (r *BookingRepository) TechnicianLocationForBooking(ctx context.Context, bookingID string) (lat, lng *float64, updatedAt *time.Time, err error) {
+	err = r.db.QueryRow(ctx, `
+		SELECT t.current_lat, t.current_lng, t.updated_at
+		FROM bookings b
+		JOIN technicians t ON t.id = b.technician_id
+		WHERE b.id = $1
+	`, bookingID).Scan(&lat, &lng, &updatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil, nil, nil
+	}
+	return lat, lng, updatedAt, err
+}
+
+// --- Service estimate (Decline / Discuss / Approve) ---
+
+// UpsertEstimate creates the booking's estimate on first save, or replaces
+// the items/total/note on a later edit (e.g. after the customer asked to
+// "discuss" and the technician revises it) — always leaving status back at
+// "pending" so the customer sees the new number needs a fresh decision.
+func (r *BookingRepository) UpsertEstimate(ctx context.Context, bookingID string, items []models.BookingEstimateItem, note string) (*models.BookingEstimate, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	var total float64
+	for _, it := range items {
+		total += it.Amount
+	}
+
+	var estimateID string
+	err = tx.QueryRow(ctx, `
+		INSERT INTO booking_estimates (booking_id, status, total, note)
+		VALUES ($1, 'pending', $2, $3)
+		ON CONFLICT (booking_id) DO UPDATE
+			SET status = 'pending', total = EXCLUDED.total, note = EXCLUDED.note, updated_at = now()
+		RETURNING id
+	`, bookingID, total, note).Scan(&estimateID)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := tx.Exec(ctx, `DELETE FROM booking_estimate_items WHERE estimate_id = $1`, estimateID); err != nil {
+		return nil, err
+	}
+	for _, it := range items {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO booking_estimate_items (estimate_id, description, amount) VALUES ($1,$2,$3)`,
+			estimateID, it.Description, it.Amount); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return r.GetEstimate(ctx, bookingID)
+}
+
+// GetEstimate returns the booking's current estimate (with its line items),
+// or nil if the technician hasn't raised one yet.
+func (r *BookingRepository) GetEstimate(ctx context.Context, bookingID string) (*models.BookingEstimate, error) {
+	var e models.BookingEstimate
+	err := r.db.QueryRow(ctx, `
+		SELECT id, booking_id, status, total, COALESCE(note,''), created_at, updated_at
+		FROM booking_estimates WHERE booking_id = $1
+	`, bookingID).Scan(&e.ID, &e.BookingID, &e.Status, &e.Total, &e.Note, &e.CreatedAt, &e.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := r.db.Query(ctx, `SELECT id, description, amount FROM booking_estimate_items WHERE estimate_id = $1`, e.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var it models.BookingEstimateItem
+		if err := rows.Scan(&it.ID, &it.Description, &it.Amount); err != nil {
+			return nil, err
+		}
+		e.Items = append(e.Items, it)
+	}
+	return &e, rows.Err()
+}
+
+// SetEstimateStatus records the customer's decision — "approved" lets the
+// technician proceed with the paid repair, "declined" ends it there. There
+// is deliberately no separate status for "discuss": the technician just
+// calls UpsertEstimate again with revised items, which resets status back
+// to pending.
+func (r *BookingRepository) SetEstimateStatus(ctx context.Context, bookingID, status string) error {
+	tag, err := r.db.Exec(ctx, `UPDATE booking_estimates SET status = $1, updated_at = now() WHERE booking_id = $2`, status, bookingID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return errors.New("no estimate found for this booking")
+	}
+	return nil
+}
+
+// --- Before/after service photos ---
+
+func (r *BookingRepository) AddServicePhoto(ctx context.Context, bookingID, photoURL, photoType string) (*models.BookingServicePhoto, error) {
+	var p models.BookingServicePhoto
+	p.BookingID = bookingID
+	p.PhotoURL = photoURL
+	p.PhotoType = photoType
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO booking_service_photos (booking_id, photo_url, photo_type)
+		VALUES ($1,$2,$3) RETURNING id, created_at
+	`, bookingID, photoURL, photoType).Scan(&p.ID, &p.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
+func (r *BookingRepository) ListServicePhotos(ctx context.Context, bookingID string) ([]models.BookingServicePhoto, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, booking_id, photo_url, photo_type, created_at
+		FROM booking_service_photos WHERE booking_id = $1 ORDER BY created_at ASC
+	`, bookingID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []models.BookingServicePhoto
+	for rows.Next() {
+		var p models.BookingServicePhoto
+		if err := rows.Scan(&p.ID, &p.BookingID, &p.PhotoURL, &p.PhotoType, &p.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
 	}
 	return out, rows.Err()
 }

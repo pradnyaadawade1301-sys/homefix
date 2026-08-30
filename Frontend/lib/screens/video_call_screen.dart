@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart' show FlutterRingtonePlayer;
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:provider/provider.dart';
+import '../providers/consultation_provider.dart';
 import '../services/signaling_service.dart';
 import '../services/webrtc_service.dart';
+import 'consultation/post_call_screen.dart';
 
 /// Actual video call UI - customer aur technician dono isi screen ko
 /// use karte hain, bas [isCaller] flag alag hota hai.
@@ -13,6 +16,16 @@ class VideoCallScreen extends StatefulWidget {
   final bool isCaller; // true = customer (offer create karega)
   final List<Map<String, dynamic>>? iceServers;
 
+  // Consultation context — when this call is a Live Video Consultation
+  // (customer side, started from SearchingTechnicianScreen), these are set
+  // so we can (a) tell the backend the call ended, which is what makes it
+  // show up in call history, and (b) offer "Book a Slot" with the same
+  // technician right after hangup.
+  final String? consultationId;
+  final String? categoryId;
+  final String? categoryName;
+  final String? technicianName;
+
   const VideoCallScreen({
     super.key,
     required this.signaling,
@@ -20,6 +33,10 @@ class VideoCallScreen extends StatefulWidget {
     required this.peerId,
     required this.isCaller,
     this.iceServers,
+    this.consultationId,
+    this.categoryId,
+    this.categoryName,
+    this.technicianName,
   });
 
   @override
@@ -37,6 +54,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   bool _micOn = true;
   bool _cameraOn = true;
   bool _ringing = false;
+  DateTime? _connectedAt;
 
   /// One-shot "calling..." feedback for the caller (customer) — a single
   /// short tone (NOT the looping incoming-call ringtone) so the caller gets
@@ -79,11 +97,12 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     _webrtc.onRemoteStream = (stream) {
       _remoteRenderer.srcObject = stream;
       _stopRingback();
+      _connectedAt ??= DateTime.now();
       if (mounted) setState(() => _connecting = false);
     };
     _webrtc.onCallEnded = () {
       _stopRingback();
-      if (mounted) Navigator.of(context).pop();
+      _endCall(notifyPeer: false);
     };
 
     widget.signaling.onMessage = (msg) async {
@@ -170,7 +189,41 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       ));
     }
     await _webrtc.hangUp();
-    if (mounted) Navigator.of(context).pop();
+    if (!mounted) return;
+
+    // Report the call as ended so the backend flips it from "in_call" to
+    // "ended" — without this the consultation stays stuck mid-call forever
+    // and never shows up in the customer's call history. Only the customer
+    // side carries consultationId (the technician side of this same screen
+    // has it as null), so this only fires once per call.
+    if (widget.consultationId != null) {
+      final durationSeconds = _connectedAt != null
+          ? DateTime.now().difference(_connectedAt!).inSeconds
+          : 0;
+      try {
+        await context.read<ConsultationProvider>().endCall(
+              widget.consultationId!,
+              durationSeconds: durationSeconds,
+              amount: 0,
+            );
+      } catch (_) {
+        // Non-fatal — the customer can still see the call ended locally;
+        // history may just be briefly stale if this particular call failed.
+      }
+
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(MaterialPageRoute(
+        builder: (_) => PostCallScreen(
+          consultationId: widget.consultationId!,
+          categoryId: widget.categoryId ?? '',
+          categoryName: widget.categoryName ?? '',
+          technicianName: widget.technicianName,
+        ),
+      ));
+      return;
+    }
+
+    Navigator.of(context).pop();
   }
 
   @override

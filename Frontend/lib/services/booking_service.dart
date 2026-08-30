@@ -185,8 +185,35 @@ class BookingService {
     }
   }
 
+  /// Technician marks themselves as having reached the customer's location —
+  /// POST /bookings/:id/arrived. Backend generates a fresh OTP and pushes it
+  /// to the customer only; this call doesn't return the code itself.
+  Future<void> markArrived(String bookingId, String technicianId) async {
+    try {
+      await _httpClient.post(
+        '${ApiConfig.bookingDetail}/$bookingId/arrived',
+        data: {'technician_id': technicianId},
+      );
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Technician submits the OTP the customer read out to them — POST
+  /// /bookings/:id/verify-otp. On success the booking moves to in_progress.
+  Future<void> verifyArrivalOtp(String bookingId, String technicianId, String otp) async {
+    try {
+      await _httpClient.post(
+        '${ApiConfig.bookingDetail}/$bookingId/verify-otp',
+        data: {'technician_id': technicianId, 'otp': otp},
+      );
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
   /// Technician updates job progress — PATCH /bookings/:id/status.
-  /// status: accepted | in_progress | completed | cancelled
+  /// status: accepted | on_the_way | in_progress | completed | cancelled
   Future<void> updateBookingStatus(String bookingId, String status, {String? note}) async {
     try {
       await _httpClient.patch(
@@ -204,6 +231,123 @@ class BookingService {
         '${ApiConfig.bookingComplete}/$bookingId/complete',
         data: {'final_price': finalPrice},
       );
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  // --- Physical Inspection -> Estimate -> Approval ---
+
+  /// Technician submits a labour+parts estimate after inspecting the job on
+  /// site — POST /bookings/:id/estimate. Moves the booking to
+  /// awaiting_estimate_approval.
+  Future<BookingEstimate> submitEstimate({
+    required String bookingId,
+    required String technicianId,
+    required List<BookingEstimateItem> items,
+    String? note,
+  }) async {
+    try {
+      final response = await _httpClient.post(
+        '${ApiConfig.bookingDetail}/$bookingId/estimate',
+        data: {
+          'technician_id': technicianId,
+          'items': items.map((i) => i.toRequestJson()).toList(),
+          if (note != null && note.isNotEmpty) 'note': note,
+        },
+      );
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return BookingEstimate.fromJson(data);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// The most recently submitted estimate for a booking (any status) — GET
+  /// /bookings/:id/estimate. Powers both the customer's approval card and
+  /// the technician's "estimate sent, waiting on customer" state.
+  Future<BookingEstimate?> getLatestEstimate(String bookingId) async {
+    try {
+      final response = await _httpClient.get('${ApiConfig.bookingDetail}/$bookingId/estimate');
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>?;
+      if (data == null) return null;
+      return BookingEstimate.fromJson(data);
+    } catch (e) {
+      // No estimate submitted yet (404) is a normal, expected state — not an error.
+      if (ApiEnvelope.errorMessage(e).toLowerCase().contains('no estimate')) return null;
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Full negotiation history for a booking (every estimate ever submitted,
+  /// oldest first) — GET /bookings/:id/estimates.
+  Future<List<BookingEstimate>> listEstimates(String bookingId) async {
+    try {
+      final response = await _httpClient.get('${ApiConfig.bookingDetail}/$bookingId/estimates');
+      final list = ApiEnvelope.unwrap(response) as List? ?? [];
+      return list.map((e) => BookingEstimate.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Customer approves or declines a pending estimate — POST
+  /// /bookings/:id/estimate/:estimateId/respond. Either way the booking
+  /// returns to in_progress; `note` is the customer's reason on decline.
+  Future<void> respondToEstimate({
+    required String bookingId,
+    required String estimateId,
+    required String action, // 'approve' | 'decline'
+    String? note,
+  }) async {
+    try {
+      await _httpClient.post(
+        '${ApiConfig.bookingDetail}/$bookingId/estimate/$estimateId/respond',
+        data: {
+          'action': action,
+          if (note != null && note.isNotEmpty) 'note': note,
+        },
+      );
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  // --- Before/After job proof photos ---
+  //
+  // The file itself is uploaded separately via UploadService.uploadFile
+  // (POST /uploads, generic multipart -> {url}); these calls just attach
+  // the resulting URL to the booking.
+
+  /// Technician attaches a before/after proof photo — POST /bookings/:id/photos.
+  Future<BookingJobPhoto> addJobPhoto({
+    required String bookingId,
+    required String photoType, // 'before' | 'after'
+    required String imageUrl,
+    String? caption,
+  }) async {
+    try {
+      final response = await _httpClient.post(
+        '${ApiConfig.bookingDetail}/$bookingId/photos',
+        data: {
+          'photo_type': photoType,
+          'image_url': imageUrl,
+          if (caption != null && caption.isNotEmpty) 'caption': caption,
+        },
+      );
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return BookingJobPhoto.fromJson(data);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// All before/after photos for a booking, oldest first — GET /bookings/:id/photos.
+  Future<List<BookingJobPhoto>> listJobPhotos(String bookingId) async {
+    try {
+      final response = await _httpClient.get('${ApiConfig.bookingDetail}/$bookingId/photos');
+      final list = ApiEnvelope.unwrap(response) as List? ?? [];
+      return list.map((e) => BookingJobPhoto.fromJson(e as Map<String, dynamic>)).toList();
     } catch (e) {
       throw Exception(ApiEnvelope.errorMessage(e));
     }

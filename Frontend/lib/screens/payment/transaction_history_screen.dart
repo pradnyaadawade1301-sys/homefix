@@ -6,7 +6,11 @@ import '../../models/payment_model.dart';
 import 'invoice_screen.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
-  const TransactionHistoryScreen({Key? key}) : super(key: key);
+  /// Optional anchor the Guided Tour can spotlight when it walks onto this
+  /// screen. Attached to the AppBar title so it's always present.
+  final GlobalKey? tourKey;
+
+  const TransactionHistoryScreen({Key? key, this.tourKey}) : super(key: key);
 
   @override
   State<TransactionHistoryScreen> createState() => _TransactionHistoryScreenState();
@@ -52,7 +56,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Transaction History')),
+      appBar: AppBar(title: Text('Transaction History', key: widget.tourKey)),
       body: RefreshIndicator(
         onRefresh: () => context.read<PaymentProvider>().loadHistory(),
         child: Consumer<PaymentProvider>(

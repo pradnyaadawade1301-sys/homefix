@@ -22,7 +22,12 @@ import '../service_radius_screen.dart';
 import '../bank_details_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({Key? key}) : super(key: key);
+  /// Optional anchor the Guided Tour can spotlight when it walks onto this
+  /// screen. Attached to the AppBar title so it's always present, even while
+  /// the profile is still loading.
+  final GlobalKey? tourKey;
+
+  const ProfileScreen({Key? key, this.tourKey}) : super(key: key);
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -111,7 +116,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(title: Text('Profile', key: widget.tourKey)),
       body: Consumer<UserProvider>(
         builder: (context, userProvider, _) {
           final user = userProvider.user;

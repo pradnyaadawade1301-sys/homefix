@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
+import '../core/google_auth_helper.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
@@ -48,6 +49,31 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final response = await _authService.login(identifier, password);
+      _currentUser = response.user;
+      _accessToken = response.accessToken;
+      _isLoggedIn = true;
+      _error = null;
+      onAuthenticated?.call();
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+      _isLoggedIn = false;
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// "Continue with Google" — same success/failure shape as [login] so the
+  /// UI can handle both identically.
+  Future<bool> loginWithGoogle(String idToken, {String role = 'customer'}) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _authService.loginWithGoogle(idToken, role: role);
       _currentUser = response.user;
       _accessToken = response.accessToken;
       _isLoggedIn = true;
@@ -130,6 +156,7 @@ class AuthProvider extends ChangeNotifier {
     _isLoading = true;
     try {
       await _authService.logout();
+      await GoogleAuthHelper.signOut();
       _currentUser = null;
       _accessToken = null;
       _isLoggedIn = false;

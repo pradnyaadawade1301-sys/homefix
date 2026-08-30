@@ -13,6 +13,9 @@ dependencies:
 
   # HTTP & Networking
   dio: ^5.3.0
+
+  # Google Sign-In ("Continue with Google" on the login screen)
+  google_sign_in: ^6.2.1
   web_socket_channel: ^2.4.0 # WebRTC signaling transport (ws/call/:id) — see services/webrtc_signaling_service.dart
 
   # State Management

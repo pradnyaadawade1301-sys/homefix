@@ -272,3 +272,53 @@ func (r *UserRepository) ListAddresses(ctx context.Context, userID string) ([]mo
 	}
 	return out, nil
 }
+
+// GetByGoogleID looks up a user previously created via "Continue with
+// Google" by their stable Google account id ("sub" claim).
+func (r *UserRepository) GetByGoogleID(ctx context.Context, googleID string) (*models.User, error) {
+	var u models.User
+	err := r.db.QueryRow(ctx, `
+		SELECT id, phone, COALESCE(name,''), email, COALESCE(password_hash,''), role,
+		       phone_verified, email_verified, photo_url, fcm_token, is_active, created_at, updated_at
+		FROM users WHERE google_id = $1
+	`, googleID).Scan(&u.ID, &u.Phone, &u.Name, &u.Email, &u.PasswordHash, &u.Role,
+		&u.PhoneVerified, &u.EmailVerified, &u.PhotoURL, &u.FCMToken, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &u, nil
+}
+
+// CreateWithGoogle registers a brand-new account from a verified Google
+// sign-in. No phone number is available at this point (see migration 018,
+// which made phone nullable specifically for this), and the account is
+// immediately treated as email-verified since Google already confirmed it.
+func (r *UserRepository) CreateWithGoogle(ctx context.Context, googleID, email, name, photoURL, role string) (*models.User, error) {
+	var u models.User
+	var photoArg interface{}
+	if photoURL != "" {
+		photoArg = photoURL
+	}
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO users (google_id, email, name, role, email_verified, photo_url)
+		VALUES ($1, $2, $3, $4, true, $5)
+		RETURNING id, COALESCE(phone,''), COALESCE(name,''), email, role, phone_verified, email_verified, photo_url, is_active, created_at, updated_at
+	`, googleID, email, name, role, photoArg).Scan(
+		&u.ID, &u.Phone, &u.Name, &u.Email, &u.Role, &u.PhoneVerified, &u.EmailVerified, &u.PhotoURL, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+// LinkGoogleID attaches a Google account id to an existing user found by
+// email — e.g. someone who originally signed up with phone+password using
+// the same email address now taps "Continue with Google". Keeps the two
+// sign-in methods pointing at one account instead of creating a duplicate.
+func (r *UserRepository) LinkGoogleID(ctx context.Context, userID, googleID string) error {
+	_, err := r.db.Exec(ctx, `UPDATE users SET google_id = $1, updated_at = now() WHERE id = $2`, googleID, userID)
+	return err
+}

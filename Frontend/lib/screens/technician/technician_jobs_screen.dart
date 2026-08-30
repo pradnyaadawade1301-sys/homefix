@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../models/booking_model.dart';
@@ -8,11 +10,16 @@ import '../../providers/booking_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/consultation_provider.dart';
+import '../../services/booking_service.dart';
+import '../../services/service_locator.dart' show UploadService;
 import '../consultation/incoming_consultation_screen.dart';
 import '../profile/profile_screen.dart';
 import 'technician_settlement_screen.dart';
 import 'repeat_customers_screen.dart';
 import '../chat/booking_chat_screen.dart';
+import 'technician_estimate_screen.dart';
+import 'job_photos_sheet.dart';
+import 'technician_job_detail_screen.dart';
 
 /// Technician-facing home screen — the mirror image of the customer's
 /// [BookingsScreen]. A logged-in technician lands here and sees:
@@ -140,7 +147,7 @@ Widget _buildGreetingHeader() {
   return Consumer<BookingProvider>(
     builder: (context, provider, _) {
       final activeCount = provider.bookings
-          .where((b) => b.status == 'accepted' || b.status == 'in_progress')
+          .where((b) => b.status == 'accepted' || b.status == 'on_the_way' || b.status == 'arrived' || b.status == 'in_progress' || b.status == 'awaiting_estimate_approval')
           .length;
       final completedCount = provider.bookings.where((b) => b.status == 'completed').length;
       return Container(
@@ -253,7 +260,7 @@ padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),          child: Row(
 
                 final jobs = _tabIndex == 0
                     ? provider.bookings
-                        .where((b) => b.status == 'accepted' || b.status == 'in_progress')
+                        .where((b) => b.status == 'accepted' || b.status == 'on_the_way' || b.status == 'arrived' || b.status == 'in_progress' || b.status == 'awaiting_estimate_approval')
                         .toList()
                     : provider.bookings;
 
@@ -398,7 +405,8 @@ class _FilterChip extends StatelessWidget {
 /// A single job card for the technician — leads with the CUSTOMER's details
 /// (name, phone, address) since that's what the technician needs to act on
 /// the job, plus the category/problem description and a status-appropriate
-/// action button (Accept / Start / Complete).
+/// action button (Accept / Start / Complete). Tapping the customer block
+/// opens the full [TechnicianJobDetailScreen].
 class _JobCard extends StatelessWidget {
   final Booking booking;
   const _JobCard({required this.booking});
@@ -411,6 +419,9 @@ class _JobCard extends StatelessWidget {
         return AppTheme.errorColor;
       case 'in_progress':
       case 'accepted':
+      case 'on_the_way':
+      case 'arrived':
+      case 'awaiting_estimate_approval':
         return AppTheme.warningColor;
       default:
         return Colors.grey;
@@ -469,31 +480,53 @@ class _JobCard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.15),
-                    child: Text(
-                      customer.name.isNotEmpty ? customer.name[0].toUpperCase() : '?',
-                      style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(customer.name.isNotEmpty ? customer.name : 'Customer',
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                        if (booking.address != null)
-                          Text(
-                            booking.address!.formatted,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 11.5, color: Colors.grey[600]),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => TechnicianJobDetailScreen(booking: booking),
+                      )),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.15),
+                            child: Text(
+                              customer.name.isNotEmpty ? customer.name[0].toUpperCase() : '?',
+                              style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w700),
+                            ),
                           ),
-                      ],
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(customer.name.isNotEmpty ? customer.name : 'Customer',
+                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                if (booking.address != null)
+                                  Text(
+                                    booking.address!.formatted,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontSize: 11.5, color: Colors.grey[600]),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
+                 if (booking.status != 'requested' && booking.status != 'cancelled')
+  IconButton(
+    icon: const Icon(Icons.add_a_photo_outlined, color: AppTheme.primaryColor, size: 20),
+    tooltip: 'Before/after photos',
+    onPressed: () => showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => JobPhotosSheet(bookingId: booking.id),
+    ),
+  ),
                  IconButton(
   icon: const Icon(Icons.forum_outlined, color: AppTheme.primaryColor, size: 20),
   tooltip: 'Chat with customer',
@@ -510,21 +543,26 @@ class _JobCard extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 10),
-          _ActionRow(booking: booking),
+          JobActionRow(booking: booking),
         ],
       ),
     );
   }
 }
 
-class _ActionRow extends StatelessWidget {
+class JobActionRow extends StatelessWidget {
   final Booking booking;
-  const _ActionRow({required this.booking});
+  const JobActionRow({required this.booking});
 
   @override
   Widget build(BuildContext context) {
     final provider = context.read<BookingProvider>();
-    final kycProfile = context.read<TechnicianKycProvider>().profile;
+    // `watch` (not `read`) here: the KYC profile loads asynchronously after
+    // this screen's first frame, so without watching, a technician whose
+    // profile hadn't finished loading yet would get stuck with a permanently
+    // disabled action button (e.g. "I've arrived" never becoming tappable)
+    // until something unrelated happened to rebuild this row.
+    final kycProfile = context.watch<TechnicianKycProvider>().profile;
 
     switch (booking.status) {
       case 'requested':
@@ -543,31 +581,43 @@ class _ActionRow extends StatelessWidget {
       case 'accepted':
         return SizedBox(
           width: double.infinity,
-          child: OutlinedButton(
-            onPressed: () => provider.updateBookingStatus(booking.id, 'in_progress', note: 'Technician started the job'),
-            child: const Text('Start job'),
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.directions_run_rounded, size: 18),
+            onPressed: () => provider.updateBookingStatus(booking.id, 'on_the_way', note: 'Technician is on the way'),
+            label: const Text("I'm on my way"),
           ),
         );
-      case 'in_progress':
+      case 'on_the_way':
         return SizedBox(
           width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () => _showInvoiceDialog(context, provider, booking),
-            child: const Text('Generate invoice & complete'),
+          child: ElevatedButton.icon(
+            icon: const Icon(Icons.home_rounded, size: 18),
+            onPressed: kycProfile == null
+                ? null
+                : () => provider.markArrived(booking.id, kycProfile.id),
+            label: const Text("I've arrived"),
           ),
         );
+      case 'arrived':
+        return _OtpVerifyRow(booking: booking, technicianId: kycProfile?.id);
+      case 'in_progress':
+        return _EstimateAwareAction(booking: booking, technicianId: kycProfile?.id);
+      case 'awaiting_estimate_approval':
+        return _WaitingOnEstimateRow(booking: booking);
       default:
         return const SizedBox.shrink();
     }
   }
 
-  /// The technician's "invoice" — a single final-amount entry, since that's
-  /// what the backend actually stores (Booking.FinalPrice) and what
-  /// UpiService.CreateOrder validates the customer's payment against. Pre-
-  /// filled with the original estimate so the common case (no change) is a
-  /// single tap, but the technician can adjust it up or down for parts used,
-  /// extra labor, etc. before it goes to the customer.
-  void _showInvoiceDialog(BuildContext context, BookingProvider provider, Booking booking) {
+}
+
+/// The technician's "invoice" — a single final-amount entry, since that's
+/// what the backend actually stores (Booking.FinalPrice) and what
+/// UpiService.CreateOrder validates the customer's payment against. Pre-
+/// filled with the original estimate so the common case (no change) is a
+/// single tap, but the technician can adjust it up or down for parts used,
+/// extra labor, etc. before it goes to the customer.
+void _showInvoiceDialog(BuildContext context, BookingProvider provider, Booking booking) {
     final controller = TextEditingController(
       text: (booking.estimatedPrice ?? 0) > 0 ? (booking.estimatedPrice ?? 0).toStringAsFixed(0) : '',
     );
@@ -617,6 +667,239 @@ class _ActionRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+}
+
+/// Shown for an 'in_progress' job. A technician who hasn't inspected the job
+/// yet (or whose last estimate was declined) sees "Submit estimate"; once an
+/// estimate has been approved by the customer, this instead shows the usual
+/// "Generate invoice & complete" button. Fetches the booking's latest
+/// estimate lazily (once per card) rather than through the shared
+/// BookingProvider state, since many job cards can be on screen at once.
+class _EstimateAwareAction extends StatefulWidget {
+  final Booking booking;
+  final String? technicianId;
+  const _EstimateAwareAction({required this.booking, required this.technicianId});
+
+  @override
+  State<_EstimateAwareAction> createState() => _EstimateAwareActionState();
+}
+
+class _EstimateAwareActionState extends State<_EstimateAwareAction> {
+  late Future<BookingEstimate?> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = context.read<BookingService>().getLatestEstimate(widget.booking.id);
+  }
+
+  void _refresh() {
+    setState(() {
+      _future = context.read<BookingService>().getLatestEstimate(widget.booking.id);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.read<BookingProvider>();
+
+    return FutureBuilder<BookingEstimate?>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 40,
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        }
+
+        final estimate = snapshot.data;
+        // No estimate yet, or the last one was declined — technician needs
+        // to (re)submit one before they can proceed to invoicing.
+        if (estimate == null || estimate.isDeclined) {
+          return Column(
+            children: [
+              if (estimate != null && estimate.isDeclined && (estimate.customerNote ?? '').isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.errorColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'Customer declined: ${estimate.customerNote}',
+                    style: const TextStyle(fontSize: 12, color: AppTheme.errorColor),
+                  ),
+                ),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.receipt_long_rounded, size: 18),
+                  onPressed: widget.technicianId == null
+                      ? null
+                      : () async {
+                          final sent = await Navigator.of(context).push<bool>(MaterialPageRoute(
+                            builder: (_) => TechnicianEstimateScreen(
+                              bookingId: widget.booking.id,
+                              technicianId: widget.technicianId!,
+                              customerName: widget.booking.customer?.name ?? 'the customer',
+                            ),
+                          ));
+                          if (sent == true) _refresh();
+                        },
+                  label: Text(estimate != null && estimate.isDeclined ? 'Revise & resend estimate' : 'Submit estimate'),
+                ),
+              ),
+            ],
+          );
+        }
+
+        // estimate.isApproved (or otherwise already resolved) — proceed to
+        // the normal final-invoice flow, pre-filled with the approved total.
+        return SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () => _showInvoiceDialog(context, provider, widget.booking),
+            child: const Text('Generate invoice & complete'),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Shown while a booking is 'awaiting_estimate_approval' — the technician
+/// has submitted an estimate and is waiting on the customer to approve,
+/// decline, or discuss it. Read-only; nothing for the technician to tap
+/// except a peek at what they sent.
+class _WaitingOnEstimateRow extends StatelessWidget {
+  final Booking booking;
+  const _WaitingOnEstimateRow({required this.booking});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<BookingEstimate?>(
+      future: context.read<BookingService>().getLatestEstimate(booking.id),
+      builder: (context, snapshot) {
+        final estimate = snapshot.data;
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppTheme.warningColor.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const SizedBox(
+                width: 16, height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.warningColor),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  estimate != null
+                      ? 'Waiting for customer to approve \u20b9${estimate.totalAmount.toStringAsFixed(0)} estimate'
+                      : 'Waiting for customer to review your estimate',
+                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+
+/// Uber-style OTP entry shown to the technician once a booking is "arrived".
+/// The customer reads out the code from their tracking screen; the
+/// technician types it here to actually start the job.
+class _OtpVerifyRow extends StatefulWidget {
+  final Booking booking;
+  final String? technicianId;
+  const _OtpVerifyRow({required this.booking, required this.technicianId});
+
+  @override
+  State<_OtpVerifyRow> createState() => _OtpVerifyRowState();
+}
+
+class _OtpVerifyRowState extends State<_OtpVerifyRow> {
+  final _controller = TextEditingController();
+  bool _submitting = false;
+  String? _errorText;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final otp = _controller.text.trim();
+    if (widget.technicianId == null) return;
+    if (otp.length != 6) {
+      setState(() => _errorText = 'Enter the 6-digit OTP');
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _errorText = null;
+    });
+    final provider = context.read<BookingProvider>();
+    final ok = await provider.verifyArrivalOtp(widget.booking.id, widget.technicianId!, otp);
+    if (!mounted) return;
+    setState(() {
+      _submitting = false;
+      if (!ok) _errorText = provider.error ?? 'Incorrect OTP, try again';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Ask the customer for their OTP to start the service',
+          style: TextStyle(fontSize: 12.5, color: Colors.grey[700]),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: 4),
+                decoration: InputDecoration(
+                  counterText: '',
+                  hintText: '------',
+                  errorText: _errorText,
+                  border: const OutlineInputBorder(),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            ElevatedButton(
+              onPressed: _submitting ? null : _submit,
+              child: _submitting
+                  ? const SizedBox(
+                      width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Verify'),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -72,6 +73,12 @@ func (h *AIHandler) History(c *gin.Context) {
 
 const maxAudioBytes = 15 << 20 // 15 MB
 
+// Below this, a recording is almost certainly an accidental tap rather than
+// real speech (a fraction of a second of AAC audio) — reject before even
+// calling Groq, since that's the #1 cause of Whisper hallucinating filler
+// text like "Thank you." instead of a real transcription.
+const minAudioBytes = 2 << 10 // 2 KB
+
 // Transcribe accepts a multipart audio file (field name "file") and returns
 // {"text": "..."} — the voice note transcribed to text via Groq Whisper.
 // Used by the Issue Details screen's "Record voice description" button.
@@ -85,6 +92,10 @@ func (h *AIHandler) Transcribe(c *gin.Context) {
 	}
 	if fileHeader.Size > maxAudioBytes {
 		utils.Error(c, http.StatusBadRequest, "audio file too large (max 15MB)")
+		return
+	}
+	if fileHeader.Size < minAudioBytes {
+		utils.Error(c, http.StatusUnprocessableEntity, "Recording was too short — please hold the button and speak for a couple of seconds")
 		return
 	}
 
@@ -103,6 +114,10 @@ func (h *AIHandler) Transcribe(c *gin.Context) {
 
 	text, err := h.groq.TranscribeAudio(c.Request.Context(), data, fileHeader.Filename)
 	if err != nil {
+		if errors.Is(err, service.ErrNoSpeechDetected) {
+			utils.Error(c, http.StatusUnprocessableEntity, "Couldn't hear any speech in that recording — please try again and speak clearly")
+			return
+		}
 		log.Printf("ai_handler: TranscribeAudio failed: %v", err)
 		utils.Error(c, http.StatusBadGateway, err.Error())
 		return

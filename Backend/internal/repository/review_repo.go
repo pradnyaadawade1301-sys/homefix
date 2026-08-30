@@ -50,20 +50,6 @@ func (r *ReviewRepository) CreateForConsultation(ctx context.Context, consultati
 	return rv, nil
 }
 
-// ExistsForConsultation reports whether a review has already been submitted for
-// this consultation. Used to give a clean "already reviewed" error instead of
-// letting a duplicate submission fall through to the DB's unique index error.
-func (r *ReviewRepository) ExistsForConsultation(ctx context.Context, consultationID string) (bool, error) {
-	var exists bool
-	err := r.db.QueryRow(ctx, `
-		SELECT EXISTS(SELECT 1 FROM reviews WHERE consultation_id = $1)
-	`, consultationID).Scan(&exists)
-	if err != nil {
-		return false, err
-	}
-	return exists, nil
-}
-
 func (r *ReviewRepository) ListByTechnician(ctx context.Context, technicianID string) ([]models.Review, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, booking_id, customer_id, technician_id, rating, COALESCE(comment,''), created_at

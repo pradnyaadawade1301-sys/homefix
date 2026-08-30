@@ -49,9 +49,15 @@ func (s *TechnicianService) RegisterTechnician(ctx context.Context, userID, cate
 		return nil, err
 	}
 
-	// Technicians start in "pending" status (the repo's default) and must go
-	// through actual KYC document review by an admin via Verify() before they
-	// are approved and IsVerified is set.
+	// DEV-ONLY: auto-approve every new technician so local testing doesn't
+	// require manually visiting the admin panel each time. REMOVE this block
+	// before going to production — real technicians must go through actual
+	// KYC document review by an admin via Verify().
+	if err := s.techRepo.SetApprovalStatus(ctx, created.ID, "approved", ""); err != nil {
+		return nil, err
+	}
+	created.ApprovalStatus = "approved"
+	created.IsVerified = true
 
 	return created, nil
 }

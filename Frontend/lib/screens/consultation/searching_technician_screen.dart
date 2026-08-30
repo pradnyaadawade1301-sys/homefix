@@ -120,6 +120,10 @@ class _SearchingTechnicianScreenState extends State<SearchingTechnicianScreen> {
           peerId: withCallInfo.technicianId ?? '',
           isCaller: true,
           iceServers: withCallInfo.iceServers.map((s) => s.toMap()).toList(),
+          consultationId: consultation.id,
+          categoryId: widget.categoryId,
+          categoryName: widget.categoryName,
+          technicianName: withCallInfo.technicianName ?? widget.preferredTechnicianName,
         ),
       ));
     } catch (e) {

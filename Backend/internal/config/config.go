@@ -19,6 +19,12 @@ type Config struct {
 	JWTAccessTTLMin  int
 	JWTRefreshTTLHrs int
 
+	// GoogleClientID is the OAuth 2.0 client id "Continue with Google" ID
+	// tokens must be issued for — checked as the token's audience during
+	// verification (see AuthService.LoginWithGoogle) so a token minted for a
+	// different app can't be replayed here.
+	GoogleClientID string
+
 	// RedisURL: Redis has been removed from this project. This field is kept
 	// (unused) only so the Config struct's shape doesn't change under other
 	// call sites; internal/cache is now a permanent no-op regardless of value.
@@ -145,6 +151,11 @@ func Load() *Config {
 		JWTRefreshSecret: mustGet("JWT_REFRESH_SECRET"),
 		JWTAccessTTLMin:  accessTTL,
 		JWTRefreshTTLHrs: refreshTTL,
+
+		// Empty by default so "Continue with Google" is simply unavailable
+		// (LoginWithGoogle returns a clear error) until GOOGLE_CLIENT_ID is
+		// actually configured — same fail-safe pattern as Firebase above.
+		GoogleClientID: getOr("GOOGLE_CLIENT_ID", ""),
 
 		SMTPHost: getOr("SMTP_HOST", "smtp.gmail.com"),
 		SMTPPort: smtpPort,

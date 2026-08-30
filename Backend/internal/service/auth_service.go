@@ -6,6 +6,8 @@ import (
 	"log"
 	"time"
 
+	"google.golang.org/api/idtoken"
+
 	"homefix-backend/internal/models"
 	"homefix-backend/internal/repository"
 	"homefix-backend/internal/utils"
@@ -18,9 +20,10 @@ type AuthService struct {
 	refreshSecret   string
 	accessTTLMin    int
 	refreshTTLHours int
+	googleClientID  string
 }
 
-func NewAuthService(userRepo *repository.UserRepository, mailService *MailService, accessSecret, refreshSecret string, accessTTLMin, refreshTTLHours int) *AuthService {
+func NewAuthService(userRepo *repository.UserRepository, mailService *MailService, accessSecret, refreshSecret string, accessTTLMin, refreshTTLHours int, googleClientID string) *AuthService {
 	return &AuthService{
 		userRepo:        userRepo,
 		mailService:     mailService,
@@ -28,6 +31,7 @@ func NewAuthService(userRepo *repository.UserRepository, mailService *MailServic
 		refreshSecret:   refreshSecret,
 		accessTTLMin:    accessTTLMin,
 		refreshTTLHours: refreshTTLHours,
+		googleClientID:  googleClientID,
 	}
 }
 
@@ -122,6 +126,69 @@ func (s *AuthService) SignupWithPassword(ctx context.Context, name, email, phone
 	u, err := s.userRepo.CreateFull(ctx, name, email, phone, hash, role)
 	if err != nil {
 		return nil, "", "", err
+	}
+	access, refresh, err := s.issueTokens(u.ID, u.Role)
+	if err != nil {
+		return nil, "", "", err
+	}
+	return u, access, refresh, nil
+}
+
+// LoginWithGoogle verifies a Google ID token (the token the frontend gets
+// back from google_sign_in / GoogleSignInAuthentication.idToken) directly
+// against Google's public keys and audience check — no Firebase Auth
+// roundtrip needed, just the idtoken package already pulled in via
+// google.golang.org/api. On success it finds-or-creates the user:
+//   - existing google_id match -> that user
+//   - no google_id match but a user already exists with that email
+//     (e.g. they originally signed up with phone+password) -> link the
+//     google_id onto that same account rather than creating a duplicate
+//   - otherwise -> brand-new account, immediately email-verified since
+//     Google already confirmed the address
+func (s *AuthService) LoginWithGoogle(ctx context.Context, googleIDToken, role string) (*models.User, string, string, error) {
+	if s.googleClientID == "" {
+		return nil, "", "", errors.New("Google sign-in is not configured on this server")
+	}
+	payload, err := idtoken.Validate(ctx, googleIDToken, s.googleClientID)
+	if err != nil {
+		return nil, "", "", errors.New("invalid Google sign-in token")
+	}
+
+	googleID := payload.Subject
+	email, _ := payload.Claims["email"].(string)
+	name, _ := payload.Claims["name"].(string)
+	photoURL, _ := payload.Claims["picture"].(string)
+	if email == "" {
+		return nil, "", "", errors.New("Google account has no email")
+	}
+
+	u, err := s.userRepo.GetByGoogleID(ctx, googleID)
+	if err != nil {
+		return nil, "", "", err
+	}
+	if u == nil {
+		existing, err := s.userRepo.GetByEmail(ctx, email)
+		if err != nil {
+			return nil, "", "", err
+		}
+		if existing != nil {
+			if err := s.userRepo.LinkGoogleID(ctx, existing.ID, googleID); err != nil {
+				return nil, "", "", err
+			}
+			u = existing
+		} else {
+			if role != "customer" && role != "technician" {
+				role = "customer"
+			}
+			u, err = s.userRepo.CreateWithGoogle(ctx, googleID, email, name, photoURL, role)
+			if err != nil {
+				return nil, "", "", err
+			}
+		}
+	}
+
+	if !u.IsActive {
+		return nil, "", "", errors.New("this account has been deactivated")
 	}
 	access, refresh, err := s.issueTokens(u.ID, u.Role)
 	if err != nil {

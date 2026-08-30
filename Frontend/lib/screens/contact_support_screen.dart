@@ -3,8 +3,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/theme.dart';
 import 'live_chat_screen.dart';
 
-/// Contact Support — quick channels (call, email, chat) plus a short
-/// message form for cases that don't fit Report an Issue.
+/// Contact Support — quick channels (call, email, chat) for cases that
+/// don't fit Report an Issue.
 /// Call/Email actually open the phone dialer / email app via url_launcher.
 /// Live chat opens a working in-app chat screen.
 class ContactSupportScreen extends StatefulWidget {
@@ -15,17 +15,8 @@ class ContactSupportScreen extends StatefulWidget {
 }
 
 class _ContactSupportScreenState extends State<ContactSupportScreen> {
-  final _messageController = TextEditingController();
-  bool _isSending = false;
-
   static const String _supportPhone = '+911800123456';
   static const String _supportEmail = 'support@homefixlive.com';
-
-  @override
-  void dispose() {
-    _messageController.dispose();
-    super.dispose();
-  }
 
   Future<void> _call() async {
     final uri = Uri(scheme: 'tel', path: _supportPhone);
@@ -54,21 +45,6 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
   void _openChat() {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const LiveChatScreen()),
-    );
-  }
-
-  Future<void> _send() async {
-    final text = _messageController.text.trim();
-    if (text.isEmpty) return;
-    setState(() => _isSending = true);
-    // TODO: POST message to your support API / helpdesk integration.
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
-    setState(() => _isSending = false);
-    _messageController.clear();
-    FocusScope.of(context).unfocus();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Message sent. Our team will reply here shortly.')),
     );
   }
 
@@ -104,63 +80,6 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
               title: 'Live chat',
               subtitle: 'Typically replies in a few minutes',
               onTap: _openChat,
-            ),
-            const SizedBox(height: 28),
-            Text('Or send us a message',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppTheme.lightOutline),
-              ),
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: _messageController,
-                    minLines: 3,
-                    maxLines: 6,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      isCollapsed: true,
-                      hintText: 'Type your message here...',
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: SizedBox(
-                      height: 44,
-                      child: ElevatedButton(
-                        onPressed: _isSending ? null : _send,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                        ),
-                        child: _isSending
-                            ? const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.send_rounded, size: 18),
-                                  SizedBox(width: 8),
-                                  Text('Send'),
-                                ],
-                              ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ),
           ],
         ),

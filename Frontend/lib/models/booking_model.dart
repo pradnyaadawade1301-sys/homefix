@@ -96,12 +96,17 @@ class Booking {
   final String? technicianId;
   final String categoryId;
   final String addressId;
-  final String status; // requested, accepted, in_progress, completed, cancelled
+  final String status; // requested, accepted, on_the_way, arrived, in_progress, completed, cancelled
   final String paymentStatus; // pending, paid, refunded
   final String problemDescription;
   final DateTime? scheduledAt;
   final double? estimatedPrice;
   final double? finalPrice;
+  // otpCode is the arrival OTP the customer reads out to the technician —
+  // only ever present in the CUSTOMER's own view of the booking (the backend
+  // strips it for the technician), and only while status == 'arrived'.
+  final String? otpCode;
+  final DateTime? otpVerifiedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
   final String categoryName;
@@ -121,6 +126,8 @@ class Booking {
     this.scheduledAt,
     this.estimatedPrice,
     this.finalPrice,
+    this.otpCode,
+    this.otpVerifiedAt,
     required this.createdAt,
     required this.updatedAt,
     this.categoryName = '',
@@ -138,6 +145,11 @@ class Booking {
   bool get isInvoiced => status == 'completed' && finalPrice != null;
   bool get isPaid => paymentStatus == 'paid';
 
+  /// True while the technician has submitted a cost estimate that the
+  /// customer still needs to approve/decline (Physical Inspection ->
+  /// Estimate -> Approval flow).
+  bool get isAwaitingEstimateApproval => status == 'awaiting_estimate_approval';
+
   factory Booking.fromJson(Map<String, dynamic> json) {
     return Booking(
       id: json['id'] as String,
@@ -151,6 +163,8 @@ class Booking {
       scheduledAt: json['scheduled_at'] != null ? DateTime.tryParse(json['scheduled_at'] as String) : null,
       estimatedPrice: (json['estimated_price'] as num?)?.toDouble(),
       finalPrice: (json['final_price'] as num?)?.toDouble(),
+      otpCode: json['otp_code'] as String?,
+      otpVerifiedAt: json['otp_verified_at'] != null ? DateTime.tryParse(json['otp_verified_at'] as String) : null,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       categoryName: (json['category_name'] as String?) ?? '',
@@ -220,6 +234,154 @@ class BookingStatusHistory {
       status: json['status'] as String,
       note: (json['note'] as String?) ?? '',
       createdAt: DateTime.parse(json['created_at'] as String),
+    );
+  }
+}
+
+// BookingJobPhoto is a "before" or "after" proof photo the technician
+// attaches on-site — separate from Booking.images, which is the customer's
+// own upload of the problem at booking time.
+// Matches backend internal/models/booking.go -> BookingJobPhoto.
+class BookingJobPhoto {
+  final String id;
+  final String bookingId;
+  final String technicianId;
+  final String photoType; // "before" | "after"
+  final String imageUrl;
+  final String? caption;
+  final DateTime createdAt;
+
+  BookingJobPhoto({
+    required this.id,
+    required this.bookingId,
+    required this.technicianId,
+    required this.photoType,
+    required this.imageUrl,
+    this.caption,
+    required this.createdAt,
+  });
+
+  bool get isBefore => photoType == 'before';
+  bool get isAfter => photoType == 'after';
+
+  factory BookingJobPhoto.fromJson(Map<String, dynamic> json) {
+    return BookingJobPhoto(
+      id: json['id'] as String,
+      bookingId: json['booking_id'] as String,
+      technicianId: json['technician_id'] as String,
+      photoType: (json['photo_type'] as String?) ?? '',
+      imageUrl: (json['image_url'] as String?) ?? '',
+      caption: json['caption'] as String?,
+      createdAt: DateTime.parse(json['created_at'] as String),
+    );
+  }
+}
+
+// --- Physical Inspection -> Estimate -> Approval ---
+//
+// Matches backend internal/models/booking.go -> BookingEstimateItem /
+// BookingEstimate exactly. A technician submits one of these after
+// physically inspecting the job on-site; the customer must approve or
+// decline it before the job can be completed and invoiced.
+
+class BookingEstimateItem {
+  final String id;
+  final String estimateId;
+  final String itemType; // "labour" | "part"
+  final String name;
+  final double quantity;
+  final double unitPrice;
+  final double amount;
+
+  BookingEstimateItem({
+    required this.id,
+    required this.estimateId,
+    required this.itemType,
+    required this.name,
+    required this.quantity,
+    required this.unitPrice,
+    required this.amount,
+  });
+
+  bool get isLabour => itemType == 'labour';
+
+  factory BookingEstimateItem.fromJson(Map<String, dynamic> json) {
+    return BookingEstimateItem(
+      id: (json['id'] as String?) ?? '',
+      estimateId: (json['estimate_id'] as String?) ?? '',
+      itemType: (json['item_type'] as String?) ?? 'part',
+      name: (json['name'] as String?) ?? '',
+      quantity: (json['quantity'] as num?)?.toDouble() ?? 1,
+      unitPrice: (json['unit_price'] as num?)?.toDouble() ?? 0,
+      amount: (json['amount'] as num?)?.toDouble() ?? 0,
+    );
+  }
+
+  /// Body shape expected by POST /bookings/:id/estimate's `items` array.
+  Map<String, dynamic> toRequestJson() {
+    return {
+      'item_type': itemType,
+      'name': name,
+      'quantity': quantity,
+      'unit_price': unitPrice,
+    };
+  }
+}
+
+class BookingEstimate {
+  final String id;
+  final String bookingId;
+  final String technicianId;
+  final String status; // "pending" | "approved" | "declined"
+  final double labourAmount;
+  final double partsAmount;
+  final double totalAmount;
+  final String? note;
+  final String? customerNote;
+  final List<BookingEstimateItem> items;
+  final DateTime createdAt;
+  final DateTime? decidedAt;
+
+  BookingEstimate({
+    required this.id,
+    required this.bookingId,
+    required this.technicianId,
+    required this.status,
+    required this.labourAmount,
+    required this.partsAmount,
+    required this.totalAmount,
+    this.note,
+    this.customerNote,
+    required this.items,
+    required this.createdAt,
+    this.decidedAt,
+  });
+
+  bool get isPending => status == 'pending';
+  bool get isApproved => status == 'approved';
+  bool get isDeclined => status == 'declined';
+
+  List<BookingEstimateItem> get labourItems => items.where((i) => i.isLabour).toList();
+  List<BookingEstimateItem> get partItems => items.where((i) => !i.isLabour).toList();
+
+  factory BookingEstimate.fromJson(Map<String, dynamic> json) {
+    return BookingEstimate(
+      id: (json['id'] as String?) ?? '',
+      bookingId: (json['booking_id'] as String?) ?? '',
+      technicianId: (json['technician_id'] as String?) ?? '',
+      status: (json['status'] as String?) ?? 'pending',
+      labourAmount: (json['labour_amount'] as num?)?.toDouble() ?? 0,
+      partsAmount: (json['parts_amount'] as num?)?.toDouble() ?? 0,
+      totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0,
+      note: json['note'] as String?,
+      customerNote: json['customer_note'] as String?,
+      items: (json['items'] as List? ?? [])
+          .map((e) => BookingEstimateItem.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : DateTime.now(),
+      decidedAt: json['decided_at'] != null ? DateTime.tryParse(json['decided_at'] as String) : null,
     );
   }
 }

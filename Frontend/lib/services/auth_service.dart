@@ -94,6 +94,28 @@ class AuthService {
     }
   }
 
+  /// "Continue with Google" — sends the ID token from google_sign_in to the
+  /// backend for verification. `role` only matters the first time (brand
+  /// new account); it's ignored if the Google account is already linked to
+  /// an existing user. Backend: POST /auth/google { id_token, role }
+  Future<AuthResponse> loginWithGoogle(String idToken, {String role = 'customer'}) async {
+    try {
+      final response = await _httpClient.post(
+        ApiConfig.authGoogleLogin,
+        data: {'id_token': idToken, 'role': role},
+      );
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      final authResponse = AuthResponse.fromJson(data);
+      await _httpClient.setTokens(
+        authResponse.accessToken,
+        authResponse.refreshToken,
+      );
+      return authResponse;
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
   Future<void> logout() async {
     try {
       await _httpClient.clearTokens();

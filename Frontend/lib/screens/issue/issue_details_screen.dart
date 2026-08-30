@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -34,6 +35,9 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
   final _audioRecorder = AudioRecorder();
   bool _isRecording = false;
   bool _isTranscribing = false;
+  DateTime? _recordingStartedAt;
+  Duration _recordingElapsed = Duration.zero;
+  Timer? _recordingTicker;
 
   Future<void> _pickImage(ImageSource source) async {
     if (_images.length >= 5) {
@@ -76,8 +80,27 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
     if (_isRecording) {
       // Stop recording, then upload + transcribe.
       final path = await _audioRecorder.stop();
-      setState(() => _isRecording = false);
+      _recordingTicker?.cancel();
+      final elapsed = _recordingStartedAt != null ? DateTime.now().difference(_recordingStartedAt!) : Duration.zero;
+      setState(() {
+        _isRecording = false;
+        _recordingStartedAt = null;
+        _recordingElapsed = Duration.zero;
+      });
       if (path == null) return;
+
+      // A recording under ~1 second is almost always an accidental tap
+      // rather than real speech, and is exactly what makes Whisper
+      // hallucinate unrelated text (e.g. "Thank you.") instead of failing
+      // cleanly — so catch it here before even uploading.
+      if (elapsed < const Duration(milliseconds: 1000)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Recording bahut chhoti thi — button dabaye rakhein aur kam se kam 2 second bolein')),
+          );
+        }
+        return;
+      }
 
       setState(() => _isTranscribing = true);
       try {
@@ -95,7 +118,7 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not transcribe voice note: $e')),
+          SnackBar(content: Text(_transcribeErrorMessage(e))),
         );
       } finally {
         if (mounted) setState(() => _isTranscribing = false);
@@ -115,8 +138,32 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
 
     final dir = await getTemporaryDirectory();
     final filePath = '${dir.path}/voice_note_${DateTime.now().millisecondsSinceEpoch}.m4a';
-    await _audioRecorder.start(const RecordConfig(), path: filePath);
+    // Explicit AAC-LC config at a healthy bitrate/sample rate — the record
+    // package's bare default can end up choosing a low-quality encoder on
+    // some Android devices, which also makes Whisper's output less reliable.
+    await _audioRecorder.start(
+      const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000, sampleRate: 44100),
+      path: filePath,
+    );
+    _recordingStartedAt = DateTime.now();
+    _recordingTicker?.cancel();
+    _recordingTicker = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      if (!mounted || _recordingStartedAt == null) return;
+      setState(() => _recordingElapsed = DateTime.now().difference(_recordingStartedAt!));
+    });
     setState(() => _isRecording = true);
+  }
+
+  /// Server sends a clear, already-user-facing message for the "no real
+  /// speech in that clip" case (see ai_handler.go / groq_service.go) —
+  /// surface that as-is instead of a generic "Could not transcribe" wrapper.
+  String _transcribeErrorMessage(Object e) {
+    final message = e.toString().replaceFirst('Exception: ', '');
+    if (message.toLowerCase().contains("couldn't hear any speech") ||
+        message.toLowerCase().contains('recording was too short')) {
+      return message;
+    }
+    return 'Could not transcribe voice note: $message';
   }
 
   Future<void> _continue() async {
@@ -181,6 +228,7 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
     _titleController.dispose();
     _descriptionController.dispose();
     _audioRecorder.dispose();
+    _recordingTicker?.cancel();
     super.dispose();
   }
 
@@ -359,7 +407,7 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
                 _isTranscribing
                     ? 'Transcribing...'
                     : _isRecording
-                        ? 'Stop recording'
+                        ? 'Stop recording (${_recordingElapsed.inSeconds}s)'
                         : 'Record voice description',
                 style: TextStyle(color: _isRecording ? AppTheme.errorColor : null),
               ),

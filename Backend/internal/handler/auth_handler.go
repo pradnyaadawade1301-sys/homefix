@@ -81,7 +81,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 }
 
 type signupBody struct {
-	Name  string `json:"name" binding:"required"`
+	Name string `json:"name" binding:"required"`
 	// Email is mandatory (not just optional) since every new account must go
 	// through email verification (see VerifyEmailScreen on the Flutter side).
 	Email    string `json:"email" binding:"required,email"`
@@ -188,4 +188,29 @@ func (h *AuthHandler) VerifyEmailOTP(c *gin.Context) {
 		return
 	}
 	utils.Success(c, http.StatusOK, gin.H{"message": "email verified"})
+}
+
+type googleLoginBody struct {
+	// IDToken is GoogleSignInAuthentication.idToken from the Flutter
+	// google_sign_in package — NOT the accessToken.
+	IDToken string `json:"id_token" binding:"required"`
+	Role    string `json:"role"` // "customer" or "technician"; ignored if the account already exists
+}
+
+// LoginWithGoogle is "Continue with Google" — POST /auth/google. Verifies
+// the ID token server-side and finds-or-creates the user, returning the
+// same {user, access_token, refresh_token} shape as password Login so the
+// Flutter side handles both identically.
+func (h *AuthHandler) LoginWithGoogle(c *gin.Context) {
+	var body googleLoginBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	u, access, refresh, err := h.authService.LoginWithGoogle(c.Request.Context(), body.IDToken, body.Role)
+	if err != nil {
+		utils.Error(c, http.StatusUnauthorized, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"user": u, "access_token": access, "refresh_token": refresh})
 }

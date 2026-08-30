@@ -127,16 +127,6 @@ type availabilityBody struct {
 
 func (h *TechnicianHandler) SetAvailability(c *gin.Context) {
 	technicianID := c.Param("id")
-	userID := c.GetString("user_id")
-	owner, err := h.techService.GetProfile(c.Request.Context(), technicianID)
-	if err != nil {
-		utils.Error(c, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if owner == nil || owner.UserID != userID {
-		utils.Error(c, http.StatusForbidden, "not authorized to update this technician")
-		return
-	}
 	var body availabilityBody
 	if err := c.ShouldBindJSON(&body); err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
@@ -156,16 +146,6 @@ type locationBody struct {
 
 func (h *TechnicianHandler) UpdateLocation(c *gin.Context) {
 	technicianID := c.Param("id")
-	userID := c.GetString("user_id")
-	owner, err := h.techService.GetProfile(c.Request.Context(), technicianID)
-	if err != nil {
-		utils.Error(c, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if owner == nil || owner.UserID != userID {
-		utils.Error(c, http.StatusForbidden, "not authorized to update this technician")
-		return
-	}
 	var body locationBody
 	if err := c.ShouldBindJSON(&body); err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())

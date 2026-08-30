@@ -15,6 +15,8 @@ import 'technician_detail_screen.dart';
 import 'technician_list_screen.dart';
 import 'repeat_technicians_screen.dart';
 import '../payment/transaction_history_screen.dart';
+import '../consult/consult_screen.dart';
+import '../../widgets/guided_tour.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -26,19 +28,174 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
-  static const _tabs = [
-  _HomeTab(),
-  BookingsScreen(),
-  TransactionHistoryScreen(),
-  ProfileScreen(),
-];
+  // One GlobalKey per bottom-nav destination so the Guided Tour can find each
+  // icon's real on-screen position (see widgets/guided_tour.dart) — no
+  // hardcoded coordinates, so this keeps working if the nav bar ever changes.
+  final _homeNavKey = GlobalKey();
+  final _historyNavKey = GlobalKey();
+  final _consultNavKey = GlobalKey();
+  final _transactionsNavKey = GlobalKey();
+  final _profileNavKey = GlobalKey();
+
+  // Reaches into each tab's own State so the Guided Tour can also spotlight
+  // real widgets *inside* those screens (not just their bottom-nav icon) —
+  // this is what lets one tour walk through the whole app.
+  final _homeTabKey = GlobalKey<_HomeTabState>();
+  final _bookingsTourKey = GlobalKey();
+  final _consultTourKey = GlobalKey();
+  final _transactionsTourKey = GlobalKey();
+  final _profileTourKey = GlobalKey();
+
+  late final _tabs = [
+    _HomeTab(key: _homeTabKey),
+    BookingsScreen(tourKey: _bookingsTourKey),
+    ConsultScreen(tourKey: _consultTourKey),
+    TransactionHistoryScreen(tourKey: _transactionsTourKey),
+    ProfileScreen(tourKey: _profileTourKey),
+  ];
 
  static const _navItems = [
   _NavItemData(icon: Icons.home_rounded, label: 'Home'),
   _NavItemData(icon: Icons.history_rounded, label: 'History'),
+  _NavItemData(icon: Icons.chat_bubble_outline_rounded, label: 'Consult'),
   _NavItemData(icon: Icons.receipt_long_rounded, label: 'Transactions'),
   _NavItemData(icon: Icons.person_rounded, label: 'Profile'),
 ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startGuidedTourIfNeeded());
+  }
+
+  List<GlobalKey> get _navKeys => [
+        _homeNavKey,
+        _historyNavKey,
+        _consultNavKey,
+        _transactionsNavKey,
+        _profileNavKey,
+      ];
+
+  /// Shows the full-app "Guided Tour" once per install: it walks through
+  /// every bottom-nav tab in turn — not just the nav icons themselves, but a
+  /// couple of the real widgets inside each screen (search bar, promo
+  /// banner, service categories, top technicians on Home; the list/tab
+  /// content on Bookings, Consult, Transactions and Profile) — switching
+  /// tabs automatically as it goes.
+  /// Pass force: true (e.g. from a "Replay Tour" button in Settings) to show
+  /// it again on demand.
+  Future<void> _startGuidedTourIfNeeded({bool force = false}) async {
+    final home = _homeTabKey.currentState;
+
+    final steps = <GuidedTourStep>[
+      GuidedTourStep(
+        targetKey: _homeNavKey,
+        tabIndex: 0,
+        icon: Icons.home_rounded,
+        title: 'Welcome to HomeFix!',
+        description: 'Yahan se apni home service start karein — electrician, plumber, AC repair aur bahut kuch.',
+      ),
+      if (home != null) ...[
+        GuidedTourStep(
+          targetKey: home._searchBarKey,
+          tabIndex: 0,
+          icon: Icons.search_rounded,
+          title: 'Search',
+          description: 'Kisi bhi service ko seedha naam se search karein — jaise "AC repair" ya "plumber".',
+        ),
+        GuidedTourStep(
+          targetKey: home._bannerKey,
+          tabIndex: 0,
+          icon: Icons.local_offer_rounded,
+          title: 'Offers',
+          description: 'Chalte offers aur discounts yahan dikhte rahenge — nazar rakhein!',
+        ),
+        GuidedTourStep(
+          targetKey: home._categoriesKey,
+          tabIndex: 0,
+          icon: Icons.grid_view_rounded,
+          title: 'Services',
+          description: 'Sabse zyada book hone wali services yahan se ek tap mein choose karein.',
+        ),
+        GuidedTourStep(
+          targetKey: home._topPicksKey,
+          tabIndex: 0,
+          icon: Icons.star_rounded,
+          title: 'Top Technicians',
+          description: 'Aapke area ke verified, top-rated technicians yahan dikhaye jaate hain.',
+        ),
+      ],
+      GuidedTourStep(
+        targetKey: _historyNavKey,
+        tabIndex: 0,
+        icon: Icons.history_rounded,
+        title: 'Bookings',
+        description: 'Apni upcoming aur previous bookings yahan track karein.',
+      ),
+      GuidedTourStep(
+        targetKey: _bookingsTourKey,
+        tabIndex: 1,
+        icon: Icons.history_rounded,
+        title: 'My Bookings',
+        description: 'Yahan har booking ka live status dikhega — technician assign hone se lekar job complete hone tak.',
+      ),
+      GuidedTourStep(
+        targetKey: _consultNavKey,
+        tabIndex: 1,
+        icon: Icons.chat_bubble_outline_rounded,
+        title: 'Consult',
+        description: 'Technician se chat karein ya live video call par turant apni problem dikhayein.',
+      ),
+      GuidedTourStep(
+        targetKey: _consultTourKey,
+        tabIndex: 2,
+        icon: Icons.chat_bubble_outline_rounded,
+        title: 'Chat & Video',
+        description: 'Chat aur Video tabs se technician ke saath apni saari conversations yahan se access karein.',
+      ),
+      GuidedTourStep(
+        targetKey: _transactionsNavKey,
+        tabIndex: 2,
+        icon: Icons.receipt_long_rounded,
+        title: 'Transactions',
+        description: 'Apni saari payments aur invoices yahan se dekhein.',
+      ),
+      GuidedTourStep(
+        targetKey: _transactionsTourKey,
+        tabIndex: 3,
+        icon: Icons.receipt_long_rounded,
+        title: 'Transaction History',
+        description: 'Har payment ka status aur invoice yahan ek jagah milega.',
+      ),
+      GuidedTourStep(
+        targetKey: _profileNavKey,
+        tabIndex: 3,
+        icon: Icons.person_rounded,
+        title: 'Profile',
+        description: 'Account, addresses, payments aur settings yahan manage karein.',
+      ),
+      GuidedTourStep(
+        targetKey: _profileTourKey,
+        tabIndex: 4,
+        icon: Icons.person_rounded,
+        title: 'Your Profile',
+        description: 'Yahan se profile edit karein, addresses manage karein aur account settings dekhein.',
+      ),
+    ];
+
+    await GuidedTour.maybeShow(
+      context,
+      force: force,
+      steps: steps,
+      onTabChange: (i) {
+        if (mounted) setState(() => _selectedIndex = i);
+      },
+      onTourEnd: () {
+        // Tour ends on the Profile tab — bring the user back to Home.
+        if (mounted) setState(() => _selectedIndex = 0);
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,6 +226,7 @@ class _HomeScreenState extends State<HomeScreen> {
           final item = _navItems[i];
           final selected = i == _selectedIndex;
           return InkWell(
+            key: _navKeys[i],
             borderRadius: BorderRadius.circular(24),
             onTap: () => setState(() => _selectedIndex = i),
             child: AnimatedContainer(
@@ -101,7 +259,7 @@ class _NavItemData {
 }
 
 class _HomeTab extends StatefulWidget {
-  const _HomeTab();
+  const _HomeTab({Key? key}) : super(key: key);
 
   @override
   State<_HomeTab> createState() => _HomeTabState();
@@ -109,6 +267,15 @@ class _HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin {
   final _searchController = TextEditingController();
+
+  // Anchors the full-app Guided Tour spotlights on this tab (see
+  // HomeScreenState._startGuidedTourIfNeeded, which reaches into this state
+  // via a GlobalKey to find the real, currently-laid-out widgets below).
+  final _searchBarKey = GlobalKey();
+  final _bannerKey = GlobalKey();
+  final _categoriesKey = GlobalKey();
+  final _topPicksKey = GlobalKey();
+
   late final AnimationController _bannerAnimController;
   late final Animation<double> _floatAnim;
   late final Animation<double> _sparkleAnim;
@@ -176,18 +343,18 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
           children: [
             _buildHeader(context),
             const SizedBox(height: 20),
-            _buildSearchBar(),
+            KeyedSubtree(key: _searchBarKey, child: _buildSearchBar()),
             const SizedBox(height: 20),
-            _buildPromoBanner(context),
+            KeyedSubtree(key: _bannerKey, child: _buildPromoBanner(context)),
             const SizedBox(height: 24),
             _sectionTitle('Most Booked Services', onViewAll: _openCategories),
             const SizedBox(height: 14),
-            _buildCategoriesRow(),
+            KeyedSubtree(key: _categoriesKey, child: _buildCategoriesRow()),
             const SizedBox(height: 24),
             _buildRepeatTechniciansSection(),
             _sectionTitle('Top Picks for you', onViewAll: () => _openTechnicianList()),
             const SizedBox(height: 14),
-            _buildTechnicianList(),
+            KeyedSubtree(key: _topPicksKey, child: _buildTechnicianList()),
           ],
         ),
       ),
@@ -292,7 +459,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
               onTap: () {
                 final homeState = context.findAncestorStateOfType<_HomeScreenState>();
                 if (homeState != null) {
-                  homeState.setState(() => homeState._selectedIndex = 3);
+                  homeState.setState(() => homeState._selectedIndex = 4);
                 } else {
                   Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfileScreen()));
                 }

@@ -19,6 +19,7 @@ class ApiConfig {
   // Auth endpoints (backend: internal/router/router.go -> auth group)
   static const String authSignup = '/auth/signup';
   static const String authLogin = '/auth/login';
+  static const String authGoogleLogin = '/auth/google';
   static const String authRequestOtp = '/auth/request-otp';
   static const String authVerifyOtp = '/auth/verify-otp';
   static const String authRequestEmailOtp = '/auth/request-email-otp';
@@ -84,6 +85,7 @@ class ApiConfig {
   static const String consultationPayment = '/consultations'; // + /:id/payment -> POST {payment_method}
   static const String consultationRating = '/consultations'; // + /:id/rating -> POST {rating, comment}
   static const String consultationPending = '/consultations/pending'; // GET (technician) - incoming requests
+  static const String consultationMine = '/consultations/mine'; // GET (customer) - own call history
 
   // WebRTC signaling (peer-to-peer video/audio call handshake only — see
   // internal/handler/call_handler.go). Auth via ?token= query param since WebSocket

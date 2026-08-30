@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"homefix-backend/internal/models"
 	"homefix-backend/internal/repository"
@@ -146,6 +147,9 @@ func (s *BookingService) Accept(ctx context.Context, bookingID, technicianID str
 }
 
 func (s *BookingService) UpdateStatus(ctx context.Context, bookingID, status, note string) error {
+	if !models.ValidBookingStatuses[status] {
+		return errors.New("invalid status: " + status)
+	}
 	b, err := s.bookingRepo.GetByID(ctx, bookingID)
 	if err != nil {
 		return err
@@ -155,6 +159,17 @@ func (s *BookingService) UpdateStatus(ctx context.Context, bookingID, status, no
 	}
 	if err := s.bookingRepo.UpdateStatus(ctx, bookingID, status, note); err != nil {
 		return err
+	}
+	// The moment a technician marks themselves "arrived", generate a fresh
+	// OTP and store it against the booking. No SMS/push is sent — the
+	// customer's own Booking Tracking screen fetches and displays this code
+	// directly (see GetOTP below), the same way ride-hailing apps show a
+	// start-ride PIN on-screen rather than texting it.
+	if status == models.BookingArrived {
+		otp := generateOTP()
+		if err := s.bookingRepo.SetOTP(ctx, bookingID, otp); err != nil {
+			return err
+		}
 	}
 	if s.fcm != nil {
 		_ = s.fcm.SendToUser(ctx, b.CustomerID, "Booking update",
@@ -321,4 +336,106 @@ func (s *BookingService) resolveBookingParticipantRole(ctx context.Context, b *m
 		}
 	}
 	return "", errors.New("you are not a participant in this booking")
+}
+
+// generateOTP returns a random 4-digit numeric code shown to the customer
+// and read out to the technician on-site (see UpdateStatus above).
+func generateOTP() string {
+	n := time.Now().UnixNano() % 10000
+	if n < 0 {
+		n = -n
+	}
+	return fmt.Sprintf("%04d", n)
+}
+
+// VerifyOTP is called by the technician's app once the customer has read
+// out the code shown on their screen. Success moves the booking straight
+// into "inspecting" — the technician can now legitimately start diagnosing
+// the problem and later raise an estimate.
+func (s *BookingService) VerifyOTP(ctx context.Context, bookingID, otp string) (bool, error) {
+	ok, err := s.bookingRepo.VerifyOTP(ctx, bookingID, otp)
+	if err != nil || !ok {
+		return ok, err
+	}
+	if err := s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingInspecting, "OTP verified, service started"); err != nil {
+		return true, err
+	}
+	return true, nil
+}
+
+// GetOTP returns the current, unverified OTP for a booking so the
+// customer's own app can display it on-screen — the same pattern as a
+// ride-hailing app's start-ride PIN. Only the booking's own customer should
+// ever be allowed to call this (enforced in the handler); it is never sent
+// over SMS or push, and returns "" once already verified or if none has
+// been generated yet (e.g. technician hasn't marked "arrived").
+func (s *BookingService) GetOTP(ctx context.Context, bookingID string) (string, error) {
+	return s.bookingRepo.GetOTP(ctx, bookingID)
+}
+
+// TechnicianLocation exposes the assigned technician's last known position
+// for the customer's live tracking screen. Returns (nil, nil, nil, nil) if
+// no technician is assigned yet, so the caller can render "finding
+// technician" instead of a map.
+func (s *BookingService) TechnicianLocation(ctx context.Context, bookingID string) (lat, lng *float64, updatedAt *time.Time, err error) {
+	return s.bookingRepo.TechnicianLocationForBooking(ctx, bookingID)
+}
+
+// SubmitEstimate is called by the technician after inspecting the problem.
+// Calling it again (e.g. after the customer chose "Discuss") simply
+// replaces the items/total and resets status to pending for a fresh
+// decision — see BookingRepository.UpsertEstimate.
+func (s *BookingService) SubmitEstimate(ctx context.Context, bookingID string, items []models.BookingEstimateItem, note string) (*models.BookingEstimate, error) {
+	if len(items) == 0 {
+		return nil, errors.New("estimate must have at least one line item")
+	}
+	est, err := s.bookingRepo.UpsertEstimate(ctx, bookingID, items, note)
+	if err != nil {
+		return nil, err
+	}
+	if b, _ := s.bookingRepo.GetByID(ctx, bookingID); b != nil && s.fcm != nil {
+		_ = s.fcm.SendToUser(ctx, b.CustomerID, "Service estimate ready",
+			fmt.Sprintf("Your technician has sent an estimate of \u20b9%.0f", est.Total),
+			map[string]string{"booking_id": bookingID, "type": "booking_estimate"})
+	}
+	return est, nil
+}
+
+func (s *BookingService) GetEstimate(ctx context.Context, bookingID string) (*models.BookingEstimate, error) {
+	return s.bookingRepo.GetEstimate(ctx, bookingID)
+}
+
+// RespondToEstimate records the customer's Approve/Decline decision.
+// "Discuss" isn't a persisted status here — it's just the customer opening
+// chat with the technician, who then calls SubmitEstimate again with
+// revised numbers. Approving moves the booking into "repair_in_progress" so
+// the technician is unambiguously authorised to start paid work.
+func (s *BookingService) RespondToEstimate(ctx context.Context, bookingID, decision string) error {
+	var status string
+	switch decision {
+	case "approve":
+		status = models.EstimateApproved
+	case "decline":
+		status = models.EstimateDeclined
+	default:
+		return errors.New("decision must be 'approve' or 'decline'")
+	}
+	if err := s.bookingRepo.SetEstimateStatus(ctx, bookingID, status); err != nil {
+		return err
+	}
+	if status == models.EstimateApproved {
+		return s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingRepairInProgress, "Customer approved estimate")
+	}
+	return s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingCancelled, "Customer declined estimate")
+}
+
+func (s *BookingService) AddServicePhoto(ctx context.Context, bookingID, photoURL, photoType string) (*models.BookingServicePhoto, error) {
+	if photoType != "before" && photoType != "after" {
+		return nil, errors.New("photo_type must be 'before' or 'after'")
+	}
+	return s.bookingRepo.AddServicePhoto(ctx, bookingID, photoURL, photoType)
+}
+
+func (s *BookingService) ListServicePhotos(ctx context.Context, bookingID string) ([]models.BookingServicePhoto, error) {
+	return s.bookingRepo.ListServicePhotos(ctx, bookingID)
 }

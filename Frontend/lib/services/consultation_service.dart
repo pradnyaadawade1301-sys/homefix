@@ -128,4 +128,39 @@ class ConsultationService {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
   }
+
+  /// Customer: their own past consultations (video calls), most recent first —
+  /// powers the call-history screen.
+  Future<List<Consultation>> getMine() async {
+    try {
+      final response = await _httpClient.get(ApiConfig.consultationMine);
+      final list = ApiEnvelope.unwrap(response) as List? ?? [];
+      return list.map((e) => Consultation.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Customer: turns a finished consultation into a real booking (optionally
+  /// with a scheduled date/time slot) for the same technician — this is the
+  /// "on-site visit" / "book a slot" step after a video call.
+  Future<void> escalate(
+    String id, {
+    required String addressId,
+    String? problemDescription,
+    DateTime? scheduledAt,
+  }) async {
+    try {
+      await _httpClient.post(
+        '${ApiConfig.consultationEscalate}/$id/escalate',
+        data: {
+          'address_id': addressId,
+          if (problemDescription != null) 'problem_description': problemDescription,
+          if (scheduledAt != null) 'scheduled_at': scheduledAt.toUtc().toIso8601String(),
+        },
+      );
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
 }

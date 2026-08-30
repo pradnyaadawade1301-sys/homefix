@@ -56,6 +56,7 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		auth.POST("/verify-otp", middleware.RateLimit(rdb, "otp-verify", 10, time.Minute), h.Auth.VerifyOTP)
 		auth.POST("/signup", middleware.RateLimit(rdb, "signup", 10, time.Minute), h.Auth.Signup)
 		auth.POST("/login", middleware.RateLimit(rdb, "login", 10, time.Minute), h.Auth.Login)
+		auth.POST("/google", middleware.RateLimit(rdb, "google-login", 10, time.Minute), h.Auth.LoginWithGoogle)
 		auth.POST("/request-email-otp", middleware.RateLimit(rdb, "email-otp", 5, time.Minute), h.Auth.RequestEmailOTP)
 		auth.POST("/verify-email-otp", middleware.RateLimit(rdb, "email-otp-verify", 10, time.Minute), h.Auth.VerifyEmailOTP)
 		auth.POST("/refresh", h.Auth.Refresh)
@@ -119,6 +120,22 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.POST("/bookings/:id/cancel", h.Booking.Cancel)
 		authed.POST("/bookings/:id/messages", h.Booking.SendMessage)
 		authed.GET("/bookings/:id/messages", h.Booking.ListMessages)
+
+		// OTP verification before the technician can start work on-site.
+		// GetOTP is polled by the customer's app to show the on-screen code;
+		// VerifyOTP is called by the technician's app once the customer
+		// reads it out — no SMS/push involved, both sides are on-site.
+		authed.GET("/bookings/:id/otp", h.Booking.GetOTP)
+		authed.POST("/bookings/:id/verify-otp", middleware.RequireRole("technician"), h.Booking.VerifyOTP)
+		// Live technician location for the customer's tracking map.
+		authed.GET("/bookings/:id/technician-location", h.Booking.GetTechnicianLocation)
+		// Service estimate: technician raises/revises it, customer approves or declines.
+		authed.POST("/bookings/:id/estimate", middleware.RequireRole("technician"), h.Booking.SubmitEstimate)
+		authed.GET("/bookings/:id/estimate", h.Booking.GetEstimate)
+		authed.POST("/bookings/:id/estimate/respond", h.Booking.RespondToEstimate)
+		// Before/after service photos.
+		authed.POST("/bookings/:id/photos", middleware.RequireRole("technician"), h.Booking.AddServicePhoto)
+		authed.GET("/bookings/:id/photos", h.Booking.ListServicePhotos)
 		// Live Video Consultation (on-demand, peer-to-peer) — see consultation_service.go
 		// for the matching flow. The actual call media reuses the same /ws/call/:id
 		// signaling relay as booking calls (CallHandler.Signal accepts either a booking

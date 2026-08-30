@@ -195,6 +195,51 @@ class ConsultationProvider extends ChangeNotifier {
     }
   }
 
+  // --- Customer: consultation call history -------------------------------
+  List<Consultation> _history = [];
+  bool _isLoadingHistory = false;
+
+  List<Consultation> get history => _history;
+  bool get isLoadingHistory => _isLoadingHistory;
+
+  /// Customer: fetch past video consultations for the history screen.
+  Future<void> loadHistory() async {
+    _isLoadingHistory = true;
+    notifyListeners();
+    try {
+      _history = await _consultationService.getMine();
+      _error = null;
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoadingHistory = false;
+      notifyListeners();
+    }
+  }
+
+  /// Customer: convert a finished consultation into a real (optionally
+  /// scheduled) booking with the same technician.
+  Future<void> escalateToBooking(
+    String consultationId, {
+    required String addressId,
+    String? problemDescription,
+    DateTime? scheduledAt,
+  }) async {
+    try {
+      await _consultationService.escalate(
+        consultationId,
+        addressId: addressId,
+        problemDescription: problemDescription,
+        scheduledAt: scheduledAt,
+      );
+      _error = null;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   void clearCurrent() {
     _current = null;
     notifyListeners();

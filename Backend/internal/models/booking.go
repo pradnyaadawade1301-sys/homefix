@@ -8,7 +8,30 @@ const (
 	BookingInProgress = "in_progress"
 	BookingCompleted  = "completed"
 	BookingCancelled  = "cancelled"
+
+	// Granular on-site sub-steps shown on the customer's live tracking
+	// screen between "accepted" and "in_progress"/"completed". These are
+	// stored in the same free-form bookings.status column (see
+	// migration 017) — no schema change needed, just new recognised values.
+	BookingOnTheWay         = "on_the_way"
+	BookingArrived          = "arrived"
+	BookingInspecting       = "inspecting"
+	BookingRepairInProgress = "repair_in_progress"
 )
+
+// ValidBookingStatuses is the whitelist enforced by BookingService.UpdateStatus
+// so a typo'd status string can't get silently stuck in a booking's history.
+var ValidBookingStatuses = map[string]bool{
+	BookingRequested:        true,
+	BookingAccepted:         true,
+	BookingOnTheWay:         true,
+	BookingArrived:          true,
+	BookingInspecting:       true,
+	BookingRepairInProgress: true,
+	BookingInProgress:       true,
+	BookingCompleted:        true,
+	BookingCancelled:        true,
+}
 
 type Booking struct {
 	ID                 string     `json:"id"`
@@ -18,15 +41,55 @@ type Booking struct {
 	AddressID          string     `json:"address_id"`
 	Status             string     `json:"status"`
 	ServiceCode        string     `json:"service_code,omitempty"` // e.g. "SRV-001042" — a stable, human-readable ID for invoices/receipts, distinct from the internal UUID
-	PaymentStatus      string     `json:"payment_status"` // pending | paid | refunded — set only via verified UpiService.ConfirmPayment
+	PaymentStatus      string     `json:"payment_status"`         // pending | paid | refunded — set only via verified UpiService.ConfirmPayment
 	ProblemDescription string     `json:"problem_description,omitempty"`
 	Notes              *string    `json:"notes,omitempty"`
 	Images             []string   `json:"images,omitempty"`
 	ScheduledAt        *time.Time `json:"scheduled_at,omitempty"`
 	EstimatedPrice     *float64   `json:"estimated_price,omitempty"`
 	FinalPrice         *float64   `json:"final_price,omitempty"`
+	OTPVerifiedAt      *time.Time `json:"otp_verified_at,omitempty"` // set once the technician has confirmed the customer's OTP on-site; deliberately excludes OTPCode itself, which is never returned to the technician's side
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
+}
+
+// BookingEstimateItem is a single line in a service estimate, e.g.
+// "AC Gas Refill — ₹1,500".
+type BookingEstimateItem struct {
+	ID          string  `json:"id"`
+	Description string  `json:"description"`
+	Amount      float64 `json:"amount"`
+}
+
+// BookingEstimate is the itemised quote a technician raises after
+// inspecting the problem on-site. The customer must explicitly Approve it
+// (or ask to Discuss / Decline) before the technician can start any paid
+// repair work — see BookingService.RespondToEstimate.
+type BookingEstimate struct {
+	ID        string                `json:"id"`
+	BookingID string                `json:"booking_id"`
+	Status    string                `json:"status"` // pending | approved | declined
+	Total     float64               `json:"total"`
+	Note      string                `json:"note,omitempty"`
+	Items     []BookingEstimateItem `json:"items"`
+	CreatedAt time.Time             `json:"created_at"`
+	UpdatedAt time.Time             `json:"updated_at"`
+}
+
+const (
+	EstimatePending  = "pending"
+	EstimateApproved = "approved"
+	EstimateDeclined = "declined"
+)
+
+// BookingServicePhoto is a single before/after photo the technician attaches
+// while the repair is in progress.
+type BookingServicePhoto struct {
+	ID        string    `json:"id"`
+	BookingID string    `json:"booking_id"`
+	PhotoURL  string    `json:"photo_url"`
+	PhotoType string    `json:"photo_type"` // before | after
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // BookingMessage is a single chat message between the customer and the

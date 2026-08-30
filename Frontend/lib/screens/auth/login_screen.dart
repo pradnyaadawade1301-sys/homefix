@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/google_auth_helper.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/category_provider.dart';
 import 'signup_screen.dart';
@@ -17,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _obscurePassword = true;
+  bool _isGoogleLoading = false;
 
   @override
   void dispose() {
@@ -37,25 +39,73 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!mounted) return;
     if (success) {
-      if (authProvider.currentUser?.role == 'technician') {
-        final kycProvider = context.read<TechnicianKycProvider>();
-        await kycProvider.loadMyProfile();
-        if (!mounted) return;
-        final profile = kycProvider.profile;
-        if (profile == null) {
-          Navigator.of(context).pushReplacementNamed('/technician-kyc');
-        } else if (profile.isApproved) {
-          Navigator.of(context).pushReplacementNamed('/technician-home');
-        } else {
-          Navigator.of(context).pushReplacementNamed('/technician-status');
-        }
-      } else {
-        Navigator.of(context).pushReplacementNamed('/home');
-      }
+      await _routeAfterLogin();
     } else if (authProvider.error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(authProvider.error!), backgroundColor: AppTheme.errorColor),
       );
+    }
+  }
+
+  /// "Continue with Google" — opens the native account picker, then sends
+  /// the resulting ID token to our backend for verification. A cancelled
+  /// picker (user backs out) is not an error, so it just silently no-ops.
+  void _handleGoogleLogin() async {
+    FocusScope.of(context).unfocus();
+    setState(() => _isGoogleLoading = true);
+
+    String? idToken;
+    try {
+      idToken = await GoogleAuthHelper.signIn();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isGoogleLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Google sign-in failed: ${e.toString().replaceFirst('Exception: ', '')}'), backgroundColor: AppTheme.errorColor),
+      );
+      return;
+    }
+
+    if (idToken == null) {
+      // User cancelled the account picker.
+      if (mounted) setState(() => _isGoogleLoading = false);
+      return;
+    }
+
+    if (!mounted) return;
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.loginWithGoogle(idToken);
+
+    if (!mounted) return;
+    setState(() => _isGoogleLoading = false);
+    if (success) {
+      await _routeAfterLogin();
+    } else if (authProvider.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(authProvider.error!), backgroundColor: AppTheme.errorColor),
+      );
+    }
+  }
+
+  /// Shared post-login routing for both password and Google sign-in —
+  /// technicians go through their KYC/status gate, customers go straight
+  /// home.
+  Future<void> _routeAfterLogin() async {
+    final authProvider = context.read<AuthProvider>();
+    if (authProvider.currentUser?.role == 'technician') {
+      final kycProvider = context.read<TechnicianKycProvider>();
+      await kycProvider.loadMyProfile();
+      if (!mounted) return;
+      final profile = kycProvider.profile;
+      if (profile == null) {
+        Navigator.of(context).pushReplacementNamed('/technician-kyc');
+      } else if (profile.isApproved) {
+        Navigator.of(context).pushReplacementNamed('/technician-home');
+      } else {
+        Navigator.of(context).pushReplacementNamed('/technician-status');
+      }
+    } else {
+      Navigator.of(context).pushReplacementNamed('/home');
     }
   }
 
@@ -180,6 +230,51 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               );
                             },
+                          ),
+                          const SizedBox(height: 20),
+                          Row(
+                            children: [
+                              Expanded(child: Divider(color: Colors.grey[300])),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                child: Text('OR', style: TextStyle(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.w600)),
+                              ),
+                              Expanded(child: Divider(color: Colors.grey[300])),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          SizedBox(
+                            height: 56,
+                            child: OutlinedButton(
+                              onPressed: _isGoogleLoading ? null : _handleGoogleLogin,
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: Colors.grey[300]!),
+                                backgroundColor: Colors.white,
+                              ),
+                              child: _isGoogleLoading
+                                  ? const SizedBox(
+                                      height: 22,
+                                      width: 22,
+                                      child: CircularProgressIndicator(strokeWidth: 2.4, color: AppTheme.primaryColor),
+                                    )
+                                  : Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Image.asset(
+                                          'assets/images/google_logo.png',
+                                          width: 20,
+                                          height: 20,
+                                          errorBuilder: (context, error, stackTrace) =>
+                                              const Icon(Icons.g_mobiledata_rounded, size: 24, color: Colors.redAccent),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        const Text(
+                                          'Continue with Google',
+                                          style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1A1F36)),
+                                        ),
+                                      ],
+                                    ),
+                            ),
                           ),
                         ],
                       ),
