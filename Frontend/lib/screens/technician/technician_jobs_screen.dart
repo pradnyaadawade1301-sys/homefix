@@ -1,7 +1,5 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../models/booking_model.dart';
@@ -11,51 +9,109 @@ import '../../providers/category_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/consultation_provider.dart';
 import '../../services/booking_service.dart';
-import '../../services/service_locator.dart' show UploadService;
+import '../../widgets/guided_tour.dart';
 import '../consultation/incoming_consultation_screen.dart';
 import '../consultation/upcoming_consultations_screen.dart';
 import '../profile/profile_screen.dart';
 import 'technician_settlement_screen.dart';
+import 'technician_history_screen.dart';
 import 'repeat_customers_screen.dart';
 import '../chat/booking_chat_screen.dart';
 import 'technician_estimate_screen.dart';
-import 'job_photos_sheet.dart';
 import 'technician_job_detail_screen.dart';
-/// Technician-facing home screen — the mirror image of the customer's
-/// [BookingsScreen]. A logged-in technician lands here and sees:
-///  - a live "incoming consultation requests" banner (used to be buried in
-///    Profile — now front-and-center since that's where jobs actually get
-///    created from),
-///  - an "upcoming scheduled consultations" banner (Schedule for Later slots
-///    awaiting confirmation or already confirmed), and
-///  - the jobs assigned to them, each carrying the CUSTOMER's name/phone/
-///    address (booking.customer, booking.address).
-/// A bottom nav switches between this Jobs view and the Settlement view.
+
 class TechnicianJobsScreen extends StatefulWidget {
   const TechnicianJobsScreen({Key? key}) : super(key: key);
 
+  static final GlobalKey<TechnicianJobsScreenState> globalKey = GlobalKey<TechnicianJobsScreenState>();
+
   @override
-  State<TechnicianJobsScreen> createState() => _TechnicianJobsScreenState();
+  State<TechnicianJobsScreen> createState() => TechnicianJobsScreenState();
 }
 
-class _TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
-  int _navIndex = 0; // 0 = Jobs, 1 = Consultations, 2 = Settlement
-  int _tabIndex = 0; // Active / All filter within the Jobs tab
+class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
+  int _navIndex = 0; // 0 = Jobs, 1 = Consultations, 2 = Settlement, 3 = History
+  int _tabIndex = 0;
 
   List<ConsultationRequest> _pendingRequests = [];
   List<Consultation> _upcomingConsultations = [];
   Timer? _pollTimer;
 
+  final _overviewKey = GlobalKey();
+  final _filterKey = GlobalKey();
+  final _jobsListKey = GlobalKey();
+  final _customersNavKey = GlobalKey();
+  final _profileNavKey = GlobalKey();
+  final _settlementNavKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startGuidedTourIfNeeded());
     _pollPendingRequests();
     _pollUpcoming();
     _pollTimer = Timer.periodic(const Duration(seconds: 6), (_) {
       _pollPendingRequests();
       _pollUpcoming();
     });
+  }
+
+  Future<void> _startGuidedTourIfNeeded({bool force = false}) async {
+    final steps = <GuidedTourStep>[
+      GuidedTourStep(
+        targetKey: _overviewKey,
+        icon: Icons.pending_actions_rounded,
+        title: 'Welcome to HomeFix!',
+        description: 'Here\'s a quick overview of your active and completed jobs at a glance.',
+      ),
+      GuidedTourStep(
+        targetKey: _filterKey,
+        icon: Icons.filter_list_rounded,
+        title: 'Active & All Jobs',
+        description: 'Switch between jobs that need your attention right now and your full job history.',
+      ),
+      GuidedTourStep(
+        targetKey: _jobsListKey,
+        icon: Icons.work_outline_rounded,
+        title: 'Your Jobs',
+        description: 'Every job assigned to you shows up here — tap a card to see the full Job Brief, chat with the customer, and update the job status.',
+      ),
+      GuidedTourStep(
+        targetKey: _customersNavKey,
+        icon: Icons.people_alt_outlined,
+        title: 'My Customers',
+        description: 'See customers you\'ve worked with before, so repeat bookings are quick to spot.',
+      ),
+      GuidedTourStep(
+        targetKey: _profileNavKey,
+        icon: Icons.person_outline,
+        title: 'Your Profile',
+        description: 'Manage your KYC, bank details, service categories and settings here.',
+      ),
+      GuidedTourStep(
+        targetKey: _settlementNavKey,
+        icon: Icons.receipt_long_outlined,
+        title: 'Settlement',
+        description: 'Track your earnings, commission and payout status for every completed job here.',
+      ),
+    ];
+
+    await GuidedTour.maybeShow(
+      context,
+      force: force,
+      steps: steps,
+      onTourEnd: () {
+        if (mounted) setState(() => _navIndex = 0);
+      },
+    );
+  }
+
+  Future<void> replayGuidedTour() async {
+    await GuidedTour.reset();
+    if (!mounted) return;
+    setState(() => _navIndex = 0);
+    await _startGuidedTourIfNeeded(force: true);
   }
 
   @override
@@ -65,24 +121,19 @@ class _TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
   }
 
   Future<void> _pollPendingRequests() async {
-  try {
-    final requests = await context.read<ConsultationProvider>().fetchPendingRequests();
-    if (!mounted) return;
-    setState(() => _pendingRequests = requests);
-  } catch (_) {
-    // Silent — this is a background poll; the Jobs list below still shows
-    // its own error if the main fetch fails.
+    try {
+      final requests = await context.read<ConsultationProvider>().fetchPendingRequests();
+      if (!mounted) return;
+      setState(() => _pendingRequests = requests);
+    } catch (_) {}
   }
-}
 
   Future<void> _pollUpcoming() async {
     try {
       final upcoming = await context.read<ConsultationProvider>().fetchUpcomingList();
       if (!mounted) return;
       setState(() => _upcomingConsultations = upcoming);
-    } catch (_) {
-      // Silent — same as _pollPendingRequests, background poll only.
-    }
+    } catch (_) {}
   }
 
   Future<void> _load() async {
@@ -118,13 +169,28 @@ class _TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
     Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
   }
 
+  String _navTitle() {
+    switch (_navIndex) {
+      case 0:
+        return 'My Jobs';
+      case 1:
+        return 'Consultations';
+      case 2:
+        return 'Settlement';
+      default:
+        return 'History';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-title: Text(_navIndex == 0 ? 'My Jobs' : _navIndex == 1 ? 'Consultations' : 'Settlement'),        actions: [
+        title: Text(_navTitle()),
+        actions: [
           IconButton(
             icon: const Icon(Icons.people_alt_outlined),
+            key: _customersNavKey,
             tooltip: 'My Customers',
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const RepeatCustomersScreen()),
@@ -132,6 +198,7 @@ title: Text(_navIndex == 0 ? 'My Jobs' : _navIndex == 1 ? 'Consultations' : 'Set
           ),
           IconButton(
             icon: const Icon(Icons.person_outline),
+            key: _profileNavKey,
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ProfileScreen()),
             ),
@@ -143,97 +210,104 @@ title: Text(_navIndex == 0 ? 'My Jobs' : _navIndex == 1 ? 'Consultations' : 'Set
           ),
         ],
       ),
-     body: IndexedStack(
-  index: _navIndex,
-  children: [
-    _buildJobsBody(),
-    const UpcomingConsultationsScreen(embedded: true),
-    const TechnicianSettlementScreen(),
-  ],
-),
+      body: IndexedStack(
+        index: _navIndex,
+        children: [
+          _buildJobsBody(),
+          const UpcomingConsultationsScreen(embedded: true),
+          const TechnicianSettlementScreen(),
+          const TechnicianHistoryScreen(),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
         currentIndex: _navIndex,
         onTap: (i) => setState(() => _navIndex = i),
-        items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.work_outline_rounded), label: 'Jobs'),
-        BottomNavigationBarItem(icon: Icon(Icons.event_available_outlined), label: 'Upcoming'),
-        BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined), label: 'Settlement'),
-      ],
+        items: [
+          const BottomNavigationBarItem(icon: Icon(Icons.work_outline_rounded), label: 'Jobs'),
+          const BottomNavigationBarItem(icon: Icon(Icons.event_available_outlined), label: 'Upcoming'),
+          BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined, key: _settlementNavKey), label: 'Settlement'),
+          const BottomNavigationBarItem(icon: Icon(Icons.history_rounded), label: 'History'),
+        ],
       ),
     );
   }
-Widget _buildGreetingHeader() {
-  return Consumer<BookingProvider>(
-    builder: (context, provider, _) {
-      final activeCount = provider.bookings
-          .where((b) => b.status == 'accepted' || b.status == 'on_the_way' || b.status == 'arrived' || b.status == 'in_progress' || b.status == 'awaiting_estimate_approval')
-          .length;
-      final completedCount = provider.bookings.where((b) => b.status == 'completed').length;
-      return Container(
-        margin: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: AppTheme.primaryColor.withValues(alpha: 0.25), blurRadius: 14, offset: const Offset(0, 6))],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Welcome back 👋', style: TextStyle(color: Colors.white70, fontSize: 13)),
-            const SizedBox(height: 4),
-            const Text('Here\'s your work overview', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(child: _statPill('Active', activeCount.toString(), Icons.pending_actions_rounded)),
-                const SizedBox(width: 10),
-                Expanded(child: _statPill('Completed', completedCount.toString(), Icons.check_circle_outline_rounded)),
-              ],
+
+  Widget _buildGreetingHeader() {
+    return Consumer<BookingProvider>(
+      builder: (context, provider, _) {
+        final activeCount = provider.bookings
+            .where((b) => b.status == 'accepted' || b.status == 'on_the_way' || b.status == 'arrived' || b.status == 'inspecting' || b.status == 'in_progress' || b.status == 'awaiting_estimate_approval')
+            .length;
+        final completedCount = provider.bookings.where((b) => b.status == 'completed').length;
+        return Container(
+          key: _overviewKey,
+          margin: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          ],
-        ),
-      );
-    },
-  );
-}
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [BoxShadow(color: AppTheme.primaryColor.withValues(alpha: 0.25), blurRadius: 14, offset: const Offset(0, 6))],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Welcome back 👋', style: TextStyle(color: Colors.white70, fontSize: 13)),
+              const SizedBox(height: 4),
+              const Text('Here\'s your work overview', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _statPill('Active', activeCount.toString(), Icons.pending_actions_rounded)),
+                  const SizedBox(width: 10),
+                  Expanded(child: _statPill('Completed', completedCount.toString(), Icons.check_circle_outline_rounded)),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
-Widget _statPill(String label, String value, IconData icon) {
-  return Container(
-    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-    decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.15),
-      borderRadius: BorderRadius.circular(14),
-    ),
-    child: Row(
+  Widget _statPill(String label, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white, size: 20),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+              Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildJobsBody() {
+    return Column(
       children: [
-        Icon(icon, color: Colors.white, size: 20),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-          ],
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _buildJobsBody() {
-  return Column(
-    children: [
-      _buildGreetingHeader(),
-      const SizedBox(height: 4),
-      if (_pendingRequests.isNotEmpty) _buildConsultationBanner(),
-      if (_upcomingConsultations.isNotEmpty) _buildUpcomingBanner(),
+        _buildGreetingHeader(),
+        const SizedBox(height: 4),
+        if (_pendingRequests.isNotEmpty) _buildConsultationBanner(),
+        if (_upcomingConsultations.isNotEmpty) _buildUpcomingBanner(),
         Padding(
-padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),          child: Row(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
+          child: Row(
+            key: _filterKey,
             children: [
               _FilterChip(label: 'Active', selected: _tabIndex == 0, onTap: () => setState(() => _tabIndex = 0)),
               const SizedBox(width: 8),
@@ -242,6 +316,7 @@ padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),          child: Row(
           ),
         ),
         Expanded(
+          key: _jobsListKey,
           child: RefreshIndicator(
             onRefresh: () async {
               await _load();
@@ -254,9 +329,6 @@ padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),          child: Row(
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                // Surface real fetch errors instead of silently showing an
-                // empty state — an empty list and a failed request used to
-                // look identical to the technician.
                 if (provider.error != null && provider.bookings.isEmpty) {
                   return ListView(
                     children: [
@@ -281,7 +353,7 @@ padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),          child: Row(
 
                 final jobs = _tabIndex == 0
                     ? provider.bookings
-                        .where((b) => b.status == 'accepted' || b.status == 'on_the_way' || b.status == 'arrived' || b.status == 'in_progress' || b.status == 'awaiting_estimate_approval')
+                        .where((b) => b.status == 'accepted' || b.status == 'on_the_way' || b.status == 'arrived' || b.status == 'inspecting' || b.status == 'in_progress' || b.status == 'awaiting_estimate_approval')
                         .toList()
                     : provider.bookings;
 
@@ -321,9 +393,6 @@ padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),          child: Row(
     );
   }
 
-  /// Prominent "you have live video consultation requests" banner — this used
-  /// to only be reachable via Profile → "Live Consultation Requests"; now it
-  /// sits right on the main dashboard where the technician is already looking.
   Widget _buildConsultationBanner() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
@@ -393,12 +462,6 @@ padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),          child: Row(
     );
   }
 
-  /// "You have scheduled consultations" banner — Schedule for Later slots
-  /// that are either awaiting the technician's confirmation ('scheduled') or
-  /// already confirmed and waiting for their time ('confirmed'). Distinct
-  /// from [_buildConsultationBanner], which is the urgent ringing-right-now
-  /// queue — this one is calmer (no red badge/ring), just a reminder to open
-  /// [UpcomingConsultationsScreen] and confirm/decline.
   Widget _buildUpcomingBanner() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
@@ -475,11 +538,6 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-/// A single job card for the technician — leads with the CUSTOMER's details
-/// (name, phone, address) since that's what the technician needs to act on
-/// the job, plus the category/problem description and a status-appropriate
-/// action button (Accept / Start / Complete). Tapping the customer block
-/// opens the full [TechnicianJobDetailScreen].
 class _JobCard extends StatelessWidget {
   final Booking booking;
   const _JobCard({required this.booking});
@@ -494,6 +552,7 @@ class _JobCard extends StatelessWidget {
       case 'accepted':
       case 'on_the_way':
       case 'arrived':
+      case 'inspecting':
       case 'awaiting_estimate_approval':
         return AppTheme.warningColor;
       default:
@@ -543,7 +602,6 @@ class _JobCard extends StatelessWidget {
                 maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: Colors.grey[700])),
           ],
           const SizedBox(height: 12),
-          // --- Customer details: the whole point of this screen ---
           if (customer != null)
             Container(
               padding: const EdgeInsets.all(10),
@@ -590,28 +648,18 @@ class _JobCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                 if (booking.status != 'requested' && booking.status != 'cancelled')
-  IconButton(
-    icon: const Icon(Icons.add_a_photo_outlined, color: AppTheme.primaryColor, size: 20),
-    tooltip: 'Before/after photos',
-    onPressed: () => showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => JobPhotosSheet(bookingId: booking.id),
-    ),
-  ),
-                 IconButton(
-  icon: const Icon(Icons.forum_outlined, color: AppTheme.primaryColor, size: 20),
-  tooltip: 'Chat with customer',
-  onPressed: () {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => BookingChatScreen(
-        bookingId: booking.id,
-        peerName: customer.name.isNotEmpty ? customer.name : 'Customer',
-      ),
-    ));
-  },
-),
+                  IconButton(
+                    icon: const Icon(Icons.forum_outlined, color: AppTheme.primaryColor, size: 20),
+                    tooltip: 'Chat with customer',
+                    onPressed: () {
+                      Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => BookingChatScreen(
+                          bookingId: booking.id,
+                          peerName: customer.name.isNotEmpty ? customer.name : 'Customer',
+                        ),
+                      ));
+                    },
+                  ),
                 ],
               ),
             ),
@@ -625,29 +673,21 @@ class _JobCard extends StatelessWidget {
 
 class JobActionRow extends StatelessWidget {
   final Booking booking;
-  const JobActionRow({required this.booking});
+  const JobActionRow({super.key, required this.booking});
 
   @override
   Widget build(BuildContext context) {
     final provider = context.read<BookingProvider>();
-    // `watch` (not `read`) here: the KYC profile loads asynchronously after
-    // this screen's first frame, so without watching, a technician whose
-    // profile hadn't finished loading yet would get stuck with a permanently
-    // disabled action button (e.g. "I've arrived" never becoming tappable)
-    // until something unrelated happened to rebuild this row.
     final kycProfile = context.watch<TechnicianKycProvider>().profile;
 
     switch (booking.status) {
       case 'requested':
-        // Only reachable when browsing the general "requested" queue; for now
-        // technicians only see jobs already routed to them via ListForTechnician,
-        // but keep Accept available in case that changes.
         return SizedBox(
           width: double.infinity,
           child: ElevatedButton(
             onPressed: kycProfile == null
                 ? null
-                : () => provider.acceptBooking(booking.id, kycProfile.id),
+                : () => _runAction(context, () => provider.acceptBooking(booking.id, kycProfile.id)),
             child: const Text('Accept job'),
           ),
         );
@@ -656,7 +696,8 @@ class JobActionRow extends StatelessWidget {
           width: double.infinity,
           child: OutlinedButton.icon(
             icon: const Icon(Icons.directions_run_rounded, size: 18),
-            onPressed: () => provider.updateBookingStatus(booking.id, 'on_the_way', note: 'Technician is on the way'),
+            onPressed: () => _runAction(
+                context, () => provider.updateBookingStatus(booking.id, 'on_the_way', note: 'Technician is on the way')),
             label: const Text("I'm on my way"),
           ),
         );
@@ -667,12 +708,13 @@ class JobActionRow extends StatelessWidget {
             icon: const Icon(Icons.home_rounded, size: 18),
             onPressed: kycProfile == null
                 ? null
-                : () => provider.markArrived(booking.id, kycProfile.id),
+                : () => _runAction(context, () => provider.markArrived(booking.id, kycProfile.id)),
             label: const Text("I've arrived"),
           ),
         );
       case 'arrived':
         return _OtpVerifyRow(booking: booking, technicianId: kycProfile?.id);
+      case 'inspecting':
       case 'in_progress':
         return _EstimateAwareAction(booking: booking, technicianId: kycProfile?.id);
       case 'awaiting_estimate_approval':
@@ -682,73 +724,69 @@ class JobActionRow extends StatelessWidget {
     }
   }
 
+  Future<void> _runAction(BuildContext context, Future<void> Function() action) async {
+    final provider = context.read<BookingProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    await action();
+    if (provider.error != null) {
+      messenger.showSnackBar(SnackBar(content: Text(provider.error!)));
+    }
+  }
 }
 
-/// The technician's "invoice" — a single final-amount entry, since that's
-/// what the backend actually stores (Booking.FinalPrice) and what
-/// UpiService.CreateOrder validates the customer's payment against. Pre-
-/// filled with the original estimate so the common case (no change) is a
-/// single tap, but the technician can adjust it up or down for parts used,
-/// extra labor, etc. before it goes to the customer.
 void _showInvoiceDialog(BuildContext context, BookingProvider provider, Booking booking) {
-    final controller = TextEditingController(
-      text: (booking.estimatedPrice ?? 0) > 0 ? (booking.estimatedPrice ?? 0).toStringAsFixed(0) : '',
-    );
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Generate invoice'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Enter the final amount the customer should pay. This is sent to them immediately as the amount due.',
-              style: TextStyle(fontSize: 13, color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                prefixText: '₹ ',
-                labelText: 'Final amount',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
+  final controller = TextEditingController(
+    text: (booking.estimatedPrice ?? 0) > 0 ? (booking.estimatedPrice ?? 0).toStringAsFixed(0) : '',
+  );
+  showDialog(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Generate invoice'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Enter the final amount the customer should pay. This is sent to them immediately as the amount due.',
+            style: TextStyle(fontSize: 13, color: Colors.grey),
           ),
-          ElevatedButton(
-            onPressed: () {
-              final price = double.tryParse(controller.text.trim());
-              if (price == null || price <= 0) {
-                ScaffoldMessenger.of(dialogContext).showSnackBar(
-                  const SnackBar(content: Text('Enter a valid amount')),
-                );
-                return;
-              }
-              Navigator.of(dialogContext).pop();
-              provider.completeBooking(booking.id, price);
-            },
-            child: const Text('Send invoice'),
+          const SizedBox(height: 16),
+          TextField(
+            controller: controller,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              prefixText: '₹ ',
+              labelText: 'Final amount',
+              border: OutlineInputBorder(),
+            ),
           ),
         ],
       ),
-    );
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final price = double.tryParse(controller.text.trim());
+            if (price == null || price <= 0) {
+              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                const SnackBar(content: Text('Enter a valid amount')),
+              );
+              return;
+            }
+            Navigator.of(dialogContext).pop();
+            provider.completeBooking(booking.id, price);
+          },
+          child: const Text('Send invoice'),
+        ),
+      ],
+    ),
+  );
 }
 
-/// Shown for an 'in_progress' job. A technician who hasn't inspected the job
-/// yet (or whose last estimate was declined) sees "Submit estimate"; once an
-/// estimate has been approved by the customer, this instead shows the usual
-/// "Generate invoice & complete" button. Fetches the booking's latest
-/// estimate lazily (once per card) rather than through the shared
-/// BookingProvider state, since many job cards can be on screen at once.
 class _EstimateAwareAction extends StatefulWidget {
   final Booking booking;
   final String? technicianId;
@@ -788,8 +826,6 @@ class _EstimateAwareActionState extends State<_EstimateAwareAction> {
         }
 
         final estimate = snapshot.data;
-        // No estimate yet, or the last one was declined — technician needs
-        // to (re)submit one before they can proceed to invoicing.
         if (estimate == null || estimate.isDeclined) {
           return Column(
             children: [
@@ -830,8 +866,6 @@ class _EstimateAwareActionState extends State<_EstimateAwareAction> {
           );
         }
 
-        // estimate.isApproved (or otherwise already resolved) — proceed to
-        // the normal final-invoice flow, pre-filled with the approved total.
         return SizedBox(
           width: double.infinity,
           child: ElevatedButton(
@@ -844,10 +878,6 @@ class _EstimateAwareActionState extends State<_EstimateAwareAction> {
   }
 }
 
-/// Shown while a booking is 'awaiting_estimate_approval' — the technician
-/// has submitted an estimate and is waiting on the customer to approve,
-/// decline, or discuss it. Read-only; nothing for the technician to tap
-/// except a peek at what they sent.
 class _WaitingOnEstimateRow extends StatelessWidget {
   final Booking booking;
   const _WaitingOnEstimateRow({required this.booking});
@@ -888,10 +918,6 @@ class _WaitingOnEstimateRow extends StatelessWidget {
   }
 }
 
-
-/// Uber-style OTP entry shown to the technician once a booking is "arrived".
-/// The customer reads out the code from their tracking screen; the
-/// technician types it here to actually start the job.
 class _OtpVerifyRow extends StatefulWidget {
   final Booking booking;
   final String? technicianId;
@@ -915,8 +941,8 @@ class _OtpVerifyRowState extends State<_OtpVerifyRow> {
   Future<void> _submit() async {
     final otp = _controller.text.trim();
     if (widget.technicianId == null) return;
-    if (otp.length != 6) {
-      setState(() => _errorText = 'Enter the 6-digit OTP');
+    if (otp.length != 4) {
+      setState(() => _errorText = 'Enter the 4-digit OTP');
       return;
     }
     setState(() {
@@ -948,12 +974,12 @@ class _OtpVerifyRowState extends State<_OtpVerifyRow> {
               child: TextField(
                 controller: _controller,
                 keyboardType: TextInputType.number,
-                maxLength: 6,
+                maxLength: 4,
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: 4),
                 decoration: InputDecoration(
                   counterText: '',
-                  hintText: '------',
+                  hintText: '----',
                   errorText: _errorText,
                   border: const OutlineInputBorder(),
                   contentPadding: const EdgeInsets.symmetric(vertical: 10),

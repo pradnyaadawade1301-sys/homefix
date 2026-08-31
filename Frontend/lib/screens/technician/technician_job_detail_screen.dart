@@ -5,7 +5,7 @@ import '../../core/contact_actions.dart';
 import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
 import '../chat/booking_chat_screen.dart';
-import 'job_photos_sheet.dart';
+import 'job_brief_card.dart';
 import 'technician_jobs_screen.dart' show JobActionRow;
 
 /// Full-detail view of a single job, reached by tapping the customer block on
@@ -96,9 +96,30 @@ class TechnicianJobDetailScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
-                            child: Text(
-                              current.categoryName.isNotEmpty ? current.categoryName : 'Service request',
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                            child: Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    current.categoryName.isNotEmpty ? current.categoryName : 'Service request',
+                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (current.isUrgent) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.errorColor.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: const Text(
+                                      '🚨 Urgent',
+                                      style: TextStyle(fontSize: 11, color: AppTheme.errorColor, fontWeight: FontWeight.w700),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
                           Container(
@@ -140,6 +161,7 @@ class TechnicianJobDetailScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 20),
+                if (current.jobBrief != null || current.images.isNotEmpty) JobBriefCard(booking: current),
                 if (customer != null) ...[
                   Text('Customer', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.grey[800])),
                   const SizedBox(height: 10),
@@ -229,18 +251,7 @@ class TechnicianJobDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
                 ],
-                if (current.status != 'requested' && current.status != 'cancelled') ...[
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-                    label: const Text('Before / after photos'),
-                    onPressed: () => showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      builder: (_) => JobPhotosSheet(bookingId: current.id),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                ],
+                const SizedBox(height: 20),
                 JobActionRow(booking: current),
               ],
             ),

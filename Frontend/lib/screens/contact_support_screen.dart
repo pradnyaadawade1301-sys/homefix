@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/theme.dart';
-import 'live_chat_screen.dart';
 
-/// Contact Support — quick channels (call, email, chat) for cases that
-/// don't fit Report an Issue.
-/// Call/Email actually open the phone dialer / email app via url_launcher.
-/// Live chat opens a working in-app chat screen.
+/// Contact Support — quick channels (call, email) for cases that don't fit
+/// Report an Issue. Both actually open the phone dialer / email app via
+/// url_launcher.
 class ContactSupportScreen extends StatefulWidget {
   const ContactSupportScreen({Key? key}) : super(key: key);
 
@@ -42,12 +40,6 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
     }
   }
 
-  void _openChat() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const LiveChatScreen()),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -73,13 +65,6 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
               title: 'Email us',
               subtitle: _supportEmail,
               onTap: _email,
-            ),
-            const SizedBox(height: 10),
-            _ContactTile(
-              icon: Icons.chat_bubble_outline_rounded,
-              title: 'Live chat',
-              subtitle: 'Typically replies in a few minutes',
-              onTap: _openChat,
             ),
           ],
         ),

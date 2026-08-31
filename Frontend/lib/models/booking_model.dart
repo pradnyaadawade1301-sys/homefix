@@ -6,6 +6,8 @@
 // screen both use the same [Booking] shape: `customer` is always present,
 // `technician` is null until one is assigned.
 
+import 'dart:convert';
+
 class BookingCustomerInfo {
   final String id;
   final String name;
@@ -99,6 +101,15 @@ class Booking {
   final String status; // requested, accepted, on_the_way, arrived, in_progress, completed, cancelled
   final String paymentStatus; // pending, paid, refunded
   final String problemDescription;
+  // Guided-questions answers (When did it start? / Continuous or occasional? /
+  // Repaired before? / Unusual sound-smell-leak? / Emergency?) formatted as a
+  // readable text block by IssueDetailsScreen — this IS the "Job Brief" data
+  // the technician sees before accepting. Maps to the backend's free-form
+  // `notes` column (see migration 006_booking_notes_images.sql), so no schema
+  // change was needed — HomeFix already had a place to put this.
+  final String? notes;
+  // Photo/video URLs the customer attached while describing the issue.
+  final List<String> images;
   final DateTime? scheduledAt;
   final double? estimatedPrice;
   final double? finalPrice;
@@ -123,6 +134,8 @@ class Booking {
     required this.status,
     this.paymentStatus = 'pending',
     required this.problemDescription,
+    this.notes,
+    this.images = const [],
     this.scheduledAt,
     this.estimatedPrice,
     this.finalPrice,
@@ -150,6 +163,22 @@ class Booking {
   /// Estimate -> Approval flow).
   bool get isAwaitingEstimateApproval => status == 'awaiting_estimate_approval';
 
+  // ---------------------------------------------------------------------
+  // Job Brief
+  //
+  // IssueDetailsScreen / AIDiagnosisScreen / PostCallScreen collect guided-
+  // question answers, AI diagnosis text, and consultation notes into a
+  // [JobBrief], which BookTechnicianScreen encodes into this booking's
+  // `notes` field at creation time (see JobBrief.encode/.decode below) — no
+  // backend schema change needed, `notes` already existed as a free-form
+  // column. [jobBrief] is the single place that decodes it back out, used
+  // by both JobBriefCard (job detail) and jobBriefPreviewLine (job list).
+  JobBrief? get jobBrief => JobBrief.decode(notes);
+
+  /// True if the customer flagged this as an emergency in the guided
+  /// questions — drives the 🚨 Urgent badge technicians see before accepting.
+  bool get isUrgent => jobBrief?.isEmergency == true;
+
   factory Booking.fromJson(Map<String, dynamic> json) {
     return Booking(
       id: json['id'] as String,
@@ -160,6 +189,8 @@ class Booking {
       status: json['status'] as String,
       paymentStatus: (json['payment_status'] as String?) ?? 'pending',
       problemDescription: (json['problem_description'] as String?) ?? '',
+      notes: json['notes'] as String?,
+      images: (json['images'] as List?)?.map((e) => e as String).toList() ?? const [],
       scheduledAt: json['scheduled_at'] != null ? DateTime.tryParse(json['scheduled_at'] as String) : null,
       estimatedPrice: (json['estimated_price'] as num?)?.toDouble(),
       finalPrice: (json['final_price'] as num?)?.toDouble(),
@@ -178,6 +209,114 @@ class Booking {
           ? BookingTechnicianInfo.fromJson(json['technician'] as Map<String, dynamic>)
           : null,
     );
+  }
+}
+
+/// Everything HomeFix collects about the problem before a technician ever
+/// gets involved — guided-question answers, an AI diagnosis, and/or live
+/// video consultation notes — bundled so the technician can read it all
+/// before tapping Accept, instead of learning the details on-site.
+///
+/// Built up gradually across several screens (see BookingProvider's
+/// pendingJobBrief / updatePendingJobBrief) and only actually persisted once
+/// [encode]d into a booking's free-form `notes` field at creation time —
+/// there's no dedicated backend column for it. [decode] is the inverse,
+/// used by [Booking.jobBrief] to read it back out on the technician's side.
+class JobBrief {
+  final String? startedWhen;
+  final bool? isContinuous;
+  final bool? previousRepair;
+  final bool? isEmergency;
+  final String? unusualSigns;
+  final bool hasVideo;
+  final String? aiDiagnosis;
+  final String? consultationNotes;
+
+  const JobBrief({
+    this.startedWhen,
+    this.isContinuous,
+    this.previousRepair,
+    this.isEmergency,
+    this.unusualSigns,
+    this.hasVideo = false,
+    this.aiDiagnosis,
+    this.consultationNotes,
+  });
+
+  /// True if the customer actually answered any of the guided questions —
+  /// distinct from [hasVideo]/[aiDiagnosis] having content, since a booking
+  /// can carry AI/consultation notes without any guided answers (or vice
+  /// versa). Drives whether JobBriefCard shows the "Customer answers"
+  /// section vs. its empty-state message.
+  bool get hasGuidedAnswers =>
+      startedWhen != null || isContinuous != null || previousRepair != null || isEmergency != null ||
+      (unusualSigns != null && unusualSigns!.isNotEmpty);
+
+  JobBrief copyWith({
+    String? startedWhen,
+    bool? isContinuous,
+    bool? previousRepair,
+    bool? isEmergency,
+    String? unusualSigns,
+    bool? hasVideo,
+    String? aiDiagnosis,
+    String? consultationNotes,
+  }) {
+    return JobBrief(
+      startedWhen: startedWhen ?? this.startedWhen,
+      isContinuous: isContinuous ?? this.isContinuous,
+      previousRepair: previousRepair ?? this.previousRepair,
+      isEmergency: isEmergency ?? this.isEmergency,
+      unusualSigns: unusualSigns ?? this.unusualSigns,
+      hasVideo: hasVideo ?? this.hasVideo,
+      aiDiagnosis: aiDiagnosis ?? this.aiDiagnosis,
+      consultationNotes: consultationNotes ?? this.consultationNotes,
+    );
+  }
+
+  // A short marker prefix (kept from the original plain-text format) lets
+  // [decode] tell a real Job Brief apart from any other free-form text a
+  // technician or an older client version might have put in `notes`,
+  // without needing a new booking field. Everything after the marker is
+  // just compact JSON — far more robust than hand-parsed "Label: value"
+  // lines once multi-line fields like [aiDiagnosis] are involved.
+  static const _marker = '[JobBrief]';
+
+  String encode() {
+    final map = {
+      if (startedWhen != null) 'startedWhen': startedWhen,
+      if (isContinuous != null) 'isContinuous': isContinuous,
+      if (previousRepair != null) 'previousRepair': previousRepair,
+      if (isEmergency != null) 'isEmergency': isEmergency,
+      if (unusualSigns != null && unusualSigns!.isNotEmpty) 'unusualSigns': unusualSigns,
+      if (hasVideo) 'hasVideo': hasVideo,
+      if (aiDiagnosis != null && aiDiagnosis!.isNotEmpty) 'aiDiagnosis': aiDiagnosis,
+      if (consultationNotes != null && consultationNotes!.isNotEmpty) 'consultationNotes': consultationNotes,
+    };
+    return '$_marker${jsonEncode(map)}';
+  }
+
+  /// Returns null if [notes] doesn't contain an encoded Job Brief at all —
+  /// e.g. it's null, empty, plain free-form text, or (defensively) malformed
+  /// JSON left over from a future format change.
+  static JobBrief? decode(String? notes) {
+    if (notes == null || !notes.contains(_marker)) return null;
+    try {
+      final jsonPart = notes.substring(notes.indexOf(_marker) + _marker.length);
+      final map = jsonDecode(jsonPart) as Map<String, dynamic>;
+      return JobBrief(
+        startedWhen: map['startedWhen'] as String?,
+        isContinuous: map['isContinuous'] as bool?,
+        previousRepair: map['previousRepair'] as bool?,
+        isEmergency: map['isEmergency'] as bool?,
+        unusualSigns: map['unusualSigns'] as String?,
+        hasVideo: map['hasVideo'] as bool? ?? false,
+        aiDiagnosis: map['aiDiagnosis'] as String?,
+        consultationNotes: map['consultationNotes'] as String?,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 }
 

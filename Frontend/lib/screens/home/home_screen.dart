@@ -22,10 +22,15 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HomeScreen> createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+/// Public (not `_`-prefixed) so other screens embedded inside this one —
+/// e.g. ProfileScreen's "Replay Guided Tour" button — can reach it via
+/// `context.findAncestorStateOfType<HomeScreenState>()` and call
+/// [replayGuidedTour] directly, without HomeScreen needing to thread a
+/// callback down through every tab.
+class HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
   // One GlobalKey per bottom-nav destination so the Guided Tour can find each
@@ -93,7 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
         tabIndex: 0,
         icon: Icons.home_rounded,
         title: 'Welcome to HomeFix!',
-        description: 'Yahan se apni home service start karein — electrician, plumber, AC repair aur bahut kuch.',
+        description: 'Start booking a home service here — electrician, plumber, AC repair and much more.',
       ),
       if (home != null) ...[
         GuidedTourStep(
@@ -101,28 +106,28 @@ class _HomeScreenState extends State<HomeScreen> {
           tabIndex: 0,
           icon: Icons.search_rounded,
           title: 'Search',
-          description: 'Kisi bhi service ko seedha naam se search karein — jaise "AC repair" ya "plumber".',
+          description: 'Search for any service directly by name — like "AC repair" or "plumber".',
         ),
         GuidedTourStep(
           targetKey: home._bannerKey,
           tabIndex: 0,
           icon: Icons.local_offer_rounded,
           title: 'Offers',
-          description: 'Chalte offers aur discounts yahan dikhte rahenge — nazar rakhein!',
+          description: 'Ongoing offers and discounts will keep showing up here — keep an eye out!',
         ),
         GuidedTourStep(
           targetKey: home._categoriesKey,
           tabIndex: 0,
           icon: Icons.grid_view_rounded,
           title: 'Services',
-          description: 'Sabse zyada book hone wali services yahan se ek tap mein choose karein.',
+          description: 'Choose from the most frequently booked services in just one tap.',
         ),
         GuidedTourStep(
           targetKey: home._topPicksKey,
           tabIndex: 0,
           icon: Icons.star_rounded,
           title: 'Top Technicians',
-          description: 'Aapke area ke verified, top-rated technicians yahan dikhaye jaate hain.',
+          description: 'Verified, top-rated technicians in your area are shown here.',
         ),
       ],
       GuidedTourStep(
@@ -130,56 +135,56 @@ class _HomeScreenState extends State<HomeScreen> {
         tabIndex: 0,
         icon: Icons.history_rounded,
         title: 'Bookings',
-        description: 'Apni upcoming aur previous bookings yahan track karein.',
+        description: 'Track your upcoming and past bookings here.',
       ),
       GuidedTourStep(
         targetKey: _bookingsTourKey,
         tabIndex: 1,
         icon: Icons.history_rounded,
         title: 'My Bookings',
-        description: 'Yahan har booking ka live status dikhega — technician assign hone se lekar job complete hone tak.',
+        description: 'See the live status of every booking here — from technician assignment right through to job completion.',
       ),
       GuidedTourStep(
         targetKey: _consultNavKey,
         tabIndex: 1,
         icon: Icons.chat_bubble_outline_rounded,
         title: 'Consult',
-        description: 'Technician se chat karein ya live video call par turant apni problem dikhayein.',
+        description: 'Chat with a technician or show your problem instantly on a live video call.',
       ),
       GuidedTourStep(
         targetKey: _consultTourKey,
         tabIndex: 2,
         icon: Icons.chat_bubble_outline_rounded,
         title: 'Chat & Video',
-        description: 'Chat aur Video tabs se technician ke saath apni saari conversations yahan se access karein.',
+        description: 'Access all your conversations with technicians here, via the Chat and Video tabs.',
       ),
       GuidedTourStep(
         targetKey: _transactionsNavKey,
         tabIndex: 2,
         icon: Icons.receipt_long_rounded,
         title: 'Transactions',
-        description: 'Apni saari payments aur invoices yahan se dekhein.',
+        description: 'View all your payments and invoices here.',
       ),
       GuidedTourStep(
         targetKey: _transactionsTourKey,
         tabIndex: 3,
         icon: Icons.receipt_long_rounded,
         title: 'Transaction History',
-        description: 'Har payment ka status aur invoice yahan ek jagah milega.',
+        description: 'Find every payment\'s status and invoice in one place here.',
       ),
       GuidedTourStep(
         targetKey: _profileNavKey,
         tabIndex: 3,
         icon: Icons.person_rounded,
         title: 'Profile',
-        description: 'Account, addresses, payments aur settings yahan manage karein.',
+        description: 'Manage your account, addresses, payments and settings here.',
       ),
       GuidedTourStep(
         targetKey: _profileTourKey,
         tabIndex: 4,
         icon: Icons.person_rounded,
         title: 'Your Profile',
-        description: 'Yahan se profile edit karein, addresses manage karein aur account settings dekhein.',
+        description: 'Edit your profile, manage addresses, and view account settings here.',
       ),
     ];
 
@@ -195,6 +200,23 @@ class _HomeScreenState extends State<HomeScreen> {
         if (mounted) setState(() => _selectedIndex = 0);
       },
     );
+  }
+
+  /// Lets the user manually restart the Guided Tour later — e.g. if they
+  /// tapped "Skip" on first launch and now want a refresher on how the app
+  /// works. Called from ProfileScreen's "Replay Guided Tour" button via
+  /// `context.findAncestorStateOfType<HomeScreenState>()`.
+  ///
+  /// Clears the "seen" flag first so `_startGuidedTourIfNeeded` doesn't
+  /// think this is a repeat and skip it, then jumps to the Home tab (where
+  /// the tour always starts) before showing it — matching the first-launch
+  /// experience exactly, no matter which tab the user was on when they
+  /// tapped the button.
+  Future<void> replayGuidedTour() async {
+    await GuidedTour.reset();
+    if (!mounted) return;
+    setState(() => _selectedIndex = 0);
+    await _startGuidedTourIfNeeded(force: true);
   }
 
   @override
@@ -457,7 +479,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
           children: [
             GestureDetector(
               onTap: () {
-                final homeState = context.findAncestorStateOfType<_HomeScreenState>();
+                final homeState = context.findAncestorStateOfType<HomeScreenState>();
                 if (homeState != null) {
                   homeState.setState(() => homeState._selectedIndex = 4);
                 } else {

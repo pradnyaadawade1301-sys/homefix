@@ -625,7 +625,7 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
                         ),
                         if (isCurrent) ...[
                           const SizedBox(height: 3),
-                          Text(
+                          const Text(
                             'In progress...',
                             style: TextStyle(fontSize: 12, color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
                           ),

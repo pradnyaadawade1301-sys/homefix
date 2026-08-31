@@ -191,7 +191,7 @@ class _MyAppState extends State<MyApp> {
           '/home': (context) => const HomeScreen(),
           '/technician-kyc': (context) => const TechnicianKycScreen(),
           '/technician-status': (context) => const TechnicianStatusScreen(),
-          '/technician-home': (context) => const TechnicianJobsScreen(),
+          '/technician-home': (context) => TechnicianJobsScreen(key: TechnicianJobsScreen.globalKey),
           '/consultation-requests': (context) => const IncomingConsultationScreen(),
         },
       ),

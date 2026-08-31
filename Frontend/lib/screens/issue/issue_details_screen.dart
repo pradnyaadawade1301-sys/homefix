@@ -6,7 +6,9 @@ import 'package:provider/provider.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../core/theme.dart';
+import '../../models/booking_model.dart';
 import '../../providers/ai_provider.dart';
+import '../../providers/booking_provider.dart';
 import '../../services/service_locator.dart';
 import 'ai_diagnosis_screen.dart';
 
@@ -30,6 +32,15 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
   final List<File> _images = [];
   final List<File> _videos = [];
   bool _isUploading = false;
+
+  // Guided questions — quick chip-style answers that fold into the Job
+  // Brief the technician sees before Accept (see JobBrief in booking_model).
+  static const _startedOptions = ['Today', '1-2 days', '3-7 days', 'Over a week'];
+  String? _startedWhen;
+  bool? _isContinuous;
+  bool? _previousRepair;
+  bool _isEmergency = false;
+  final _unusualSignsController = TextEditingController();
 
   // Voice recording state.
   final _audioRecorder = AudioRecorder();
@@ -208,6 +219,22 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
     if (!mounted) return;
     setState(() => _isUploading = false);
 
+    // Fold guided-question answers into the pending Job Brief so the
+    // technician can see them later — done here rather than only at final
+    // booking-create time because this is the one place we know them.
+    final brief = JobBrief(
+      startedWhen: _startedWhen,
+      isContinuous: _isContinuous,
+      previousRepair: _previousRepair,
+      isEmergency: _isEmergency,
+      unusualSigns: _unusualSignsController.text.trim().isEmpty ? null : _unusualSignsController.text.trim(),
+      hasVideo: videoUrls.isNotEmpty,
+    );
+    if (!mounted) return;
+    final bookingProvider = context.read<BookingProvider>();
+    bookingProvider.setPendingJobBrief(brief);
+    bookingProvider.setPendingJobBriefImages(imageUrls);
+
     await context.read<AIProvider>().startWithIssue(
           categoryId: widget.categoryId,
           issueSummary: issueSummary.toString(),
@@ -227,6 +254,7 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _unusualSignsController.dispose();
     _audioRecorder.dispose();
     _recordingTicker?.cancel();
     super.dispose();
@@ -256,6 +284,76 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
                 hintText: 'Describe what\'s wrong, when it started, anything unusual...',
                 alignLabelWithHint: true,
               ),
+            ),
+            const SizedBox(height: 20),
+            const Text('A few quick questions', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+            Text('Helps the technician come prepared', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+            const SizedBox(height: 10),
+            Text('Since when?', style: TextStyle(fontSize: 12.5, color: Colors.grey[700], fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _startedOptions.map((opt) {
+                final selected = _startedWhen == opt;
+                return ChoiceChip(
+                  label: Text(opt, style: const TextStyle(fontSize: 12.5)),
+                  selected: selected,
+                  onSelected: (_) => setState(() => _startedWhen = selected ? null : opt),
+                  selectedColor: AppTheme.primaryColor.withValues(alpha: 0.15),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 14),
+            Text('Is the problem...', style: TextStyle(fontSize: 12.5, color: Colors.grey[700], fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              ChoiceChip(
+                label: const Text('Continuous', style: TextStyle(fontSize: 12.5)),
+                selected: _isContinuous == true,
+                onSelected: (_) => setState(() => _isContinuous = _isContinuous == true ? null : true),
+                selectedColor: AppTheme.primaryColor.withValues(alpha: 0.15),
+              ),
+              ChoiceChip(
+                label: const Text('Occasional', style: TextStyle(fontSize: 12.5)),
+                selected: _isContinuous == false,
+                onSelected: (_) => setState(() => _isContinuous = _isContinuous == false ? null : false),
+                selectedColor: AppTheme.primaryColor.withValues(alpha: 0.15),
+              ),
+            ]),
+            const SizedBox(height: 14),
+            Text('Was this repaired before?', style: TextStyle(fontSize: 12.5, color: Colors.grey[700], fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              ChoiceChip(
+                label: const Text('Yes', style: TextStyle(fontSize: 12.5)),
+                selected: _previousRepair == true,
+                onSelected: (_) => setState(() => _previousRepair = _previousRepair == true ? null : true),
+                selectedColor: AppTheme.primaryColor.withValues(alpha: 0.15),
+              ),
+              ChoiceChip(
+                label: const Text('No', style: TextStyle(fontSize: 12.5)),
+                selected: _previousRepair == false,
+                onSelected: (_) => setState(() => _previousRepair = _previousRepair == false ? null : false),
+                selectedColor: AppTheme.primaryColor.withValues(alpha: 0.15),
+              ),
+            ]),
+            const SizedBox(height: 14),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('This is an emergency', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+              subtitle: const Text('Marks the job Urgent for the technician', style: TextStyle(fontSize: 11.5)),
+              value: _isEmergency,
+              activeColor: AppTheme.errorColor,
+              onChanged: (v) => setState(() => _isEmergency = v),
+            ),
+            const SizedBox(height: 10),
+            Text('Any unusual sound, smell or leakage?', style: TextStyle(fontSize: 12.5, color: Colors.grey[700], fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _unusualSignsController,
+              maxLines: 2,
+              decoration: const InputDecoration(hintText: 'Optional — e.g. loud rattling noise from outdoor unit'),
             ),
             const SizedBox(height: 20),
             Row(

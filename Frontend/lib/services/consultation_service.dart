@@ -149,6 +149,7 @@ class ConsultationService {
     String id, {
     required String addressId,
     String? problemDescription,
+    String? notes,
     DateTime? scheduledAt,
   }) async {
     try {
@@ -157,6 +158,7 @@ class ConsultationService {
         data: {
           'address_id': addressId,
           if (problemDescription != null) 'problem_description': problemDescription,
+          if (notes != null) 'notes': notes,
           if (scheduledAt != null) 'scheduled_at': scheduledAt.toUtc().toIso8601String(),
         },
       );

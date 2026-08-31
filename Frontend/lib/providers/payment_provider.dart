@@ -158,4 +158,23 @@ class PaymentProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Technician-side equivalent of [loadInvoice] — looked up by booking
+  /// since the technician never has a payment ID handy. See
+  /// PaymentService.getInvoiceByBooking.
+  Future<bool> loadInvoiceByBooking(String bookingId) async {
+    _isLoadingInvoice = true;
+    _error = null;
+    notifyListeners();
+    try {
+      _invoice = await _paymentService.getInvoiceByBooking(bookingId);
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+      return false;
+    } finally {
+      _isLoadingInvoice = false;
+      notifyListeners();
+    }
+  }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../models/booking_model.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/consultation_provider.dart';
 import '../home/technician_list_screen.dart';
@@ -94,10 +95,21 @@ class _PostCallScreenState extends State<PostCallScreen> {
 
     setState(() => _isBooking = true);
     try {
+      // Fold the video consultation into the Job Brief the technician sees
+      // before Accept — hasVideo:true records that a live call already
+      // happened, and the customer's post-call notes (if any) carry over
+      // as the consultation notes rather than being lost.
+      final consultBrief = JobBrief(
+        hasVideo: true,
+        consultationNotes: _notesController.text.trim().isNotEmpty
+            ? _notesController.text.trim()
+            : 'Video consultation completed with ${widget.technicianName ?? 'the technician'} before this visit.',
+      );
       await context.read<ConsultationProvider>().escalateToBooking(
             widget.consultationId,
             addressId: _selectedAddressId!,
             problemDescription: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
+            notes: consultBrief.encode(),
             scheduledAt: scheduledAt,
           );
       if (!mounted) return;

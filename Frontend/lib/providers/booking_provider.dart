@@ -162,10 +162,36 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
+  // --- Pending Job Brief ---
+  // Transient holder that carries the guided-question answers (+ AI
+  // diagnosis / consultation notes once available) from IssueDetailsScreen /
+  // AIDiagnosisScreen through to BookTechnicianScreen, without threading a
+  // new constructor param through every screen in that chain. Set as the
+  // customer answers guided questions; read + cleared once actually used in
+  // [createBooking] (via the `notes` param below) so it never leaks into an
+  // unrelated later booking.
+  JobBrief? _pendingJobBrief;
+  JobBrief? get pendingJobBrief => _pendingJobBrief;
+  void setPendingJobBrief(JobBrief brief) => _pendingJobBrief = brief;
+  void updatePendingJobBrief(JobBrief Function(JobBrief current) update) {
+    _pendingJobBrief = update(_pendingJobBrief ?? const JobBrief());
+  }
+
+  List<String> _pendingJobBriefImages = const [];
+  List<String> get pendingJobBriefImages => _pendingJobBriefImages;
+  void setPendingJobBriefImages(List<String> urls) => _pendingJobBriefImages = urls;
+
+  void clearPendingJobBrief() {
+    _pendingJobBrief = null;
+    _pendingJobBriefImages = const [];
+  }
+
   Future<Booking> createBooking({
     required String categoryId,
     required String addressId,
     String? problemDescription,
+    String? notes,
+    List<String>? images,
     DateTime? scheduledAt,
     String? preferredTechnicianId,
   }) async {
@@ -178,6 +204,8 @@ class BookingProvider extends ChangeNotifier {
         categoryId: categoryId,
         addressId: addressId,
         problemDescription: problemDescription,
+        notes: notes,
+        images: images,
         scheduledAt: scheduledAt,
         technicianId: preferredTechnicianId,
       );
@@ -268,27 +296,14 @@ class BookingProvider extends ChangeNotifier {
 }
 
 /// Technician taps "I've arrived" — backend generates an OTP and sends it to
-/// the customer only. Refreshes the selected/local booking so the technician
-/// side re-renders into the "arrived, waiting for OTP" state.
+/// the customer only. Goes through the same generic status-update endpoint
+/// as every other status transition (PATCH /bookings/:id/status) — there is
+/// no separate "/arrived" endpoint on the backend (BookingService.markArrived
+/// used to call one that doesn't exist, which is why the button silently did
+/// nothing). Refreshes the selected/local booking so the technician side
+/// re-renders into the "arrived, waiting for OTP" state.
 Future<void> markArrived(String bookingId, String technicianId) async {
-  _isLoading = true;
-  _error = null;
-  notifyListeners();
-
-  try {
-    await _bookingService.markArrived(bookingId, technicianId);
-    _error = null;
-    final idx = _bookings.indexWhere((b) => b.id == bookingId);
-    if (idx != -1) {
-      _selectedBooking = await _bookingService.getBookingDetail(bookingId);
-      _bookings[idx] = _selectedBooking!;
-    }
-  } catch (e) {
-    _error = e.toString();
-  } finally {
-    _isLoading = false;
-    notifyListeners();
-  }
+  await updateBookingStatus(bookingId, 'arrived', note: 'Technician has arrived');
 }
 
 /// Technician submits the OTP the customer read out to them. Returns true on

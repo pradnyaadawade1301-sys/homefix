@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
 
-/// Manage saved payment methods (cards, UPI). UI-only for now — wire the
-/// add/delete actions to your payments API once the backend endpoint exists.
+/// Manage saved payment methods (cards, UPI) shown as quick "preferred method"
+/// shortcuts. Actual charges always go through Razorpay's own hosted Checkout
+/// sheet (see payment_provider.dart / payment_screen.dart), which already
+/// offers every method Razorpay supports (UPI, cards, netbanking, wallets) —
+/// this screen doesn't gate what a customer can pay with, it's just a
+/// shortlist. UI-only for now — wire the add/delete actions to your payments
+/// API once the backend endpoint exists.
 class PaymentMethodsScreen extends StatefulWidget {
   const PaymentMethodsScreen({Key? key}) : super(key: key);
 
@@ -31,6 +36,27 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
           Navigator.pop(ctx);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('UPI ID added. This will sync once payments backend is connected.')),
+          );
+        },
+      ),
+    );
+  }
+
+  void _addCard() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _AddCardSheet(
+        onAdd: (maskedLabel) {
+          setState(() {
+            _methods.add(_PaymentMethod(type: _MethodType.card, label: maskedLabel, isDefault: false));
+          });
+          Navigator.pop(ctx);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Card added. This will sync once payments backend is connected.')),
           );
         },
       ),
@@ -112,13 +138,45 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
               );
             }),
           const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _addUpi,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Add UPI ID'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _addUpi,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add UPI ID'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 50),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _addCard,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add Card'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 50),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline_rounded, size: 16, color: Colors.grey[500]),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'These are just quick shortcuts. At checkout you can still pay '
+                  'using any method Razorpay supports — cards, UPI, netbanking, or wallets.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -126,7 +184,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
   }
 }
 
-enum _MethodType { upi }
+enum _MethodType { upi, card }
 
 class _PaymentMethod {
   final _MethodType type;
@@ -179,6 +237,71 @@ class _AddUpiSheetState extends State<_AddUpiSheet> {
                   return;
                 }
                 widget.onAdd(value);
+              },
+              child: const Text('Add'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Adds a card as a quick shortcut. Deliberately only ever stores/shows a
+/// masked "•••• 1234" label locally — the raw card number is never sent
+/// anywhere or persisted, since real card capture/tokenization has to go
+/// through Razorpay's own Checkout + backend token vault, not a plain form
+/// like this. Wire this up to that flow when the backend endpoint exists.
+class _AddCardSheet extends StatefulWidget {
+  final ValueChanged<String> onAdd;
+
+  const _AddCardSheet({required this.onAdd});
+
+  @override
+  State<_AddCardSheet> createState() => _AddCardSheetState();
+}
+
+class _AddCardSheetState extends State<_AddCardSheet> {
+  final _controller = TextEditingController();
+  String? _error;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Add Card', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            keyboardType: TextInputType.number,
+            maxLength: 19,
+            decoration: InputDecoration(
+              hintText: '1234 5678 9012 3456',
+              prefixIcon: const Icon(Icons.credit_card_rounded),
+              errorText: _error,
+              counterText: '',
+            ),
+          ),
+          Text(
+            'For your safety, only the last 4 digits are saved on this device.',
+            style: TextStyle(fontSize: 11.5, color: Colors.grey[500]),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: () {
+                final digits = _controller.text.replaceAll(RegExp(r'\s'), '');
+                if (digits.length < 12 || digits.length > 19 || int.tryParse(digits) == null) {
+                  setState(() => _error = 'Enter a valid card number');
+                  return;
+                }
+                widget.onAdd('•••• ${digits.substring(digits.length - 4)}');
               },
               child: const Text('Add'),
             ),

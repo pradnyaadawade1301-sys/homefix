@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart' show FlutterRingtonePlayer;
 import 'package:provider/provider.dart';
@@ -26,6 +27,13 @@ class IncomingConsultationScreen extends StatefulWidget {
 class _IncomingConsultationScreenState extends State<IncomingConsultationScreen> {
   String? _joiningConsultationId;
   bool _ringing = false;
+  // Without this, a request that arrives AFTER the technician has already
+  // opened this screen would never show up — loadPending() only ran once,
+  // in initState, so the list looked "empty" until a manual pull-to-refresh.
+  // Poll in the background (same 6s interval as the jobs dashboard's
+  // consultation banner) so a new request appears — and stays visible/rings
+  // — on this screen without the technician having to do anything.
+  Timer? _pollTimer;
 
   void _syncRingtone(bool hasPending) {
     if (hasPending && !_ringing) {
@@ -43,10 +51,24 @@ class _IncomingConsultationScreenState extends State<IncomingConsultationScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ConsultationProvider>().loadPending();
     });
+    _pollTimer = Timer.periodic(const Duration(seconds: 6), (_) => _pollPending());
+  }
+
+  Future<void> _pollPending() async {
+    // Skip a poll tick while mid-accept/join or the screen is gone — avoids
+    // yanking the list out from under an in-progress action.
+    if (!mounted || _joiningConsultationId != null) return;
+    try {
+      await context.read<ConsultationProvider>().fetchPendingRequests();
+    } catch (_) {
+      // Silent — this is a background refresh; the next tick will retry,
+      // and any real error is already surfaced by the manual pull-to-refresh.
+    }
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     if (_ringing) {
       FlutterRingtonePlayer().stop();
     }

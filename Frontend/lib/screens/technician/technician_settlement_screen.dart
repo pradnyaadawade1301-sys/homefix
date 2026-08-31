@@ -19,7 +19,8 @@ import '../../providers/payment_provider.dart';
 /// "pending requests" queue exists today — see ConsultationService). Once
 /// that endpoint exists this screen has a clearly marked spot to slot it in.
 class TechnicianSettlementScreen extends StatefulWidget {
-  const TechnicianSettlementScreen({Key? key}) : super(key: key);
+  final Key? tourKey;
+  const TechnicianSettlementScreen({Key? key, this.tourKey}) : super(key: key);
 
   @override
   State<TechnicianSettlementScreen> createState() => _TechnicianSettlementScreenState();
@@ -56,7 +57,7 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
             children: [
-              _SummaryCard(totalEarned: totalEarned, jobsCompleted: completedJobs.length),
+              Container(key: widget.tourKey, child: _SummaryCard(totalEarned: totalEarned, jobsCompleted: completedJobs.length)),
               const SizedBox(height: 24),
               const Text('Visit History', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),

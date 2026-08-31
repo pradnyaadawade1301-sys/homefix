@@ -39,18 +39,6 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       backgroundColor: const Color(0xFFF7F8FA),
       appBar: AppBar(
         title: const Text('Invoice'),
-        actions: [
-          Consumer<PaymentProvider>(
-            builder: (context, provider, _) {
-              if (provider.invoice == null) return const SizedBox.shrink();
-              return IconButton(
-                icon: const Icon(Icons.share_outlined),
-                tooltip: 'Share PDF',
-                onPressed: () => _sharePdf(provider.invoice!),
-              );
-            },
-          ),
-        ],
       ),
       body: Consumer<PaymentProvider>(
         builder: (context, provider, _) {
@@ -116,11 +104,6 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(content: Text('Could not download invoice: $e')));
     }
-  }
-
-  Future<void> _sharePdf(InvoiceDetail invoice) async {
-    final doc = await _buildPdf(invoice);
-    await Printing.sharePdf(bytes: await doc.save(), filename: 'Invoice-${invoice.invoiceNumber}.pdf');
   }
 
   Future<pw.Document> _buildPdf(InvoiceDetail inv) async {

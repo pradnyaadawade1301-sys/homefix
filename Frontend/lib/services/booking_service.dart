@@ -14,6 +14,8 @@ class BookingService {
     required String addressId,
     String? technicianId,
     String? problemDescription,
+    String? notes,
+    List<String>? images,
     DateTime? scheduledAt,
   }) async {
     try {
@@ -24,6 +26,8 @@ class BookingService {
           'address_id': addressId,
           if (technicianId != null) 'technician_id': technicianId,
           if (problemDescription != null) 'problem_description': problemDescription,
+          if (notes != null) 'notes': notes,
+          if (images != null && images.isNotEmpty) 'images': images,
           if (scheduledAt != null) 'scheduled_at': scheduledAt.toUtc().toIso8601String(),        },
       );
       final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;

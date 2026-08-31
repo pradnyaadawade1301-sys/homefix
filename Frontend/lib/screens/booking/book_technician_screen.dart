@@ -138,16 +138,27 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
 
     setState(() => _isSubmitting = true);
     try {
-      final booking = await context.read<BookingProvider>().createBooking(
+      final bookingProvider = context.read<BookingProvider>();
+      // Whatever guided-question / AI-diagnosis / attachment data was
+      // collected back in IssueDetailsScreen -> AIDiagnosisScreen rides
+      // along as the Job Brief the technician sees before Accept.
+      final pendingBrief = bookingProvider.pendingJobBrief;
+      final pendingImages = bookingProvider.pendingJobBriefImages;
+      final booking = await bookingProvider.createBooking(
             categoryId: widget.categoryId,
             addressId: _selectedAddressId!,
             problemDescription: [
               if (widget.problemDescription != null && widget.problemDescription!.isNotEmpty) widget.problemDescription,
               if (_notesController.text.trim().isNotEmpty) _notesController.text.trim(),
             ].join('\n\n'),
+            notes: (pendingBrief != null && (pendingBrief.hasGuidedAnswers || (pendingBrief.aiDiagnosis?.isNotEmpty ?? false)))
+                ? pendingBrief.encode()
+                : null,
+            images: pendingImages,
             scheduledAt: scheduledAt,
             preferredTechnicianId: widget.preferredTechnician?.id,
           );
+      bookingProvider.clearPendingJobBrief();
       if (!mounted) return;
 
       // Payment isn't collected upfront; it happens later once the

@@ -225,6 +225,7 @@ class ConsultationProvider extends ChangeNotifier {
     String consultationId, {
     required String addressId,
     String? problemDescription,
+    String? notes,
     DateTime? scheduledAt,
   }) async {
     try {
@@ -232,6 +233,7 @@ class ConsultationProvider extends ChangeNotifier {
         consultationId,
         addressId: addressId,
         problemDescription: problemDescription,
+        notes: notes,
         scheduledAt: scheduledAt,
       );
       _error = null;

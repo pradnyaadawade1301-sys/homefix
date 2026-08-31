@@ -313,6 +313,15 @@ class _HistoryCard extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppTheme.primaryColor,
                   side: const BorderSide(color: AppTheme.primaryColor),
+                  // The app's default OutlinedButton theme has generous
+                  // vertical/horizontal padding (see theme.dart) meant for
+                  // full-size buttons. Squeezed into this button's fixed
+                  // 38px height, that padding left no room for the icon +
+                  // label, clipping the text down to barely-visible slivers.
+                  // Overriding it here keeps this specific compact button
+                  // readable without touching the shared theme.
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                 ),
               ),
             ),

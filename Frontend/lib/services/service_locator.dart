@@ -103,6 +103,20 @@ class PaymentService {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
   }
+
+  /// Same invoice, looked up by booking instead of payment ID — this is what
+  /// the technician side calls, since it only ever has the booking on hand
+  /// (never a payment ID). Backend applies the same "payer OR assigned
+  /// technician" authorization either way.
+  Future<InvoiceDetail> getInvoiceByBooking(String bookingId) async {
+    try {
+      final response = await _httpClient.get(ApiConfig.bookingInvoice(bookingId));
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return InvoiceDetail.fromJson(data);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
 }
 
 // Technician KYC Service — authenticated: file upload, profile registration, own profile.

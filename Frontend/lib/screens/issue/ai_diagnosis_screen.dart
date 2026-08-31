@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/ai_provider.dart';
+import '../../providers/booking_provider.dart';
 import '../../providers/category_provider.dart';
 import '../home/technician_list_screen.dart';
 import '../home/technician_detail_screen.dart';
@@ -80,7 +81,22 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
   // want, sees their profile, then taps Book Now there. That's what actually
   // assigns a technician today, since automatic nearest-technician assignment
   // isn't implemented on the backend yet.
+  /// Folds the AI's latest reply into the pending Job Brief (see
+  /// BookingProvider.pendingJobBrief) so it reaches the technician without
+  /// the customer re-typing anything. Safe to call even if the customer
+  /// never touched the guided questions in IssueDetailsScreen — this just
+  /// adds to whatever's already pending.
+  void _foldAiDiagnosisIntoBrief() {
+    final messages = context.read<AIProvider>().messages;
+    final lastAi = messages.where((m) => m.role == 'assistant').toList();
+    if (lastAi.isEmpty) return;
+    context.read<BookingProvider>().updatePendingJobBrief(
+          (current) => current.copyWith(aiDiagnosis: lastAi.last.content),
+        );
+  }
+
   void _bookTechnician() {
+    _foldAiDiagnosisIntoBrief();
     setState(() => _choice = _NextStepChoice.bookDirect);
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => TechnicianListScreen(
@@ -95,6 +111,7 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
   // a consultation and shows a searching/matching state while a technician
   // accepts, then drops the customer straight into the WebRTC call.
   void _talkToExpert() {
+    _foldAiDiagnosisIntoBrief();
     setState(() => _choice = _NextStepChoice.talkToExpert);
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => SearchingTechnicianScreen(

@@ -20,7 +20,8 @@ import '../help_center_screen.dart';
 import '../contact_support_screen.dart';
 import '../service_radius_screen.dart';
 import '../bank_details_screen.dart';
-import '../consultation/upcoming_consultations_screen.dart';
+import '../home/home_screen.dart';
+import '../../widgets/guided_tour.dart';
 
 class ProfileScreen extends StatefulWidget {
   /// Optional anchor the Guided Tour can spotlight when it walks onto this
@@ -113,6 +114,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Lets someone who skipped the first-launch Guided Tour (or just wants a
+  /// refresher on how the app works) restart it from here.
+  Future<void> _replayGuidedTour(BuildContext context) async {
+    // Clear the "already seen" flag up front — if the HomeScreen lookup below
+    // fails for any reason, the tour will still show automatically the next
+    // time HomeScreen builds, instead of silently doing nothing.
+    await GuidedTour.reset();
+    if (!context.mounted) return;
+
+    // Normally Profile is one of HomeScreen's bottom-nav tabs, so it's
+    // already inside the same widget tree as HomeScreenState — reuse that
+    // instance so we don't rebuild Home from scratch under it.
+    final homeState = context.findAncestorStateOfType<HomeScreenState>();
+    if (homeState != null) {
+      await homeState.replayGuidedTour();
+      return;
+    }
+
+    // Fallback: Profile was opened as its own pushed screen (e.g. from a
+    // notification or deep link) rather than as a tab, so there's no
+    // HomeScreen above it to run the tour on. Pop back to the app's root
+    // screen — since the "seen" flag was just cleared, HomeScreen will kick
+    // the tour off itself the moment it's back on screen.
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -149,6 +176,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     openPlaceholder: (t, i) => _openPlaceholder(context, t, i),
                     openChangePassword: () => _openChangePassword(context),
                     openScreen: (w) => _openScreen(context, w),
+                    onReplayTour: () => _replayGuidedTour(context),
                   )
                 : _CustomerProfileBody(
                     user: user,
@@ -157,6 +185,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     openPlaceholder: (t, i) => _openPlaceholder(context, t, i),
                     openChangePassword: () => _openChangePassword(context),
                     openScreen: (w) => _openScreen(context, w),
+                    onReplayTour: () => _replayGuidedTour(context),
                   ),
           );
         },
@@ -178,6 +207,7 @@ class _CustomerProfileBody extends StatelessWidget {
   final _OpenPlaceholder openPlaceholder;
   final VoidCallback openChangePassword;
   final void Function(Widget) openScreen;
+  final VoidCallback onReplayTour;
 
   const _CustomerProfileBody({
     required this.user,
@@ -186,6 +216,7 @@ class _CustomerProfileBody extends StatelessWidget {
     required this.openPlaceholder,
     required this.openChangePassword,
     required this.openScreen,
+    required this.onReplayTour,
   });
 
   @override
@@ -224,13 +255,6 @@ class _CustomerProfileBody extends StatelessWidget {
               onTap: () => openScreen(const ServiceHistoryScreen()),
             ),
             _ActionTile(
-  icon: Icons.event_available_outlined,
-  label: 'Upcoming Consultations',
-  onTap: () => Navigator.of(context).push(
-    MaterialPageRoute(builder: (_) => const UpcomingConsultationsScreen()),
-  ),
-),
-            _ActionTile(
               icon: Icons.calendar_month_outlined,
               label: 'Bookings',
               onTap: () => Navigator.of(context).push(
@@ -259,6 +283,11 @@ class _CustomerProfileBody extends StatelessWidget {
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const NotificationsScreen()),
               ),
+            ),
+            _ActionTile(
+              icon: Icons.explore_outlined,
+              label: 'Replay Guided Tour',
+              onTap: onReplayTour,
             ),
           ],
         ),
@@ -325,6 +354,7 @@ class _TechnicianProfileBody extends StatefulWidget {
   final _OpenPlaceholder openPlaceholder;
   final VoidCallback openChangePassword;
   final void Function(Widget) openScreen;
+  final VoidCallback onReplayTour;
 
   const _TechnicianProfileBody({
     required this.user,
@@ -333,6 +363,7 @@ class _TechnicianProfileBody extends StatefulWidget {
     required this.openPlaceholder,
     required this.openChangePassword,
     required this.openScreen,
+    required this.onReplayTour,
   });
 
   @override
@@ -592,6 +623,11 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                   icon: Icons.privacy_tip_outlined,
                   label: 'Privacy & Security',
                   onTap: () => widget.openScreen(const PrivacySecurityScreen()),
+                ),
+                _ActionTile(
+                  icon: Icons.explore_outlined,
+                  label: 'Replay Guided Tour',
+                  onTap: widget.onReplayTour,
                 ),
                 _ActionTile(
                   icon: Icons.lock_outline_rounded,

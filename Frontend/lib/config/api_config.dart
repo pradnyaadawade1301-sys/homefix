@@ -60,6 +60,7 @@ class ApiConfig {
   static const String paymentFail = '/payments/fail';
   static const String paymentHistory = '/payments/history';
   static String paymentInvoice(String paymentId) => '/payments/$paymentId/invoice';
+  static String bookingInvoice(String bookingId) => '/bookings/$bookingId/invoice';
 
   static const String walletBalance = '/wallet';
   static const String walletTransactions = '/wallet/transactions';
