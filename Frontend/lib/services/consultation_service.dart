@@ -59,10 +59,14 @@ class ConsultationService {
     }
   }
 
-  /// Technician: declines a pending consultation request.
-  Future<void> reject(String id) async {
+  /// Technician: declines a pending (instant/ringing) consultation request.
+  /// [reason] is optional free text explaining why — shown to the customer.
+  Future<void> reject(String id, {String? reason}) async {
     try {
-      await _httpClient.post('${ApiConfig.consultationReject}/$id/reject');
+      await _httpClient.post(
+        '${ApiConfig.consultationReject}/$id/reject',
+        data: {if (reason != null && reason.isNotEmpty) 'reason': reason},
+      );
     } catch (e) {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
@@ -176,10 +180,15 @@ class ConsultationService {
     }
   }
 
-  /// Technician: declines a scheduled slot ahead of time.
-  Future<void> declineScheduled(String id) async {
+  /// Technician: declines a scheduled slot ahead of time. [reason] is optional
+  /// free text explaining why — shown to the customer instead of a bare
+  /// "declined" status.
+  Future<void> declineScheduled(String id, {String? reason}) async {
     try {
-      await _httpClient.post('${ApiConfig.consultationDeclineScheduled}/$id/decline-scheduled');
+      await _httpClient.post(
+        '${ApiConfig.consultationDeclineScheduled}/$id/decline-scheduled',
+        data: {if (reason != null && reason.isNotEmpty) 'reason': reason},
+      );
     } catch (e) {
       throw Exception(ApiEnvelope.errorMessage(e));
     }

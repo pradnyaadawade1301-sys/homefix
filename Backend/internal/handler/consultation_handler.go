@@ -85,9 +85,16 @@ func (h *ConsultationHandler) Accept(c *gin.Context) {
 }
 
 // Reject - POST /consultations/:id/reject. Technician declines the incoming request.
+// reason is optional free text explaining why (shown to the customer).
 func (h *ConsultationHandler) Reject(c *gin.Context) {
 	userID := c.GetString("user_id")
-	if err := h.consultSvc.RejectByUser(c.Request.Context(), c.Param("id"), userID); err != nil {
+
+	var body struct {
+		Reason string `json:"reason"`
+	}
+	_ = c.ShouldBindJSON(&body) // optional body — a plain empty POST is still valid
+
+	if err := h.consultSvc.RejectByUser(c.Request.Context(), c.Param("id"), userID, body.Reason); err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -109,10 +116,18 @@ func (h *ConsultationHandler) ConfirmScheduled(c *gin.Context) {
 }
 
 // DeclineScheduled - POST /consultations/:id/decline-scheduled. Technician can't
-// make a proposed slot; customer is notified to pick another time.
+// make a proposed slot; customer is notified to pick another time. reason is
+// optional free text explaining why — shown to the customer (and stored on the
+// consultation) instead of a bare "declined" with no context.
 func (h *ConsultationHandler) DeclineScheduled(c *gin.Context) {
 	userID := c.GetString("user_id")
-	if err := h.consultSvc.DeclineScheduledByUser(c.Request.Context(), c.Param("id"), userID); err != nil {
+
+	var body struct {
+		Reason string `json:"reason"`
+	}
+	_ = c.ShouldBindJSON(&body) // optional body — a plain empty POST is still valid
+
+	if err := h.consultSvc.DeclineScheduledByUser(c.Request.Context(), c.Param("id"), userID, body.Reason); err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -240,22 +255,17 @@ func (h *ConsultationHandler) Pay(c *gin.Context) {
 // call: address_id is always required; scheduled_at is optional — omitted/absent
 // means "ASAP" (technician comes as soon as possible), present means the customer
 // picked a specific date/time slot for the on-site visit.
-// Escalate - POST /consultations/:id/escalate. "Book a slot" step after a video
-// call: address_id is always required; scheduled_at is optional — omitted/absent
-// means "ASAP" (technician comes as soon as possible), present means the customer
-// picked a specific date/time slot for the on-site visit.
 func (h *ConsultationHandler) Escalate(c *gin.Context) {
 	var body struct {
 		AddressID          string     `json:"address_id" binding:"required"`
 		ProblemDescription string     `json:"problem_description"`
-		Notes              string     `json:"notes"` // Job Brief JSON (see frontend JobBrief.encode) — the consultation notes get folded in here
 		ScheduledAt        *time.Time `json:"scheduled_at"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	booking, err := h.consultSvc.Escalate(c.Request.Context(), c.Param("id"), body.AddressID, body.ProblemDescription, body.Notes, body.ScheduledAt)
+	booking, err := h.consultSvc.Escalate(c.Request.Context(), c.Param("id"), body.AddressID, body.ProblemDescription, body.ScheduledAt)
 	if err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
 		return

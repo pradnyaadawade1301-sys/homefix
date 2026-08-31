@@ -130,19 +130,18 @@ class _ConsultationCard extends StatelessWidget {
           message: 'Technician accepted — connecting your call.',
         );
       case ConsultationStatus.rejected:
-        return isScheduled
-            ? _StatusInfo(
-                label: 'Technician unavailable',
-                color: AppTheme.errorColor,
-                icon: Icons.event_busy_rounded,
-                message: 'The technician was busy and couldn\'t make this slot. Please request a new time.',
-              )
-            : _StatusInfo(
-                label: 'Not answered',
-                color: AppTheme.errorColor,
-                icon: Icons.call_end_rounded,
-                message: 'The technician couldn\'t take your call. You can try again.',
-              );
+        // Prefer the technician's own stated reason when they gave one —
+        // falls back to the generic explanation otherwise.
+        final reason = (consultation.declineReason ?? '').trim();
+        final defaultMessage = isScheduled
+            ? 'The technician was busy and couldn\'t make this slot. Please request a new time.'
+            : 'The technician couldn\'t take your call. You can try again.';
+        return _StatusInfo(
+          label: isScheduled ? 'Technician unavailable' : 'Not answered',
+          color: AppTheme.errorColor,
+          icon: isScheduled ? Icons.event_busy_rounded : Icons.call_end_rounded,
+          message: reason.isNotEmpty ? 'Reason: $reason' : defaultMessage,
+        );
       case ConsultationStatus.noTechnician:
         return _StatusInfo(
           label: 'No technician available',

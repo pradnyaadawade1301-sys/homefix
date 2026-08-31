@@ -61,6 +61,9 @@ class Consultation {
   final int? durationSeconds;
   final double? amount;
   final String? paymentStatus; // pending | paid | failed
+  // Why the technician declined/rejected — set only when status == rejected.
+  // Shown to the customer so "declined" isn't a dead end with no explanation.
+  final String? declineReason;
   final DateTime createdAt;
 
   Consultation({
@@ -82,6 +85,7 @@ class Consultation {
     this.durationSeconds,
     this.amount,
     this.paymentStatus,
+    this.declineReason,
     required this.createdAt,
   });
 
@@ -104,10 +108,11 @@ class Consultation {
       consultationFee: (json['consultation_fee'] as num?)?.toDouble() ?? 199,
       startTime: json['start_time'] != null ? DateTime.tryParse(json['start_time'] as String) : null,
       endTime: json['end_time'] != null ? DateTime.tryParse(json['end_time'] as String) : null,
-            scheduledAt: json['scheduled_at'] != null ? DateTime.tryParse(json['scheduled_at'] as String) : null,
+      scheduledAt: json['scheduled_at'] != null ? DateTime.tryParse(json['scheduled_at'] as String) : null,
       durationSeconds: json['duration_seconds'] as int?,
       amount: (json['amount'] as num?)?.toDouble(),
       paymentStatus: json['payment_status'] as String?,
+      declineReason: json['decline_reason'] as String?,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String) ?? DateTime.now()
           : DateTime.now(),
@@ -121,11 +126,12 @@ class Consultation {
     String? technicianId,
     String? technicianName,
     DateTime? startTime,
-        DateTime? scheduledAt,
+    DateTime? scheduledAt,
     DateTime? endTime,
     int? durationSeconds,
     double? amount,
     String? paymentStatus,
+    String? declineReason,
   }) {
     return Consultation(
       id: id,
@@ -139,13 +145,14 @@ class Consultation {
       customerName: customerName,
       technicianName: technicianName ?? this.technicianName,
       estimatedDurationMinutes: estimatedDurationMinutes,
-            scheduledAt: scheduledAt ?? this.scheduledAt,
+      scheduledAt: scheduledAt ?? this.scheduledAt,
       consultationFee: consultationFee,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
       durationSeconds: durationSeconds ?? this.durationSeconds,
       amount: amount ?? this.amount,
       paymentStatus: paymentStatus ?? this.paymentStatus,
+      declineReason: declineReason ?? this.declineReason,
       createdAt: createdAt,
     );
   }
