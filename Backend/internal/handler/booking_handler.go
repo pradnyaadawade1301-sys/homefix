@@ -205,6 +205,29 @@ func (h *BookingHandler) UpdateStatus(c *gin.Context) {
 	utils.Success(c, http.StatusOK, gin.H{"message": "status updated"})
 }
 
+// Arrived is a thin convenience wrapper around the same UpdateStatus path
+// (status="arrived") so the technician app can call a dedicated, obviously-
+// named endpoint instead of the generic /status route. It shares all the
+// same logic — including the fresh-OTP generation in BookingService.UpdateStatus
+// — so behaviour is identical to PATCH /bookings/:id/status {"status":"arrived"}.
+type arrivedBody struct {
+	TechnicianID string `json:"technician_id"`
+}
+
+func (h *BookingHandler) Arrived(c *gin.Context) {
+	bookingID := c.Param("id")
+	var body arrivedBody
+	// technician_id is accepted for parity with other technician-action
+	// endpoints (Accept, VerifyOTP) but UpdateStatus doesn't need it — the
+	// booking is looked up by bookingID alone.
+	_ = c.ShouldBindJSON(&body)
+	if err := h.bookingService.UpdateStatus(c.Request.Context(), bookingID, models.BookingArrived, "Technician has arrived"); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"message": "marked as arrived"})
+}
+
 type completeBody struct {
 	FinalPrice float64 `json:"final_price" binding:"required"`
 }

@@ -281,6 +281,21 @@ func (s *RazorpayService) ListByUser(ctx context.Context, userID string) ([]mode
 	return s.paymentRepo.ListByUser(ctx, userID)
 }
 
+// GetInvoiceByBooking resolves the booking's most recent payment and returns
+// its invoice — used by the technician side, which only has a booking ID on
+// hand. Delegates to GetInvoice for the actual authorization + invoice build
+// so the two entry points can never drift out of sync on who's allowed to see what.
+func (s *RazorpayService) GetInvoiceByBooking(ctx context.Context, bookingID, requestingUserID string) (*models.InvoiceDetail, error) {
+	p, err := s.paymentRepo.GetByBookingID(ctx, bookingID)
+	if err != nil {
+		return nil, err
+	}
+	if p == nil {
+		return nil, errors.New("no payment found for this booking")
+	}
+	return s.GetInvoice(ctx, p.ID, requestingUserID)
+}
+
 // GetInvoice returns the full invoice for a payment — only once it's actually
 // paid (a 'created' or 'failed' payment has no real invoice, just a would-be
 // one, which would be misleading to hand back as if it were final).
@@ -293,7 +308,20 @@ func (s *RazorpayService) GetInvoice(ctx context.Context, paymentID, requestingU
 		return nil, errors.New("payment not found")
 	}
 	if p.UserID != requestingUserID {
-		return nil, errors.New("you are not authorized to view this invoice")
+		// Not the paying customer — but the technician who serviced this
+		// booking should also be able to see the invoice once paid (so they
+		// have proof of what the customer was actually charged/paid).
+		authorized := false
+		booking, bErr := s.bookingRepo.GetByID(ctx, p.BookingID)
+		if bErr == nil && booking != nil && booking.TechnicianID != nil {
+			tech, tErr := s.technicianRepo.GetByID(ctx, *booking.TechnicianID)
+			if tErr == nil && tech != nil && tech.UserID == requestingUserID {
+				authorized = true
+			}
+		}
+		if !authorized {
+			return nil, errors.New("you are not authorized to view this invoice")
+		}
 	}
 	if p.Status != models.PaymentPaid && p.Status != models.PaymentRefunded {
 		return nil, errors.New("invoice is only available once payment is complete")

@@ -24,6 +24,16 @@ func main() {
 	defer pool.Close()
 	log.Println("connected to Postgres")
 
+	// Self-healing startup migration: the 016_arrival_otp migration file was
+	// missing its .sql extension so it never got picked up by earlier deploys,
+	// leaving bookings.otp_code / otp_verified_at missing in production. This
+	// runs on every boot and is a safe no-op once the columns already exist.
+	if _, err := pool.Exec(context.Background(),
+		`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS otp_code VARCHAR(6);
+		 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS otp_verified_at TIMESTAMP NULL;`); err != nil {
+		log.Fatalf("startup: failed to ensure otp columns exist: %v", err)
+	}
+
 	rdb := cache.New(cfg.RedisURL) // no-op now — Redis removed, see internal/cache
 	mailService := service.NewMailService(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPass, cfg.SMTPFrom)
 	if mailService.Enabled() {

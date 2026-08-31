@@ -145,3 +145,21 @@ func (h *PaymentHandler) GetInvoice(c *gin.Context) {
 	}
 	utils.Success(c, http.StatusOK, invoice)
 }
+
+// GetInvoiceByBooking — GET /bookings/:id/invoice. Same invoice as
+// GetInvoice above, but looked up via the booking rather than a payment ID
+// — the technician side never gets handed a payment ID directly, only the
+// booking they're working on, so this is what TechnicianJobDetailScreen's
+// "View Invoice" button actually calls. Reuses the exact same
+// RazorpayService.GetInvoice authorization (payer OR the assigned
+// technician), so a technician can't fetch invoices for jobs that aren't
+// theirs.
+func (h *PaymentHandler) GetInvoiceByBooking(c *gin.Context) {
+	userID := c.GetString("user_id")
+	invoice, err := h.razorpay.GetInvoiceByBooking(c.Request.Context(), c.Param("id"), userID)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, invoice)
+}

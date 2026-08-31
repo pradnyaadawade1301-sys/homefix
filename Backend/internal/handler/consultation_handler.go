@@ -199,13 +199,14 @@ func (h *ConsultationHandler) Escalate(c *gin.Context) {
     var body struct {
         AddressID          string     `json:"address_id" binding:"required"`
         ProblemDescription string     `json:"problem_description"`
+        Notes              string     `json:"notes"` // Job Brief JSON (see frontend JobBrief.encode) — the consultation notes get folded in here
         ScheduledAt        *time.Time `json:"scheduled_at"`
     }
     if err := c.ShouldBindJSON(&body); err != nil {
         utils.Error(c, http.StatusBadRequest, err.Error())
         return
     }
-    booking, err := h.consultSvc.Escalate(c.Request.Context(), c.Param("id"), body.AddressID, body.ProblemDescription, body.ScheduledAt)
+    booking, err := h.consultSvc.Escalate(c.Request.Context(), c.Param("id"), body.AddressID, body.ProblemDescription, body.Notes, body.ScheduledAt)
     if err != nil {
         utils.Error(c, http.StatusInternalServerError, err.Error())
         return

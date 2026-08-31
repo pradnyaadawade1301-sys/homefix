@@ -283,7 +283,7 @@ func (s *ConsultationService) Rate(ctx context.Context, consultationID, customer
 // into a real booking for the SAME technician (reusing the normal booking-creation
 // path, so it shows up in the technician's job list exactly like any other booking),
 // and links the two records together.
-func (s *ConsultationService) Escalate(ctx context.Context, consultationID, addressID, problemDescription string, scheduledAt *time.Time) (*models.Booking, error) {
+func (s *ConsultationService) Escalate(ctx context.Context, consultationID, addressID, problemDescription, notes string, scheduledAt *time.Time) (*models.Booking, error) {
 	c, err := s.consultRepo.GetByID(ctx, consultationID)
 	if err != nil {
 		return nil, err
@@ -292,12 +292,18 @@ func (s *ConsultationService) Escalate(ctx context.Context, consultationID, addr
 		return nil, errors.New("consultation not found")
 	}
 
+	var notesPtr *string
+	if notes != "" {
+		notesPtr = &notes
+	}
+
 	booking := &models.Booking{
 		CustomerID:         c.CustomerID,
 		CategoryID:         c.CategoryID,
 		AddressID:          addressID,
 		TechnicianID:       c.TechnicianID,
 		ProblemDescription: problemDescription,
+		Notes:              notesPtr,
 		ScheduledAt:        scheduledAt, // nil = ASAP; set = customer picked a date/time slot
 	}
 
