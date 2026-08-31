@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"log"
-	"time"
 
 	"homefix-backend/internal/admin"
 	"homefix-backend/internal/cache"
@@ -31,7 +30,8 @@ func main() {
 	// runs on every boot and is a safe no-op once the columns already exist.
 	if _, err := pool.Exec(context.Background(),
 		`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS otp_code VARCHAR(6);
-		 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS otp_verified_at TIMESTAMP NULL;`); err != nil {
+		 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS otp_verified_at TIMESTAMP NULL;
+		 ALTER TABLE consultations ADD COLUMN IF NOT EXISTS decline_reason TEXT;`); err != nil {
 		log.Fatalf("startup: failed to ensure otp columns exist: %v", err)
 	}
 
@@ -138,26 +138,6 @@ func main() {
 		JWTSecret: cfg.JWTAccessSecret,
 		Cache:     rdb,
 	})
-
-	// Background poller — periodically promotes "confirmed" scheduled consultations
-	// whose slot time has arrived into "ringing" (see ConsultationService.
-	// PromoteDueScheduled), so a "Schedule for later" call actually starts on time
-	// even if neither app is open at that exact moment. 30s granularity is plenty
-	// for a consultation slot (minutes-scale precision, not seconds).
-	go func() {
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-		for range ticker.C {
-			promoted, err := consultService.PromoteDueScheduled(context.Background())
-			if err != nil {
-				log.Printf("scheduled-consultation poller: error: %v", err)
-				continue
-			}
-			if promoted > 0 {
-				log.Printf("scheduled-consultation poller: promoted %d consultation(s) to ringing", promoted)
-			}
-		}
-	}()
 
 	log.Printf("HomeFix Live backend starting on :%s (env=%s)", cfg.Port, cfg.Env)
 	if err := r.Run(":" + cfg.Port); err != nil {
