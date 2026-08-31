@@ -305,6 +305,7 @@ func (r *BookingRepository) ListMessages(ctx context.Context, bookingID string) 
 const detailedSelect = `
 	SELECT b.id, b.customer_id, b.technician_id, b.category_id, b.address_id, b.status,
 	       COALESCE(b.problem_description,''), b.notes, COALESCE(b.images, '{}'), b.scheduled_at, b.estimated_price, b.final_price,
+	       b.otp_code, b.otp_verified_at,
 	       b.created_at, b.updated_at,
 	       c.name AS category_name,
 	       a.label, a.line1, COALESCE(a.line2,''), a.city, a.state, a.pincode,
@@ -332,6 +333,7 @@ func scanBookingDetail(row pgx.Row) (*models.BookingDetail, error) {
 	err := row.Scan(
 		&d.ID, &d.CustomerID, &d.TechnicianID, &d.CategoryID, &d.AddressID, &d.Status,
 		&d.ProblemDescription, &d.Notes, &d.Images, &d.ScheduledAt, &d.EstimatedPrice, &d.FinalPrice,
+		&d.OTPCode, &d.OTPVerifiedAt,
 		&d.CreatedAt, &d.UpdatedAt,
 		&d.CategoryName,
 		&addr.Label, &addr.Line1, &addr.Line2, &addr.City, &addr.State, &addr.Pincode,

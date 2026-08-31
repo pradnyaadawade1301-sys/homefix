@@ -106,6 +106,10 @@ func (h *BookingHandler) TechnicianBookings(c *gin.Context) {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// otp_code is customer-only — never expose it on the technician's job list.
+	for i := range list {
+		list[i].OTPCode = nil
+	}
 	utils.Success(c, http.StatusOK, list)
 }
 
