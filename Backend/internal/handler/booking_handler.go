@@ -68,6 +68,11 @@ func (h *BookingHandler) Get(c *gin.Context) {
 		utils.Error(c, http.StatusNotFound, "booking not found")
 		return
 	}
+	// otp_code is meant only for the customer to read out to the technician —
+	// strip it out unless the requester is that booking's own customer.
+	if userID := c.GetString("user_id"); userID != b.CustomerID {
+		b.OTPCode = nil
+	}
 	utils.Success(c, http.StatusOK, b)
 }
 

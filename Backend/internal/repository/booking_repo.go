@@ -58,10 +58,10 @@ func (r *BookingRepository) GetByID(ctx context.Context, id string) (*models.Boo
 	var b models.Booking
 	err := r.db.QueryRow(ctx, `
 		SELECT id, customer_id, technician_id, category_id, address_id, status, payment_status,
-		       COALESCE(problem_description,''), notes, COALESCE(images, '{}'), scheduled_at, estimated_price, final_price, created_at, updated_at
+		       COALESCE(problem_description,''), notes, COALESCE(images, '{}'), scheduled_at, estimated_price, final_price, otp_code, otp_verified_at, created_at, updated_at
 		FROM bookings WHERE id = $1
 	`, id).Scan(&b.ID, &b.CustomerID, &b.TechnicianID, &b.CategoryID, &b.AddressID, &b.Status, &b.PaymentStatus,
-		&b.ProblemDescription, &b.Notes, &b.Images, &b.ScheduledAt, &b.EstimatedPrice, &b.FinalPrice, &b.CreatedAt, &b.UpdatedAt)
+		&b.ProblemDescription, &b.Notes, &b.Images, &b.ScheduledAt, &b.EstimatedPrice, &b.FinalPrice, &b.OTPCode, &b.OTPVerifiedAt, &b.CreatedAt, &b.UpdatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil

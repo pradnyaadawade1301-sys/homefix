@@ -48,7 +48,13 @@ type Booking struct {
 	ScheduledAt        *time.Time `json:"scheduled_at,omitempty"`
 	EstimatedPrice     *float64   `json:"estimated_price,omitempty"`
 	FinalPrice         *float64   `json:"final_price,omitempty"`
-	OTPVerifiedAt      *time.Time `json:"otp_verified_at,omitempty"` // set once the technician has confirmed the customer's OTP on-site; deliberately excludes OTPCode itself, which is never returned to the technician's side
+	// OTPCode is the arrival OTP the customer reads out to the technician. It's
+	// tagged json:"-" (never auto-serialized) because this same struct backs
+	// both the customer's and the technician's booking views — the handler
+	// explicitly copies it onto the response only for the customer, keeping
+	// it hidden from the technician's side.
+	OTPCode       *string    `json:"otp_code,omitempty"`
+	OTPVerifiedAt *time.Time `json:"otp_verified_at,omitempty"` // set once the technician has confirmed the customer's OTP on-site
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
 }
