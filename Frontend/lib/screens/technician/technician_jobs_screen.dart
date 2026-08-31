@@ -13,6 +13,7 @@ import '../../providers/consultation_provider.dart';
 import '../../services/booking_service.dart';
 import '../../services/service_locator.dart' show UploadService;
 import '../consultation/incoming_consultation_screen.dart';
+import '../consultation/upcoming_consultations_screen.dart';
 import '../profile/profile_screen.dart';
 import 'technician_settlement_screen.dart';
 import 'repeat_customers_screen.dart';
@@ -20,12 +21,13 @@ import '../chat/booking_chat_screen.dart';
 import 'technician_estimate_screen.dart';
 import 'job_photos_sheet.dart';
 import 'technician_job_detail_screen.dart';
-
 /// Technician-facing home screen — the mirror image of the customer's
 /// [BookingsScreen]. A logged-in technician lands here and sees:
 ///  - a live "incoming consultation requests" banner (used to be buried in
 ///    Profile — now front-and-center since that's where jobs actually get
-///    created from), and
+///    created from),
+///  - an "upcoming scheduled consultations" banner (Schedule for Later slots
+///    awaiting confirmation or already confirmed), and
 ///  - the jobs assigned to them, each carrying the CUSTOMER's name/phone/
 ///    address (booking.customer, booking.address).
 /// A bottom nav switches between this Jobs view and the Settlement view.
@@ -37,10 +39,11 @@ class TechnicianJobsScreen extends StatefulWidget {
 }
 
 class _TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
-  int _navIndex = 0; // 0 = Jobs, 1 = Settlement
+  int _navIndex = 0; // 0 = Jobs, 1 = Consultations, 2 = Settlement
   int _tabIndex = 0; // Active / All filter within the Jobs tab
 
   List<ConsultationRequest> _pendingRequests = [];
+  List<Consultation> _upcomingConsultations = [];
   Timer? _pollTimer;
 
   @override
@@ -48,7 +51,11 @@ class _TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
     _pollPendingRequests();
-    _pollTimer = Timer.periodic(const Duration(seconds: 6), (_) => _pollPendingRequests());
+    _pollUpcoming();
+    _pollTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+      _pollPendingRequests();
+      _pollUpcoming();
+    });
   }
 
   @override
@@ -67,6 +74,17 @@ class _TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
     // its own error if the main fetch fails.
   }
 }
+
+  Future<void> _pollUpcoming() async {
+    try {
+      final upcoming = await context.read<ConsultationProvider>().fetchUpcomingList();
+      if (!mounted) return;
+      setState(() => _upcomingConsultations = upcoming);
+    } catch (_) {
+      // Silent — same as _pollPendingRequests, background poll only.
+    }
+  }
+
   Future<void> _load() async {
     final kyc = context.read<TechnicianKycProvider>();
     if (kyc.profile == null) {
@@ -104,8 +122,7 @@ class _TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_navIndex == 0 ? 'My Jobs' : 'Settlement'),
-        actions: [
+title: Text(_navIndex == 0 ? 'My Jobs' : _navIndex == 1 ? 'Consultations' : 'Settlement'),        actions: [
           IconButton(
             icon: const Icon(Icons.people_alt_outlined),
             tooltip: 'My Customers',
@@ -126,20 +143,22 @@ class _TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
           ),
         ],
       ),
-      body: IndexedStack(
-        index: _navIndex,
-        children: [
-          _buildJobsBody(),
-          const TechnicianSettlementScreen(),
-        ],
-      ),
+     body: IndexedStack(
+  index: _navIndex,
+  children: [
+    _buildJobsBody(),
+    const UpcomingConsultationsScreen(embedded: true),
+    const TechnicianSettlementScreen(),
+  ],
+),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _navIndex,
         onTap: (i) => setState(() => _navIndex = i),
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.work_outline_rounded), label: 'Jobs'),
-          BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined), label: 'Settlement'),
-        ],
+        BottomNavigationBarItem(icon: Icon(Icons.work_outline_rounded), label: 'Jobs'),
+        BottomNavigationBarItem(icon: Icon(Icons.event_available_outlined), label: 'Upcoming'),
+        BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined), label: 'Settlement'),
+      ],
       ),
     );
   }
@@ -212,6 +231,7 @@ Widget _buildJobsBody() {
       _buildGreetingHeader(),
       const SizedBox(height: 4),
       if (_pendingRequests.isNotEmpty) _buildConsultationBanner(),
+      if (_upcomingConsultations.isNotEmpty) _buildUpcomingBanner(),
         Padding(
 padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),          child: Row(
             children: [
@@ -226,6 +246,7 @@ padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),          child: Row(
             onRefresh: () async {
               await _load();
               await _pollPendingRequests();
+              await _pollUpcoming();
             },
             child: Consumer<BookingProvider>(
               builder: (context, provider, _) {
@@ -365,6 +386,58 @@ padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),          child: Row(
                 ),
               ),
               const Icon(Icons.chevron_right_rounded, color: Colors.white),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// "You have scheduled consultations" banner — Schedule for Later slots
+  /// that are either awaiting the technician's confirmation ('scheduled') or
+  /// already confirmed and waiting for their time ('confirmed'). Distinct
+  /// from [_buildConsultationBanner], which is the urgent ringing-right-now
+  /// queue — this one is calmer (no red badge/ring), just a reminder to open
+  /// [UpcomingConsultationsScreen] and confirm/decline.
+  Widget _buildUpcomingBanner() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const UpcomingConsultationsScreen()),
+        ).then((_) => _pollUpcoming()),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
+                child: const Icon(Icons.event_rounded, color: AppTheme.primaryColor),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _upcomingConsultations.length == 1
+                          ? '1 scheduled consultation'
+                          : '${_upcomingConsultations.length} scheduled consultations',
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text('Tap to confirm or decline slots', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: AppTheme.primaryColor),
             ],
           ),
         ),

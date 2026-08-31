@@ -85,7 +85,10 @@ class ApiConfig {
   static const String consultationPayment = '/consultations'; // + /:id/payment -> POST {payment_method}
   static const String consultationRating = '/consultations'; // + /:id/rating -> POST {rating, comment}
   static const String consultationPending = '/consultations/pending'; // GET (technician) - incoming requests
-  static const String consultationMine = '/consultations/mine'; // GET (customer) - own call history
+  static const String consultationMine = '/consultations/mine';
+    static const String consultationConfirmScheduled = '/consultations'; // + /:id/confirm-scheduled
+  static const String consultationDeclineScheduled = '/consultations'; // + /:id/decline-scheduled
+  static const String consultationUpcoming = '/consultations/upcoming'; // GET (customer) - own call history
 
   // WebRTC signaling (peer-to-peer video/audio call handshake only — see
   // internal/handler/call_handler.go). Auth via ?token= query param since WebSocket

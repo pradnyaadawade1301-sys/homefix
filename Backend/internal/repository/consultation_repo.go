@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -17,20 +18,27 @@ func NewConsultationRepository(database *pgxpool.Pool) *ConsultationRepository {
 	return &ConsultationRepository{db: database}
 }
 
-func (r *ConsultationRepository) Create(ctx context.Context, customerID, categoryID string, fee float64) (*models.Consultation, error) {
+// Create makes a new consultation. If scheduledAt is nil, it's the existing
+// instant flow (status 'searching', ready to be rung right away). If scheduledAt
+// is set, it starts life as 'scheduled' — nobody is rung yet.
+func (r *ConsultationRepository) Create(ctx context.Context, customerID, categoryID string, fee float64, scheduledAt *time.Time) (*models.Consultation, error) {
+	status := "searching"
+	if scheduledAt != nil {
+		status = "scheduled"
+	}
 	row := r.db.QueryRow(ctx, `
-		INSERT INTO consultations (customer_id, category_id, fee, status)
-		VALUES ($1, $2, $3, 'searching')
+		INSERT INTO consultations (customer_id, category_id, fee, status, scheduled_at)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, customer_id, technician_id, category_id, status, fee, duration_seconds,
-		          payment_status, escalated_booking_id, started_at, ended_at, created_at, updated_at
-	`, customerID, categoryID, fee)
+		          payment_status, escalated_booking_id, scheduled_at, started_at, ended_at, created_at, updated_at
+	`, customerID, categoryID, fee, status, scheduledAt)
 	return scanConsultation(row)
 }
 
 func (r *ConsultationRepository) GetByID(ctx context.Context, id string) (*models.Consultation, error) {
 	row := r.db.QueryRow(ctx, `
 		SELECT id, customer_id, technician_id, category_id, status, fee, duration_seconds,
-		       payment_status, escalated_booking_id, started_at, ended_at, created_at, updated_at
+		       payment_status, escalated_booking_id, scheduled_at, started_at, ended_at, created_at, updated_at
 		FROM consultations WHERE id = $1
 	`, id)
 	c, err := scanConsultation(row)
@@ -45,8 +53,8 @@ func (r *ConsultationRepository) GetByID(ctx context.Context, id string) (*model
 func (r *ConsultationRepository) GetWithDetails(ctx context.Context, id string) (*models.ConsultationWithDetails, error) {
 	row := r.db.QueryRow(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
-		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.started_at,
-		       co.ended_at, co.created_at, co.updated_at,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.scheduled_at,
+		       co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''),
 		       COALESCE(tu.name, ''), COALESCE(tu.phone, '')
 		FROM consultations co
@@ -60,8 +68,8 @@ func (r *ConsultationRepository) GetWithDetails(ctx context.Context, id string) 
 	var d models.ConsultationWithDetails
 	err := row.Scan(
 		&d.ID, &d.CustomerID, &d.TechnicianID, &d.CategoryID, &d.Status, &d.Fee,
-		&d.DurationSeconds, &d.PaymentStatus, &d.EscalatedBookingID, &d.StartedAt,
-		&d.EndedAt, &d.CreatedAt, &d.UpdatedAt,
+		&d.DurationSeconds, &d.PaymentStatus, &d.EscalatedBookingID, &d.ScheduledAt,
+		&d.StartedAt, &d.EndedAt, &d.CreatedAt, &d.UpdatedAt,
 		&d.CategoryName, &d.CustomerName, &d.CustomerPhone, &d.TechnicianName, &d.TechnicianPhone,
 	)
 	if err == pgx.ErrNoRows {
@@ -73,11 +81,23 @@ func (r *ConsultationRepository) GetWithDetails(ctx context.Context, id string) 
 	return &d, nil
 }
 
-// AssignTechnician moves a consultation from "searching" to "ringing" for a specific
-// technician — this is what makes the incoming-request card show up on their side.
+// AssignTechnician moves an INSTANT consultation from "searching" to "ringing" for a
+// specific technician — this is what makes the incoming-request card show up on
+// their side immediately.
 func (r *ConsultationRepository) AssignTechnician(ctx context.Context, id, technicianID string) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE consultations SET technician_id = $2, status = 'ringing', updated_at = now()
+		WHERE id = $1
+	`, id, technicianID)
+	return err
+}
+
+// AssignTechnicianScheduled moves a SCHEDULED consultation from "scheduled" to
+// "confirmed" once a technician is matched — they are NOT rung yet, just asked to
+// hold that slot. The actual ring happens later via PromoteToRinging.
+func (r *ConsultationRepository) AssignTechnicianScheduled(ctx context.Context, id, technicianID string) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE consultations SET technician_id = $2, status = 'confirmed', updated_at = now()
 		WHERE id = $1
 	`, id, technicianID)
 	return err
@@ -126,13 +146,13 @@ func (r *ConsultationRepository) SetEscalatedBooking(ctx context.Context, id, bo
 	return err
 }
 
-// Cancel is the customer giving up while still searching/ringing for a technician.
-// Only allowed in those two states — once a technician has accepted (or later), the
-// customer must end the call properly instead of silently cancelling it.
+// Cancel is the customer giving up while still searching/ringing/scheduled/confirmed
+// for a technician. Once a technician has accepted (or later), the customer must end
+// the call properly instead of silently cancelling it.
 func (r *ConsultationRepository) Cancel(ctx context.Context, id, customerID string) error {
 	tag, err := r.db.Exec(ctx, `
 		UPDATE consultations SET status = 'cancelled', updated_at = now()
-		WHERE id = $1 AND customer_id = $2 AND status IN ('searching', 'ringing')
+		WHERE id = $1 AND customer_id = $2 AND status IN ('searching', 'ringing', 'scheduled', 'confirmed')
 	`, id, customerID)
 	if err != nil {
 		return err
@@ -144,40 +164,76 @@ func (r *ConsultationRepository) Cancel(ctx context.Context, id, customerID stri
 }
 
 // ListPendingForTechnician returns the incoming-request queue for a technician: any
-// consultation currently ringing them. Same room used for the video call once
-// accepted, so this is also what repopulates the Incoming Request screen if it's
-// opened directly instead of via the FCM push.
+// consultation currently ringing them RIGHT NOW (instant flow, or a scheduled one
+// whose slot just arrived — both end up in 'ringing').
 func (r *ConsultationRepository) ListPendingForTechnician(ctx context.Context, technicianID string) ([]models.ConsultationWithDetails, error) {
+	return r.listForTechnicianByStatus(ctx, technicianID, "ringing")
+}
+
+// ListUpcomingForTechnician returns scheduled consultations awaiting the
+// technician's confirmation ('scheduled') or already confirmed and waiting for
+// their slot ('confirmed') — this powers an "Upcoming Consultations" list separate
+// from the urgent incoming-request card.
+func (r *ConsultationRepository) ListUpcomingForTechnician(ctx context.Context, technicianID string) ([]models.ConsultationWithDetails, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
-		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.started_at,
-		       co.ended_at, co.created_at, co.updated_at,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.scheduled_at,
+		       co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''), '', ''
 		FROM consultations co
 		LEFT JOIN categories cat ON cat.id = co.category_id
 		LEFT JOIN users cu ON cu.id = co.customer_id
-		WHERE co.technician_id = $1 AND co.status = 'ringing'
-		ORDER BY co.created_at ASC
+		WHERE co.technician_id = $1 AND co.status IN ('scheduled', 'confirmed')
+		ORDER BY co.scheduled_at ASC NULLS LAST
 	`, technicianID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+	return scanConsultationRows(rows)
+}
 
-	var out []models.ConsultationWithDetails
+// DueForRinging finds every 'confirmed' scheduled consultation whose slot time has
+// arrived (scheduled_at <= now) — polled periodically (see
+// ConsultationService.PromoteDueScheduled) to flip them into 'ringing' and notify
+// both sides, without either app needing to be open at that exact moment.
+func (r *ConsultationRepository) DueForRinging(ctx context.Context) ([]models.Consultation, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, customer_id, technician_id, category_id, status, fee, duration_seconds,
+		       payment_status, escalated_booking_id, scheduled_at, started_at, ended_at, created_at, updated_at
+		FROM consultations
+		WHERE status = 'confirmed' AND scheduled_at IS NOT NULL AND scheduled_at <= now()
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []models.Consultation
 	for rows.Next() {
-		var d models.ConsultationWithDetails
+		var c models.Consultation
 		if err := rows.Scan(
-			&d.ID, &d.CustomerID, &d.TechnicianID, &d.CategoryID, &d.Status, &d.Fee,
-			&d.DurationSeconds, &d.PaymentStatus, &d.EscalatedBookingID, &d.StartedAt,
-			&d.EndedAt, &d.CreatedAt, &d.UpdatedAt,
-			&d.CategoryName, &d.CustomerName, &d.CustomerPhone, &d.TechnicianName, &d.TechnicianPhone,
+			&c.ID, &c.CustomerID, &c.TechnicianID, &c.CategoryID, &c.Status, &c.Fee,
+			&c.DurationSeconds, &c.PaymentStatus, &c.EscalatedBookingID, &c.ScheduledAt,
+			&c.StartedAt, &c.EndedAt, &c.CreatedAt, &c.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
-		out = append(out, d)
+		out = append(out, c)
 	}
 	return out, nil
+}
+
+// PromoteToRinging flips a due 'confirmed' scheduled consultation to 'ringing' —
+// same terminal state the instant flow's AssignTechnician produces, so every
+// downstream screen (incoming request card, accept/reject, call connect) works
+// identically regardless of which flow got it there.
+func (r *ConsultationRepository) PromoteToRinging(ctx context.Context, id string) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE consultations SET status = 'ringing', updated_at = now()
+		WHERE id = $1 AND status = 'confirmed'
+	`, id)
+	return err
 }
 
 // ListForCustomer returns every consultation the customer has ever started, most
@@ -187,8 +243,8 @@ func (r *ConsultationRepository) ListPendingForTechnician(ctx context.Context, t
 func (r *ConsultationRepository) ListForCustomer(ctx context.Context, customerID string) ([]models.ConsultationWithDetails, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
-		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.started_at,
-		       co.ended_at, co.created_at, co.updated_at,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.scheduled_at,
+		       co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''),
 		       COALESCE(tu.name, ''), COALESCE(tu.phone, '')
 		FROM consultations co
@@ -203,21 +259,7 @@ func (r *ConsultationRepository) ListForCustomer(ctx context.Context, customerID
 		return nil, err
 	}
 	defer rows.Close()
-
-	var out []models.ConsultationWithDetails
-	for rows.Next() {
-		var d models.ConsultationWithDetails
-		if err := rows.Scan(
-			&d.ID, &d.CustomerID, &d.TechnicianID, &d.CategoryID, &d.Status, &d.Fee,
-			&d.DurationSeconds, &d.PaymentStatus, &d.EscalatedBookingID, &d.StartedAt,
-			&d.EndedAt, &d.CreatedAt, &d.UpdatedAt,
-			&d.CategoryName, &d.CustomerName, &d.CustomerPhone, &d.TechnicianName, &d.TechnicianPhone,
-		); err != nil {
-			return nil, err
-		}
-		out = append(out, d)
-	}
-	return out, nil
+	return scanConsultationRows(rows)
 }
 
 // MarkEndedWithStats is MarkEnded plus the client-reported session-analytics fields
@@ -244,12 +286,48 @@ func (r *ConsultationRepository) SetRating(ctx context.Context, id string, ratin
 	return err
 }
 
+func (r *ConsultationRepository) listForTechnicianByStatus(ctx context.Context, technicianID, status string) ([]models.ConsultationWithDetails, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.scheduled_at,
+		       co.started_at, co.ended_at, co.created_at, co.updated_at,
+		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''), '', ''
+		FROM consultations co
+		LEFT JOIN categories cat ON cat.id = co.category_id
+		LEFT JOIN users cu ON cu.id = co.customer_id
+		WHERE co.technician_id = $1 AND co.status = $2
+		ORDER BY co.created_at ASC
+	`, technicianID, status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanConsultationRows(rows)
+}
+
+func scanConsultationRows(rows pgx.Rows) ([]models.ConsultationWithDetails, error) {
+	var out []models.ConsultationWithDetails
+	for rows.Next() {
+		var d models.ConsultationWithDetails
+		if err := rows.Scan(
+			&d.ID, &d.CustomerID, &d.TechnicianID, &d.CategoryID, &d.Status, &d.Fee,
+			&d.DurationSeconds, &d.PaymentStatus, &d.EscalatedBookingID, &d.ScheduledAt,
+			&d.StartedAt, &d.EndedAt, &d.CreatedAt, &d.UpdatedAt,
+			&d.CategoryName, &d.CustomerName, &d.CustomerPhone, &d.TechnicianName, &d.TechnicianPhone,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, nil
+}
+
 func scanConsultation(row pgx.Row) (*models.Consultation, error) {
 	var c models.Consultation
 	err := row.Scan(
 		&c.ID, &c.CustomerID, &c.TechnicianID, &c.CategoryID, &c.Status, &c.Fee,
-		&c.DurationSeconds, &c.PaymentStatus, &c.EscalatedBookingID, &c.StartedAt,
-		&c.EndedAt, &c.CreatedAt, &c.UpdatedAt,
+		&c.DurationSeconds, &c.PaymentStatus, &c.EscalatedBookingID, &c.ScheduledAt,
+		&c.StartedAt, &c.EndedAt, &c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err

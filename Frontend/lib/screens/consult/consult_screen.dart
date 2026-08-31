@@ -219,6 +219,10 @@ class _VideoRow extends StatelessWidget {
       case ConsultationStatus.rejected:
       case ConsultationStatus.noTechnician:
         return AppTheme.errorColor;
+      case ConsultationStatus.confirmed:
+        return AppTheme.successColor;
+      case ConsultationStatus.scheduled:
+        return AppTheme.warningColor;
       default:
         return Colors.orange; // searching / ringing / accepted / in_call — still active
     }
@@ -231,14 +235,55 @@ class _VideoRow extends StatelessWidget {
       case ConsultationStatus.cancelled:
         return 'Cancelled';
       case ConsultationStatus.rejected:
-        return 'Declined';
+        // A scheduled slot the technician couldn't hold reads differently from
+        // an instant call nobody picked up — same underlying status, different
+        // customer-facing story, so distinguish it here rather than showing a
+        // flat "Declined" for both.
+        return consultation.scheduledAt != null ? 'Technician unavailable' : 'Declined';
       case ConsultationStatus.noTechnician:
         return 'No expert found';
       case ConsultationStatus.inCall:
         return 'In call';
+      case ConsultationStatus.confirmed:
+        return 'Confirmed';
+      case ConsultationStatus.scheduled:
+        return 'Awaiting confirmation';
       default:
         return 'Upcoming';
     }
+  }
+
+  /// A short explanatory line shown under the category/date row for statuses
+  /// where the label alone isn't enough to know what to do next — most
+  /// importantly a declined "Schedule for later" slot, where the customer
+  /// should see plainly that the technician was busy and they need to pick a
+  /// new time, not just a bare "Declined" tag with no next step.
+  String? _helperText() {
+    switch (consultation.status) {
+      case ConsultationStatus.rejected:
+        return consultation.scheduledAt != null
+            ? 'The technician was busy and couldn\'t make this slot. Please request a new time.'
+            : 'The technician couldn\'t take your call. You can try again.';
+      case ConsultationStatus.scheduled:
+        return 'Waiting for the technician to confirm your requested slot.';
+      case ConsultationStatus.confirmed:
+        return 'Confirmed — the call will start automatically at your scheduled time.';
+      case ConsultationStatus.noTechnician:
+        return 'No technician was available for this request. Please try again later.';
+      default:
+        return null;
+    }
+  }
+
+  static String _formatSlot(DateTime dt) {
+    final local = dt.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    final month = months[local.month - 1];
+    final hour12 = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final ampm = local.hour < 12 ? 'AM' : 'PM';
+    return '$day $month, $hour12:$minute $ampm';
   }
 
   @override
@@ -248,6 +293,8 @@ class _VideoRow extends StatelessWidget {
         : 'Technician';
     final minutes = consultation.durationSeconds != null ? (consultation.durationSeconds! / 60).ceil() : null;
     final ended = consultation.status == ConsultationStatus.ended;
+    final helper = _helperText();
+    final color = _statusColor();
 
     return Material(
       color: Colors.white,
@@ -270,39 +317,56 @@ class _VideoRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: AppTheme.lightOutline),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: _statusColor().withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(Icons.videocam_rounded, color: _statusColor()),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(peerName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
-                    const SizedBox(height: 3),
-                    Text(
-                      '${consultation.categoryName.isNotEmpty ? consultation.categoryName : 'Video consultation'}'
-                      ' • ${consultation.createdAt.day}/${consultation.createdAt.month}/${consultation.createdAt.year}'
-                      '${minutes != null ? ' • $minutes min' : ''}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                  ],
+                    child: Icon(Icons.videocam_rounded, color: color),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(peerName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                        const SizedBox(height: 3),
+                        Text(
+                          '${consultation.categoryName.isNotEmpty ? consultation.categoryName : 'Video consultation'}'
+                          '${consultation.scheduledAt != null ? ' • ${_formatSlot(consultation.scheduledAt!)}' : ' • ${consultation.createdAt.day}/${consultation.createdAt.month}/${consultation.createdAt.year}'}'
+                          '${minutes != null ? ' • $minutes min' : ''}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    _statusLabel(),
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: color),
+                  ),
+                ],
+              ),
+              if (helper != null) ...[
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(helper, style: TextStyle(fontSize: 12, color: color, height: 1.35)),
                 ),
-              ),
-              Text(
-                _statusLabel(),
-                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: _statusColor()),
-              ),
+              ],
             ],
           ),
         ),

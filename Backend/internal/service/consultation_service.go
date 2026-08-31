@@ -29,14 +29,51 @@ func NewConsultationService(
 
 const defaultConsultationFee = 0.0 // Live Consultation is free, no charge
 
-// Request is "Start Live Consultation". If preferredTechnicianID is set (customer
-// tapped a specific technician's profile), the call is rung ONLY to that
-// technician - no nearest/category-based search happens. If empty, falls back
-// to the old nearest-available-in-category matching.
-func (s *ConsultationService) Request(ctx context.Context, customerID, categoryID, preferredTechnicianID string, lat, lng *float64) (*models.ConsultationWithDetails, error) {
-	c, err := s.consultRepo.Create(ctx, customerID, categoryID, defaultConsultationFee)
+// minScheduleLeadTime stops someone from "scheduling" a slot that's basically
+// right now (which should just be Consult Now instead) or in the past.
+const minScheduleLeadTime = 10 * time.Minute
+
+// Request is "Start Live Consultation". Two modes based on scheduledAt:
+//
+//   - scheduledAt == nil: INSTANT flow (unchanged). If preferredTechnicianID is
+//     set, only that technician is rung. Otherwise falls back to
+//     nearest-available-in-category matching.
+//
+//   - scheduledAt != nil: SCHEDULED flow. The technician is matched the same way,
+//     but is NOT rung immediately — they're asked to confirm holding that slot
+//     (status 'scheduled' -> 'confirmed'). The actual ring happens later, when
+//     the slot time arrives, via PromoteDueScheduled.
+func (s *ConsultationService) Request(ctx context.Context, customerID, categoryID, preferredTechnicianID string, lat, lng *float64, scheduledAt *time.Time) (*models.ConsultationWithDetails, error) {
+	if scheduledAt != nil && scheduledAt.Before(time.Now().Add(minScheduleLeadTime)) {
+		return nil, errors.New("please pick a time at least 10 minutes from now")
+	}
+
+	c, err := s.consultRepo.Create(ctx, customerID, categoryID, defaultConsultationFee, scheduledAt)
 	if err != nil {
 		return nil, err
+	}
+	isScheduled := scheduledAt != nil
+
+	assign := func(technicianID string) error {
+		if isScheduled {
+			return s.consultRepo.AssignTechnicianScheduled(ctx, c.ID, technicianID)
+		}
+		return s.consultRepo.AssignTechnician(ctx, c.ID, technicianID)
+	}
+
+	notify := func(technicianUserID string) {
+		if s.fcm == nil {
+			return
+		}
+		if isScheduled {
+			_ = s.fcm.SendToUser(ctx, technicianUserID, "New consultation booking request",
+				"A customer wants to schedule a live video consultation with you at "+scheduledAt.Format("2 Jan, 3:04 PM")+". Please confirm.",
+				map[string]string{"consultation_id": c.ID, "type": "consultation_scheduled_request"})
+			return
+		}
+		_ = s.fcm.SendToUser(ctx, technicianUserID, "New consultation request",
+			"A customer is requesting a live video consultation.",
+			map[string]string{"consultation_id": c.ID, "type": "consultation_request"})
 	}
 
 	if preferredTechnicianID != "" {
@@ -44,25 +81,23 @@ func (s *ConsultationService) Request(ctx context.Context, customerID, categoryI
 		if err != nil {
 			return nil, err
 		}
-		if tech == nil || !tech.IsAvailable {
+		if tech == nil || (!isScheduled && !tech.IsAvailable) {
 			if err := s.consultRepo.UpdateStatus(ctx, c.ID, "no_technician"); err != nil {
 				return nil, err
 			}
 			return s.consultRepo.GetWithDetails(ctx, c.ID)
 		}
-		if err := s.consultRepo.AssignTechnician(ctx, c.ID, tech.ID); err != nil {
+		if err := assign(tech.ID); err != nil {
 			return nil, err
 		}
-		// Notify the preferred technician about the incoming consultation request
-		if s.fcm != nil {
-			_ = s.fcm.SendToUser(ctx, tech.UserID, "New consultation request",
-				"A customer has requested a live video consultation with you.",
-				map[string]string{"consultation_id": c.ID, "type": "consultation_request"})
-		}
+		notify(tech.UserID)
 		return s.consultRepo.GetWithDetails(ctx, c.ID)
 	}
 
-	// Fallback: old nearest-available-by-category matching
+	// Fallback: nearest-available-by-category matching. For the scheduled flow
+	// "available right now" isn't the right signal (the slot might be hours from
+	// now), so we just pick the nearest technician in the category regardless of
+	// their current live-availability toggle.
 	candidates, err := s.techRepo.ListAvailableByCategory(ctx, categoryID, lat, lng, nil)
 	if err != nil {
 		return nil, err
@@ -73,21 +108,141 @@ func (s *ConsultationService) Request(ctx context.Context, customerID, categoryI
 		}
 	} else {
 		assignedTech := candidates[0]
-		if err := s.consultRepo.AssignTechnician(ctx, c.ID, assignedTech.ID); err != nil {
+		if err := assign(assignedTech.ID); err != nil {
 			return nil, err
 		}
-		// Notify the technician about the incoming consultation request
-		if s.fcm != nil {
-			tech, techErr := s.techRepo.GetByID(ctx, assignedTech.ID)
-			if techErr == nil && tech != nil {
-				_ = s.fcm.SendToUser(ctx, tech.UserID, "New consultation request",
-					"A customer is requesting a live video consultation.",
-					map[string]string{"consultation_id": c.ID, "type": "consultation_request"})
-			}
+		tech, techErr := s.techRepo.GetByID(ctx, assignedTech.ID)
+		if techErr == nil && tech != nil {
+			notify(tech.UserID)
 		}
 	}
 
 	return s.consultRepo.GetWithDetails(ctx, c.ID)
+}
+
+// ConfirmScheduled is the technician confirming they can take a scheduled slot
+// (status 'scheduled' -> 'confirmed'). Distinct from Accept, which is for the
+// instant/ringing flow — a scheduled consultation isn't "accepted" until its slot
+// actually arrives and it becomes a real incoming call (see PromoteDueScheduled).
+func (s *ConsultationService) ConfirmScheduled(ctx context.Context, consultationID, technicianID string) (*models.ConsultationWithDetails, error) {
+	c, err := s.consultRepo.GetByID(ctx, consultationID)
+	if err != nil {
+		return nil, err
+	}
+	if c == nil {
+		return nil, errors.New("consultation not found")
+	}
+	if c.TechnicianID == nil || *c.TechnicianID != technicianID {
+		return nil, errors.New("this consultation was not offered to you")
+	}
+	if c.Status != "scheduled" {
+		return nil, errors.New("this consultation is not awaiting confirmation")
+	}
+	if err := s.consultRepo.UpdateStatus(ctx, consultationID, "confirmed"); err != nil {
+		return nil, err
+	}
+	if s.fcm != nil {
+		_ = s.fcm.SendToUser(ctx, c.CustomerID, "Consultation confirmed",
+			"Your technician has confirmed your scheduled consultation.",
+			map[string]string{"consultation_id": consultationID, "type": "consultation_confirmed"})
+	}
+	return s.consultRepo.GetWithDetails(ctx, consultationID)
+}
+
+// ConfirmScheduledByUser is the ConfirmScheduled counterpart for the Flutter app's
+// button, which only knows the logged-in user id.
+func (s *ConsultationService) ConfirmScheduledByUser(ctx context.Context, consultationID, userID string) (*models.ConsultationWithDetails, error) {
+	tech, err := s.techRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if tech == nil {
+		return nil, errors.New("technician profile not found")
+	}
+	return s.ConfirmScheduled(ctx, consultationID, tech.ID)
+}
+
+// DeclineScheduled is the technician declining a scheduled slot ahead of time.
+// Kept simple like Reject: marks 'rejected' rather than auto-retrying another
+// technician, so the customer gets a clear signal and can reschedule/re-request.
+func (s *ConsultationService) DeclineScheduled(ctx context.Context, consultationID, technicianID string) error {
+	c, err := s.consultRepo.GetByID(ctx, consultationID)
+	if err != nil {
+		return err
+	}
+	if c == nil {
+		return errors.New("consultation not found")
+	}
+	if c.TechnicianID == nil || *c.TechnicianID != technicianID {
+		return errors.New("this consultation was not offered to you")
+	}
+	if err := s.consultRepo.UpdateStatus(ctx, consultationID, "rejected"); err != nil {
+		return err
+	}
+	if s.fcm != nil {
+		_ = s.fcm.SendToUser(ctx, c.CustomerID, "Consultation declined",
+			"The technician can't make your scheduled consultation slot. Please pick another time.",
+			map[string]string{"consultation_id": consultationID, "type": "consultation_scheduled_declined"})
+	}
+	return nil
+}
+
+func (s *ConsultationService) DeclineScheduledByUser(ctx context.Context, consultationID, userID string) error {
+	tech, err := s.techRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if tech == nil {
+		return errors.New("technician profile not found")
+	}
+	return s.DeclineScheduled(ctx, consultationID, tech.ID)
+}
+
+// PromoteDueScheduled is polled periodically (see main.go) to find every
+// 'confirmed' scheduled consultation whose slot time has arrived, flip it to
+// 'ringing' (the same terminal state the instant flow lands in), and notify both
+// sides — "your consultation is starting now". From this point on it behaves
+// exactly like an instant call: the technician sees it on their incoming-request
+// card and taps Accept, which is what actually opens the WebRTC room.
+func (s *ConsultationService) PromoteDueScheduled(ctx context.Context) (int, error) {
+	due, err := s.consultRepo.DueForRinging(ctx)
+	if err != nil {
+		return 0, err
+	}
+	promoted := 0
+	for _, c := range due {
+		if err := s.consultRepo.PromoteToRinging(ctx, c.ID); err != nil {
+			continue // don't let one bad row block the rest of the batch
+		}
+		promoted++
+
+		if s.fcm == nil || c.TechnicianID == nil {
+			continue
+		}
+		tech, err := s.techRepo.GetByID(ctx, *c.TechnicianID)
+		if err == nil && tech != nil {
+			_ = s.fcm.SendToUser(ctx, tech.UserID, "Consultation starting now",
+				"Your scheduled consultation is starting — tap to join.",
+				map[string]string{"consultation_id": c.ID, "type": "consultation_request"})
+		}
+		_ = s.fcm.SendToUser(ctx, c.CustomerID, "Consultation starting now",
+			"Your scheduled consultation is starting — connecting you now.",
+			map[string]string{"consultation_id": c.ID, "type": "consultation_scheduled_starting"})
+	}
+	return promoted, nil
+}
+
+// UpcomingForUser lists the technician's scheduled/confirmed consultations —
+// distinct from PendingForUser (which is the urgent "ringing right now" queue).
+func (s *ConsultationService) UpcomingForUser(ctx context.Context, userID string) ([]models.ConsultationWithDetails, error) {
+	tech, err := s.techRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if tech == nil {
+		return nil, errors.New("technician profile not found")
+	}
+	return s.consultRepo.ListUpcomingForTechnician(ctx, tech.ID)
 }
 
 // Accept is the technician tapping [Accept] on the incoming-request card. Only the
@@ -228,7 +383,7 @@ func (s *ConsultationService) EndWithStats(ctx context.Context, consultationID s
 	return s.consultRepo.GetWithDetails(ctx, consultationID)
 }
 
-// Cancel is the customer giving up while still searching/ringing.
+// Cancel is the customer giving up while still searching/ringing/scheduled/confirmed.
 func (s *ConsultationService) Cancel(ctx context.Context, consultationID, customerID string) error {
 	return s.consultRepo.Cancel(ctx, consultationID, customerID)
 }

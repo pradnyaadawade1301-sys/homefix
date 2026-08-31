@@ -12,12 +12,23 @@ import '../video_call_screen.dart';
 /// shows a "searching for technician" state while [ConsultationProvider] polls
 /// status, then — once a technician accepts — fetches the call's room_id +
 /// ICE servers and opens the real WebRTC [VideoCallScreen].
+///
+/// IMPORTANT: every "is this scheduled?" check in this file is gated on
+/// [scheduledAt] (a value we already know on the client, right from the
+/// moment the widget is built) — NOT on the backend's status string. This is
+/// intentional: relying on the backend status alone means if the server is
+/// ever mid-rollout, stale, or briefly wrong, a scheduled request could look
+/// "accepted" and this screen would wrongly jump straight into a live video
+/// call. Gating on scheduledAt makes that impossible by construction.
 class SearchingTechnicianScreen extends StatefulWidget {
   final String categoryId;
   final String categoryName;
   final String? note;
   final String? preferredTechnicianId;
   final String? preferredTechnicianName;
+  // Non-null = "Schedule for Later". When set, this screen must NEVER
+  // auto-navigate to VideoCallScreen, no matter what status comes back.
+  final DateTime? scheduledAt;
 
   const SearchingTechnicianScreen({
     Key? key,
@@ -26,6 +37,7 @@ class SearchingTechnicianScreen extends StatefulWidget {
     this.note,
     this.preferredTechnicianId,
     this.preferredTechnicianName,
+    this.scheduledAt,
   }) : super(key: key);
 
   @override
@@ -35,6 +47,8 @@ class SearchingTechnicianScreen extends StatefulWidget {
 class _SearchingTechnicianScreenState extends State<SearchingTechnicianScreen> {
   bool _joining = false;
   Timer? _pollTimer;
+
+  bool get _isScheduled => widget.scheduledAt != null;
 
   @override
   void initState() {
@@ -51,15 +65,17 @@ class _SearchingTechnicianScreenState extends State<SearchingTechnicianScreen> {
   Future<void> _start() async {
     try {
       final provider = context.read<ConsultationProvider>();
-      await provider.requestConsultation(
+      final consultation = await provider.requestConsultation(
         categoryId: widget.categoryId,
         categoryName: widget.categoryName,
         note: widget.note,
         preferredTechnicianId: widget.preferredTechnicianId,
+        scheduledAt: widget.scheduledAt,
       );
-      // Start polling after the request is created
-      final consultation = provider.current;
-      if (consultation != null) {
+      // Scheduled requests are stored and left alone — no technician is rung
+      // yet, so there is nothing to poll for and definitely nothing to
+      // auto-join. Only instant requests start polling for accept/reject.
+      if (!_isScheduled) {
         _startPolling(consultation.id);
       }
     } catch (_) {
@@ -68,6 +84,7 @@ class _SearchingTechnicianScreenState extends State<SearchingTechnicianScreen> {
   }
 
   void _startPolling(String consultationId) {
+    if (_isScheduled) return; // belt-and-suspenders: never poll a scheduled request
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
       if (!mounted) return;
@@ -80,11 +97,6 @@ class _SearchingTechnicianScreenState extends State<SearchingTechnicianScreen> {
           _pollTimer?.cancel();
         }
       } catch (e) {
-        // TEMP DEBUG: previously silently swallowed, which is why the
-        // customer side could get stuck on "Connecting..." with zero
-        // visible error even when every poll was failing. Print it so the
-        // real cause (auth error, wrong URL, timeout, etc.) is visible in
-        // the console. Remove once the underlying issue is confirmed fixed.
         // ignore: avoid_print
         print('SearchingTechnicianScreen: poll failed for $consultationId: $e');
       }
@@ -92,6 +104,10 @@ class _SearchingTechnicianScreenState extends State<SearchingTechnicianScreen> {
   }
 
   Future<void> _joinCall(Consultation consultation) async {
+    // Hard stop: a scheduled consultation must NEVER reach this method. This
+    // check is redundant with the one at the call site in build() below, but
+    // is kept here on purpose as a last line of defense.
+    if (_isScheduled) return;
     if (_joining) return;
     setState(() => _joining = true);
     try {
@@ -148,6 +164,14 @@ class _SearchingTechnicianScreenState extends State<SearchingTechnicianScreen> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  String _formatDateTime(DateTime dt) {
+    final local = dt.toLocal();
+    final h = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final m = local.minute.toString().padLeft(2, '0');
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
+    return '${local.day}/${local.month}/${local.year}, $h:$m $ampm';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -158,7 +182,47 @@ class _SearchingTechnicianScreenState extends State<SearchingTechnicianScreen> {
             final consultation = provider.current;
             final status = consultation?.status;
 
+            // ── Scheduled request: show a fixed confirmation screen and stop.
+            // This branch is keyed ONLY on widget.scheduledAt — never on
+            // `status` — so it is impossible for a scheduled request to fall
+            // through to the auto-join logic below, regardless of what the
+            // backend reports.
+            if (_isScheduled) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.event_available_rounded, color: Colors.white, size: 56),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Video consultation scheduled for\n${_formatDateTime(widget.scheduledAt!)}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        "We'll notify you once it's confirmed. You won't be connected to a call automatically.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                      const SizedBox(height: 32),
+                      ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Done'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            // ── Instant request flow (unchanged) ────────────────────────────
+
             // Technician accepted — join the call as soon as we see it.
+            // Guarded by !_isScheduled above (whole branch already returned
+            // for scheduled requests), so this only ever runs for instant ones.
             if (status == ConsultationStatus.accepted && !_joining && consultation != null) {
               WidgetsBinding.instance.addPostFrameCallback((_) => _joinCall(consultation));
             }

@@ -36,6 +36,45 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
     _controller.forward();
     _loadReviews();
   }
+  Future<void> _pickScheduleTime(BuildContext context) async {
+  final t = widget.technician;
+  final now = DateTime.now();
+
+  final date = await showDatePicker(
+    context: context,
+    initialDate: now.add(const Duration(hours: 1)),
+    firstDate: now,
+    lastDate: now.add(const Duration(days: 30)),
+  );
+  if (date == null || !context.mounted) return;
+
+  final time = await showTimePicker(
+    context: context,
+    initialTime: TimeOfDay.fromDateTime(now.add(const Duration(hours: 1))),
+  );
+  if (time == null || !context.mounted) return;
+
+  final scheduledAt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+
+  if (scheduledAt.isBefore(now.add(const Duration(minutes: 10)))) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please pick a time at least 10 minutes from now')),
+    );
+    return;
+  }
+
+  if (!context.mounted) return;
+  Navigator.of(context).push(MaterialPageRoute(
+    builder: (_) => SearchingTechnicianScreen(
+      categoryId: t.categoryId,
+      categoryName: t.categoryName,
+      note: widget.problemDescription,
+      preferredTechnicianId: t.id,
+      preferredTechnicianName: t.name,
+      scheduledAt: scheduledAt,
+    ),
+  ));
+}
 
   Future<void> _loadReviews() async {
     try {
@@ -348,6 +387,17 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                           label: const Text('Video Call', style: TextStyle(fontWeight: FontWeight.w600)),
                         ),
                       ),
+                      const SizedBox(height: 12),
+SizedBox(
+  width: double.infinity,
+  height: 54,
+  child: OutlinedButton.icon(
+    onPressed: () => _pickScheduleTime(context),
+    style: OutlinedButton.styleFrom(foregroundColor: Colors.grey[700], side: BorderSide(color: Colors.grey[400]!, width: 1.4)),
+    icon: const Icon(Icons.event_available_outlined),
+    label: const Text('Schedule for Later', style: TextStyle(fontWeight: FontWeight.w600)),
+  ),
+),
                     ],
                   ),
                 ),

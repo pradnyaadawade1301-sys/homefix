@@ -20,6 +20,7 @@ import '../help_center_screen.dart';
 import '../contact_support_screen.dart';
 import '../service_radius_screen.dart';
 import '../bank_details_screen.dart';
+import '../consultation/upcoming_consultations_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   /// Optional anchor the Guided Tour can spotlight when it walks onto this
@@ -222,6 +223,13 @@ class _CustomerProfileBody extends StatelessWidget {
               label: 'Service History',
               onTap: () => openScreen(const ServiceHistoryScreen()),
             ),
+            _ActionTile(
+  icon: Icons.event_available_outlined,
+  label: 'Upcoming Consultations',
+  onTap: () => Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => const UpcomingConsultationsScreen()),
+  ),
+),
             _ActionTile(
               icon: Icons.calendar_month_outlined,
               label: 'Bookings',

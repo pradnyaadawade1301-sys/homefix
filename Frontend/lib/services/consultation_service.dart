@@ -13,11 +13,12 @@ class ConsultationService {
 
   /// Customer: kicks off a new consultation request. Backend starts matching
   /// a technician and returns status "searching".
-  Future<Consultation> requestConsultation({
+    Future<Consultation> requestConsultation({
     required String categoryId,
     required String categoryName,
     String? note,
     String? preferredTechnicianId,
+    DateTime? scheduledAt,
   }) async {
     try {
       final response = await _httpClient.post(
@@ -27,6 +28,7 @@ class ConsultationService {
           'category_name': categoryName,
           if (note != null && note.isNotEmpty) 'note': note,
           if (preferredTechnicianId != null) 'preferred_technician_id': preferredTechnicianId,
+          if (scheduledAt != null) 'scheduled_at': scheduledAt.toUtc().toIso8601String(),
         },
       );
       final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
@@ -35,7 +37,6 @@ class ConsultationService {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
   }
-
   /// Poll while status == searching/pending.
   Future<Consultation> getStatus(String id) async {
     try {
@@ -159,6 +160,37 @@ class ConsultationService {
           if (scheduledAt != null) 'scheduled_at': scheduledAt.toUtc().toIso8601String(),
         },
       );
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+    /// Technician: confirms holding a scheduled slot (status scheduled -> confirmed).
+  Future<Consultation> confirmScheduled(String id) async {
+    try {
+      final response = await _httpClient.post('${ApiConfig.consultationConfirmScheduled}/$id/confirm-scheduled');
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return Consultation.fromJson(data);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Technician: declines a scheduled slot ahead of time.
+  Future<void> declineScheduled(String id) async {
+    try {
+      await _httpClient.post('${ApiConfig.consultationDeclineScheduled}/$id/decline-scheduled');
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Technician: their upcoming (scheduled/confirmed) consultations.
+  Future<List<Consultation>> getUpcoming() async {
+    try {
+      final response = await _httpClient.get(ApiConfig.consultationUpcoming);
+      final list = ApiEnvelope.unwrap(response) as List? ?? [];
+      return list.map((e) => Consultation.fromJson(e as Map<String, dynamic>)).toList();
     } catch (e) {
       throw Exception(ApiEnvelope.errorMessage(e));
     }

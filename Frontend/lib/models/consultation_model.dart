@@ -5,6 +5,8 @@
 /// in_call -> on_site_recommended -> booking_created
 class ConsultationStatus {
   static const String searching = 'searching';
+  static const String scheduled = 'scheduled';
+  static const String confirmed = 'confirmed';
   static const String ringing = 'ringing'; // Backend assigned a technician, awaiting their accept/decline
   static const String accepted = 'accepted';
   static const String rejected = 'rejected';
@@ -52,6 +54,7 @@ class Consultation {
   final String? customerName;
   final String? technicianName;
   final int estimatedDurationMinutes;
+  final DateTime? scheduledAt; // null = instant ("Consult Now")
   final double consultationFee;
   final DateTime? startTime;
   final DateTime? endTime;
@@ -72,6 +75,7 @@ class Consultation {
     this.customerName,
     this.technicianName,
     this.estimatedDurationMinutes = 15,
+    this.scheduledAt,
     this.consultationFee = 199,
     this.startTime,
     this.endTime,
@@ -100,6 +104,7 @@ class Consultation {
       consultationFee: (json['consultation_fee'] as num?)?.toDouble() ?? 199,
       startTime: json['start_time'] != null ? DateTime.tryParse(json['start_time'] as String) : null,
       endTime: json['end_time'] != null ? DateTime.tryParse(json['end_time'] as String) : null,
+            scheduledAt: json['scheduled_at'] != null ? DateTime.tryParse(json['scheduled_at'] as String) : null,
       durationSeconds: json['duration_seconds'] as int?,
       amount: (json['amount'] as num?)?.toDouble(),
       paymentStatus: json['payment_status'] as String?,
@@ -116,6 +121,7 @@ class Consultation {
     String? technicianId,
     String? technicianName,
     DateTime? startTime,
+        DateTime? scheduledAt,
     DateTime? endTime,
     int? durationSeconds,
     double? amount,
@@ -133,6 +139,7 @@ class Consultation {
       customerName: customerName,
       technicianName: technicianName ?? this.technicianName,
       estimatedDurationMinutes: estimatedDurationMinutes,
+            scheduledAt: scheduledAt ?? this.scheduledAt,
       consultationFee: consultationFee,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,

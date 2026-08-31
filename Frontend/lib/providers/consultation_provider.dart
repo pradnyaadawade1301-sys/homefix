@@ -115,6 +115,7 @@ class ConsultationProvider extends ChangeNotifier {
     required String categoryName,
     String? note,
     String? preferredTechnicianId,
+    DateTime? scheduledAt,
   }) async {
     _isLoading = true;
     _error = null;
@@ -125,6 +126,7 @@ class ConsultationProvider extends ChangeNotifier {
         categoryName: categoryName,
         note: note,
         preferredTechnicianId: preferredTechnicianId,
+        scheduledAt: scheduledAt,
       );
       _current = consultation;
       _error = null;
@@ -248,5 +250,73 @@ class ConsultationProvider extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  // --- Technician: upcoming scheduled consultations -----------------------
+  List<Consultation> _upcoming = [];
+  bool _isLoadingUpcoming = false;
+
+  List<Consultation> get upcoming => _upcoming;
+  bool get isLoadingUpcoming => _isLoadingUpcoming;
+
+  /// Technician: refresh the upcoming (scheduled/confirmed) list and update
+  /// listeners. Used by [UpcomingConsultationsScreen] via RefreshIndicator /
+  /// Consumer.
+  Future<void> loadUpcoming() async {
+    _isLoadingUpcoming = true;
+    notifyListeners();
+    try {
+      _upcoming = await _consultationService.getUpcoming();
+      _error = null;
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoadingUpcoming = false;
+      notifyListeners();
+    }
+  }
+
+  /// Technician: same fetch as [loadUpcoming], but also returns the list
+  /// directly — used for lightweight background polling (e.g. the jobs
+  /// dashboard banner) that keeps its own local copy instead of listening
+  /// to [upcoming] via Consumer. Mirrors [fetchPendingRequests].
+  Future<List<Consultation>> fetchUpcomingList() async {
+    try {
+      final list = await _consultationService.getUpcoming();
+      _upcoming = list;
+      _error = null;
+      notifyListeners();
+      return list;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> confirmScheduled(String consultationId) async {
+    try {
+      await _consultationService.confirmScheduled(consultationId);
+      _upcoming = _upcoming.map((c) => c.id == consultationId ? c.copyWith(status: ConsultationStatus.confirmed) : c).toList();
+      _error = null;
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> declineScheduled(String consultationId) async {
+    try {
+      await _consultationService.declineScheduled(consultationId);
+      _upcoming = _upcoming.where((c) => c.id != consultationId).toList();
+      _error = null;
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
   }
 }

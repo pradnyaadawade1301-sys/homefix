@@ -152,7 +152,9 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.POST("/consultations/:id/payment", h.Consultation.Pay)
 		authed.POST("/consultations/:id/escalate", h.Consultation.Escalate)
 		authed.POST("/consultations/:id/rating", h.Consultation.Rating)
-
+		authed.POST("/consultations/:id/confirm-scheduled", middleware.RequireRole("technician"), h.Consultation.ConfirmScheduled)
+		authed.POST("/consultations/:id/decline-scheduled", middleware.RequireRole("technician"), h.Consultation.DeclineScheduled)
+		authed.GET("/consultations/upcoming", middleware.RequireRole("technician"), h.Consultation.Upcoming)
 		// WebRTC ICE server configuration (STUN + short-lived TURN credential) for the
 		// peer-to-peer video call — see internal/handler/webrtc_handler.go.
 		authed.GET("/webrtc/ice-servers", h.WebRTC.IceServers)
