@@ -17,20 +17,24 @@ import "time"
 //     ConsultationService.PromoteDueScheduled, polled periodically from main.go —
 //     not client-triggered, so it fires even if neither app is in the foreground.
 type Consultation struct {
-	ID                 string     `json:"id"`
-	CustomerID         string     `json:"customer_id"`
-	TechnicianID       *string    `json:"technician_id,omitempty"`
-	CategoryID         string     `json:"category_id"`
-	Status             string     `json:"status"` // scheduled, confirmed, searching, ringing, accepted, rejected, no_technician, in_call, ended, cancelled
-	Fee                float64    `json:"fee"`
-	DurationSeconds    *int       `json:"duration_seconds,omitempty"`
-	PaymentStatus      string     `json:"payment_status"` // pending, paid, not_required
-	EscalatedBookingID *string    `json:"escalated_booking_id,omitempty"`
-	ScheduledAt        *time.Time `json:"scheduled_at,omitempty"` // nil = instant ("Consult Now")
-	StartedAt          *time.Time `json:"started_at,omitempty"`
-	EndedAt            *time.Time `json:"ended_at,omitempty"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	ID                 string  `json:"id"`
+	CustomerID         string  `json:"customer_id"`
+	TechnicianID       *string `json:"technician_id,omitempty"`
+	CategoryID         string  `json:"category_id"`
+	Status             string  `json:"status"` // scheduled, confirmed, searching, ringing, accepted, rejected, no_technician, in_call, ended, cancelled
+	Fee                float64 `json:"fee"`
+	DurationSeconds    *int    `json:"duration_seconds,omitempty"`
+	PaymentStatus      string  `json:"payment_status"` // pending, paid, not_required
+	EscalatedBookingID *string `json:"escalated_booking_id,omitempty"`
+	// DeclineReason is set when a technician declines a scheduled slot (or
+	// rejects an instant request) and explains why — surfaced to the customer
+	// so "declined" isn't a dead end with no context. Nil for every other status.
+	DeclineReason *string    `json:"decline_reason,omitempty"`
+	ScheduledAt   *time.Time `json:"scheduled_at,omitempty"` // nil = instant ("Consult Now")
+	StartedAt     *time.Time `json:"started_at,omitempty"`
+	EndedAt       *time.Time `json:"ended_at,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
 }
 
 // ConsultationWithDetails adds the display info the app actually renders: which

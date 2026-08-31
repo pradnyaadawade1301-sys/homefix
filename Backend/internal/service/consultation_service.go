@@ -165,7 +165,10 @@ func (s *ConsultationService) ConfirmScheduledByUser(ctx context.Context, consul
 // DeclineScheduled is the technician declining a scheduled slot ahead of time.
 // Kept simple like Reject: marks 'rejected' rather than auto-retrying another
 // technician, so the customer gets a clear signal and can reschedule/re-request.
-func (s *ConsultationService) DeclineScheduled(ctx context.Context, consultationID, technicianID string) error {
+// reason is optional free text the technician gives (e.g. "Not available at that
+// time") — stored and passed on to the customer via FCM so "declined" isn't a
+// dead end with no explanation.
+func (s *ConsultationService) DeclineScheduled(ctx context.Context, consultationID, technicianID, reason string) error {
 	c, err := s.consultRepo.GetByID(ctx, consultationID)
 	if err != nil {
 		return err
@@ -176,18 +179,21 @@ func (s *ConsultationService) DeclineScheduled(ctx context.Context, consultation
 	if c.TechnicianID == nil || *c.TechnicianID != technicianID {
 		return errors.New("this consultation was not offered to you")
 	}
-	if err := s.consultRepo.UpdateStatus(ctx, consultationID, "rejected"); err != nil {
+	if err := s.consultRepo.UpdateStatusWithReason(ctx, consultationID, "rejected", reason); err != nil {
 		return err
 	}
 	if s.fcm != nil {
-		_ = s.fcm.SendToUser(ctx, c.CustomerID, "Consultation declined",
-			"The technician can't make your scheduled consultation slot. Please pick another time.",
-			map[string]string{"consultation_id": consultationID, "type": "consultation_scheduled_declined"})
+		body := "The technician can't make your scheduled consultation slot. Please pick another time."
+		if reason != "" {
+			body = "The technician can't make your scheduled consultation slot: " + reason + ". Please pick another time."
+		}
+		_ = s.fcm.SendToUser(ctx, c.CustomerID, "Consultation declined", body,
+			map[string]string{"consultation_id": consultationID, "type": "consultation_scheduled_declined", "reason": reason})
 	}
 	return nil
 }
 
-func (s *ConsultationService) DeclineScheduledByUser(ctx context.Context, consultationID, userID string) error {
+func (s *ConsultationService) DeclineScheduledByUser(ctx context.Context, consultationID, userID, reason string) error {
 	tech, err := s.techRepo.GetByUserID(ctx, userID)
 	if err != nil {
 		return err
@@ -195,7 +201,7 @@ func (s *ConsultationService) DeclineScheduledByUser(ctx context.Context, consul
 	if tech == nil {
 		return errors.New("technician profile not found")
 	}
-	return s.DeclineScheduled(ctx, consultationID, tech.ID)
+	return s.DeclineScheduled(ctx, consultationID, tech.ID, reason)
 }
 
 // PromoteDueScheduled is polled periodically (see main.go) to find every
@@ -271,11 +277,11 @@ func (s *ConsultationService) Accept(ctx context.Context, consultationID, techni
 	return s.consultRepo.GetWithDetails(ctx, consultationID)
 }
 
-// Reject is the technician tapping [Reject]. Kept deliberately simple for now: the
-// consultation is marked rejected rather than auto-retrying the next-nearest
-// technician, so the customer sees a clear "declined" state and can request again
-// (avoids silently re-ringing a chain of technicians with no visibility to the user).
-func (s *ConsultationService) Reject(ctx context.Context, consultationID, technicianID string) error {
+// Reject is the technician tapping [Reject] on an instant/ringing request. reason is
+// optional free text explaining why — same idea as DeclineScheduled, kept as a
+// separate method since instant and scheduled requests are declined from different
+// screens with different urgency.
+func (s *ConsultationService) Reject(ctx context.Context, consultationID, technicianID, reason string) error {
 	c, err := s.consultRepo.GetByID(ctx, consultationID)
 	if err != nil {
 		return err
@@ -286,15 +292,18 @@ func (s *ConsultationService) Reject(ctx context.Context, consultationID, techni
 	if c.TechnicianID == nil || *c.TechnicianID != technicianID {
 		return errors.New("this consultation was not offered to you")
 	}
-	if err := s.consultRepo.UpdateStatus(ctx, consultationID, "rejected"); err != nil {
+	if err := s.consultRepo.UpdateStatusWithReason(ctx, consultationID, "rejected", reason); err != nil {
 		return err
 	}
 	// Notify the customer their call wasn't answered — otherwise, if the app is
 	// backgrounded, they're left staring at "Searching..." with no signal at all.
 	if s.fcm != nil {
-		_ = s.fcm.SendToUser(ctx, c.CustomerID, "Call not answered",
-			"The technician couldn't take your live video consultation right now.",
-			map[string]string{"consultation_id": consultationID, "type": "consultation_rejected"})
+		body := "The technician couldn't take your live video consultation right now."
+		if reason != "" {
+			body = "The technician couldn't take your live video consultation: " + reason
+		}
+		_ = s.fcm.SendToUser(ctx, c.CustomerID, "Call not answered", body,
+			map[string]string{"consultation_id": consultationID, "type": "consultation_rejected", "reason": reason})
 	}
 	return nil
 }
@@ -316,7 +325,7 @@ func (s *ConsultationService) AcceptByUser(ctx context.Context, consultationID, 
 }
 
 // RejectByUser is the Reject-button counterpart of AcceptByUser.
-func (s *ConsultationService) RejectByUser(ctx context.Context, consultationID, userID string) error {
+func (s *ConsultationService) RejectByUser(ctx context.Context, consultationID, userID, reason string) error {
 	tech, err := s.techRepo.GetByUserID(ctx, userID)
 	if err != nil {
 		return err
@@ -324,7 +333,7 @@ func (s *ConsultationService) RejectByUser(ctx context.Context, consultationID, 
 	if tech == nil {
 		return errors.New("technician profile not found")
 	}
-	return s.Reject(ctx, consultationID, tech.ID)
+	return s.Reject(ctx, consultationID, tech.ID, reason)
 }
 
 func (s *ConsultationService) Get(ctx context.Context, consultationID string) (*models.ConsultationWithDetails, error) {
@@ -438,7 +447,7 @@ func (s *ConsultationService) Rate(ctx context.Context, consultationID, customer
 // into a real booking for the SAME technician (reusing the normal booking-creation
 // path, so it shows up in the technician's job list exactly like any other booking),
 // and links the two records together.
-func (s *ConsultationService) Escalate(ctx context.Context, consultationID, addressID, problemDescription, notes string, scheduledAt *time.Time) (*models.Booking, error) {
+func (s *ConsultationService) Escalate(ctx context.Context, consultationID, addressID, problemDescription string, scheduledAt *time.Time) (*models.Booking, error) {
 	c, err := s.consultRepo.GetByID(ctx, consultationID)
 	if err != nil {
 		return nil, err
@@ -447,18 +456,12 @@ func (s *ConsultationService) Escalate(ctx context.Context, consultationID, addr
 		return nil, errors.New("consultation not found")
 	}
 
-	var notesPtr *string
-	if notes != "" {
-		notesPtr = &notes
-	}
-
 	booking := &models.Booking{
 		CustomerID:         c.CustomerID,
 		CategoryID:         c.CategoryID,
 		AddressID:          addressID,
 		TechnicianID:       c.TechnicianID,
 		ProblemDescription: problemDescription,
-		Notes:              notesPtr,
 		ScheduledAt:        scheduledAt, // nil = ASAP; set = customer picked a date/time slot
 	}
 

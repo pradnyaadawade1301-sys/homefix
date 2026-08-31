@@ -78,10 +78,11 @@ class ConsultationProvider extends ChangeNotifier {
     }
   }
 
-  /// Technician: decline a pending request.
-  Future<void> rejectRequest(String consultationId) async {
+  /// Technician: decline a pending (instant/ringing) request. [reason] is
+  /// optional free text explaining why — shown to the customer.
+  Future<void> rejectRequest(String consultationId, {String? reason}) async {
     try {
-      await _consultationService.reject(consultationId);
+      await _consultationService.reject(consultationId, reason: reason);
       _pendingRequests = _pendingRequests.where((r) => r.consultationId != consultationId).toList();
       _error = null;
       notifyListeners();
@@ -309,9 +310,11 @@ class ConsultationProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> declineScheduled(String consultationId) async {
+  /// Technician: decline a scheduled slot ahead of time. [reason] is optional
+  /// free text explaining why — shown to the customer.
+  Future<void> declineScheduled(String consultationId, {String? reason}) async {
     try {
-      await _consultationService.declineScheduled(consultationId);
+      await _consultationService.declineScheduled(consultationId, reason: reason);
       _upcoming = _upcoming.where((c) => c.id != consultationId).toList();
       _error = null;
       notifyListeners();

@@ -47,13 +47,37 @@ class _UpcomingConsultationsScreenState extends State<UpcomingConsultationsScree
     }
   }
 
+  /// Shows a dialog asking the technician WHY they're declining, then sends
+  /// it along with the decline so the customer isn't left with a bare
+  /// "declined" status (see MyConsultationsScreen, which surfaces this text).
+  /// The reason is optional — a technician who's in a hurry can still just
+  /// tap Decline — but giving one is encouraged via the hint text.
   Future<void> _decline(Consultation c) async {
+    final reasonController = TextEditingController();
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Decline this slot?'),
-        content: Text(
-          'The customer will be notified that you can\'t make ${_formatSlot(c.scheduledAt)} and asked to pick another time.',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'The customer will be notified that you can\'t make ${_formatSlot(c.scheduledAt)} and asked to pick another time.',
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: reasonController,
+              autofocus: true,
+              maxLength: 150,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Reason (optional)',
+                hintText: 'e.g. Not available at that time',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
@@ -65,8 +89,9 @@ class _UpcomingConsultationsScreenState extends State<UpcomingConsultationsScree
       ),
     );
     if (confirm != true) return;
+    final reason = reasonController.text.trim();
     try {
-      await context.read<ConsultationProvider>().declineScheduled(c.id);
+      await context.read<ConsultationProvider>().declineScheduled(c.id, reason: reason.isEmpty ? null : reason);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Slot declined')));
     } catch (e) {

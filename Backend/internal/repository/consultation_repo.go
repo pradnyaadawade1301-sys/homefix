@@ -30,7 +30,7 @@ func (r *ConsultationRepository) Create(ctx context.Context, customerID, categor
 		INSERT INTO consultations (customer_id, category_id, fee, status, scheduled_at)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, customer_id, technician_id, category_id, status, fee, duration_seconds,
-		          payment_status, escalated_booking_id, scheduled_at, started_at, ended_at, created_at, updated_at
+		          payment_status, escalated_booking_id, decline_reason, scheduled_at, started_at, ended_at, created_at, updated_at
 	`, customerID, categoryID, fee, status, scheduledAt)
 	return scanConsultation(row)
 }
@@ -38,7 +38,7 @@ func (r *ConsultationRepository) Create(ctx context.Context, customerID, categor
 func (r *ConsultationRepository) GetByID(ctx context.Context, id string) (*models.Consultation, error) {
 	row := r.db.QueryRow(ctx, `
 		SELECT id, customer_id, technician_id, category_id, status, fee, duration_seconds,
-		       payment_status, escalated_booking_id, scheduled_at, started_at, ended_at, created_at, updated_at
+		       payment_status, escalated_booking_id, decline_reason, scheduled_at, started_at, ended_at, created_at, updated_at
 		FROM consultations WHERE id = $1
 	`, id)
 	c, err := scanConsultation(row)
@@ -53,8 +53,8 @@ func (r *ConsultationRepository) GetByID(ctx context.Context, id string) (*model
 func (r *ConsultationRepository) GetWithDetails(ctx context.Context, id string) (*models.ConsultationWithDetails, error) {
 	row := r.db.QueryRow(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
-		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.scheduled_at,
-		       co.started_at, co.ended_at, co.created_at, co.updated_at,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason,
+		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''),
 		       COALESCE(tu.name, ''), COALESCE(tu.phone, '')
 		FROM consultations co
@@ -68,8 +68,8 @@ func (r *ConsultationRepository) GetWithDetails(ctx context.Context, id string) 
 	var d models.ConsultationWithDetails
 	err := row.Scan(
 		&d.ID, &d.CustomerID, &d.TechnicianID, &d.CategoryID, &d.Status, &d.Fee,
-		&d.DurationSeconds, &d.PaymentStatus, &d.EscalatedBookingID, &d.ScheduledAt,
-		&d.StartedAt, &d.EndedAt, &d.CreatedAt, &d.UpdatedAt,
+		&d.DurationSeconds, &d.PaymentStatus, &d.EscalatedBookingID, &d.DeclineReason,
+		&d.ScheduledAt, &d.StartedAt, &d.EndedAt, &d.CreatedAt, &d.UpdatedAt,
 		&d.CategoryName, &d.CustomerName, &d.CustomerPhone, &d.TechnicianName, &d.TechnicianPhone,
 	)
 	if err == pgx.ErrNoRows {
@@ -105,6 +105,18 @@ func (r *ConsultationRepository) AssignTechnicianScheduled(ctx context.Context, 
 
 func (r *ConsultationRepository) UpdateStatus(ctx context.Context, id, status string) error {
 	_, err := r.db.Exec(ctx, `UPDATE consultations SET status = $2, updated_at = now() WHERE id = $1`, id, status)
+	return err
+}
+
+// UpdateStatusWithReason is UpdateStatus plus a reason string — used when a
+// technician declines a scheduled slot (or rejects an instant request) and
+// explains why, so the customer isn't left with a bare "declined" and nothing
+// else. Pass "" for statuses that don't need a reason.
+func (r *ConsultationRepository) UpdateStatusWithReason(ctx context.Context, id, status, reason string) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE consultations SET status = $2, decline_reason = NULLIF($3, ''), updated_at = now()
+		WHERE id = $1
+	`, id, status, reason)
 	return err
 }
 
@@ -177,8 +189,8 @@ func (r *ConsultationRepository) ListPendingForTechnician(ctx context.Context, t
 func (r *ConsultationRepository) ListUpcomingForTechnician(ctx context.Context, technicianID string) ([]models.ConsultationWithDetails, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
-		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.scheduled_at,
-		       co.started_at, co.ended_at, co.created_at, co.updated_at,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason,
+		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''), '', ''
 		FROM consultations co
 		LEFT JOIN categories cat ON cat.id = co.category_id
@@ -200,7 +212,7 @@ func (r *ConsultationRepository) ListUpcomingForTechnician(ctx context.Context, 
 func (r *ConsultationRepository) DueForRinging(ctx context.Context) ([]models.Consultation, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, customer_id, technician_id, category_id, status, fee, duration_seconds,
-		       payment_status, escalated_booking_id, scheduled_at, started_at, ended_at, created_at, updated_at
+		       payment_status, escalated_booking_id, decline_reason, scheduled_at, started_at, ended_at, created_at, updated_at
 		FROM consultations
 		WHERE status = 'confirmed' AND scheduled_at IS NOT NULL AND scheduled_at <= now()
 	`)
@@ -214,8 +226,8 @@ func (r *ConsultationRepository) DueForRinging(ctx context.Context) ([]models.Co
 		var c models.Consultation
 		if err := rows.Scan(
 			&c.ID, &c.CustomerID, &c.TechnicianID, &c.CategoryID, &c.Status, &c.Fee,
-			&c.DurationSeconds, &c.PaymentStatus, &c.EscalatedBookingID, &c.ScheduledAt,
-			&c.StartedAt, &c.EndedAt, &c.CreatedAt, &c.UpdatedAt,
+			&c.DurationSeconds, &c.PaymentStatus, &c.EscalatedBookingID, &c.DeclineReason,
+			&c.ScheduledAt, &c.StartedAt, &c.EndedAt, &c.CreatedAt, &c.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -243,8 +255,8 @@ func (r *ConsultationRepository) PromoteToRinging(ctx context.Context, id string
 func (r *ConsultationRepository) ListForCustomer(ctx context.Context, customerID string) ([]models.ConsultationWithDetails, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
-		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.scheduled_at,
-		       co.started_at, co.ended_at, co.created_at, co.updated_at,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason,
+		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''),
 		       COALESCE(tu.name, ''), COALESCE(tu.phone, '')
 		FROM consultations co
@@ -289,8 +301,8 @@ func (r *ConsultationRepository) SetRating(ctx context.Context, id string, ratin
 func (r *ConsultationRepository) listForTechnicianByStatus(ctx context.Context, technicianID, status string) ([]models.ConsultationWithDetails, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
-		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.scheduled_at,
-		       co.started_at, co.ended_at, co.created_at, co.updated_at,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason,
+		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''), '', ''
 		FROM consultations co
 		LEFT JOIN categories cat ON cat.id = co.category_id
@@ -311,8 +323,8 @@ func scanConsultationRows(rows pgx.Rows) ([]models.ConsultationWithDetails, erro
 		var d models.ConsultationWithDetails
 		if err := rows.Scan(
 			&d.ID, &d.CustomerID, &d.TechnicianID, &d.CategoryID, &d.Status, &d.Fee,
-			&d.DurationSeconds, &d.PaymentStatus, &d.EscalatedBookingID, &d.ScheduledAt,
-			&d.StartedAt, &d.EndedAt, &d.CreatedAt, &d.UpdatedAt,
+			&d.DurationSeconds, &d.PaymentStatus, &d.EscalatedBookingID, &d.DeclineReason,
+			&d.ScheduledAt, &d.StartedAt, &d.EndedAt, &d.CreatedAt, &d.UpdatedAt,
 			&d.CategoryName, &d.CustomerName, &d.CustomerPhone, &d.TechnicianName, &d.TechnicianPhone,
 		); err != nil {
 			return nil, err
@@ -326,8 +338,8 @@ func scanConsultation(row pgx.Row) (*models.Consultation, error) {
 	var c models.Consultation
 	err := row.Scan(
 		&c.ID, &c.CustomerID, &c.TechnicianID, &c.CategoryID, &c.Status, &c.Fee,
-		&c.DurationSeconds, &c.PaymentStatus, &c.EscalatedBookingID, &c.ScheduledAt,
-		&c.StartedAt, &c.EndedAt, &c.CreatedAt, &c.UpdatedAt,
+		&c.DurationSeconds, &c.PaymentStatus, &c.EscalatedBookingID, &c.DeclineReason,
+		&c.ScheduledAt, &c.StartedAt, &c.EndedAt, &c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
