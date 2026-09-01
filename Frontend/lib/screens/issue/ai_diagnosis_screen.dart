@@ -30,10 +30,12 @@ class AIDiagnosisScreen extends StatefulWidget {
   State<AIDiagnosisScreen> createState() => _AIDiagnosisScreenState();
 }
 
-/// The three ways a customer can proceed once the AI has given its first
+/// The two ways a customer can proceed once the AI has given its first
 /// read on the problem (mirrors the "Possible Options" step of the product
-/// spec: Get Instant AI Guidance / Talk to an Expert / Book Technician
-/// Directly).
+/// spec: Get Instant AI Guidance / Book Technician Directly). "Talk to an
+/// Expert" (live video) is still reachable via the error-fallback button
+/// further down this screen — it's just no longer in the main options
+/// card, per product request.
 enum _NextStepChoice { aiGuidance, talkToExpert, bookDirect }
 
 class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
@@ -73,6 +75,14 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
     if (text.isEmpty) return;
     _messageController.clear();
     await context.read<AIProvider>().sendMessage(text);
+    // Bring the "Possible Options" card back for the new reply — without
+    // this, picking "Get Instant AI Guidance" once would hide the card
+    // forever for the rest of the chat, even after fresh AI replies the
+    // customer might want to act on differently (e.g. book a technician
+    // after all).
+    if (mounted && _choice == _NextStepChoice.aiGuidance) {
+      setState(() => _choice = null);
+    }
     _scrollToBottom();
   }
 
@@ -256,13 +266,6 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
               onTap: _continueWithAI,
             ),
             const SizedBox(height: 10),
-            _OptionRow(
-              color: const Color(0xFFFF9800),
-              icon: Icons.support_agent_rounded,
-              title: 'Talk to an Expert',
-              subtitle: 'Live video call with a technician right now',
-              onTap: _talkToExpert,
-            ),
             const SizedBox(height: 10),
             _OptionRow(
               color: const Color(0xFF2196F3),
@@ -329,7 +332,7 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('AI Assessment')),
+      appBar: AppBar(title: const Text('AI Diagnosis')),
       body: SafeArea(
         child: Consumer<AIProvider>(
           builder: (context, ai, _) {
@@ -346,7 +349,7 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
                       const Icon(Icons.error_outline, color: AppTheme.errorColor, size: 40),
                       const SizedBox(height: 12),
                       Text(
-                        'AI assessment is unavailable right now.\n${ai.error}',
+                        'AI diagnosis is unavailable right now.\n${ai.error}',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.grey[600], fontSize: 13),
                       ),

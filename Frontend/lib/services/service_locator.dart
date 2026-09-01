@@ -417,12 +417,31 @@ class AIService {
 
   AIService({required HttpClient httpClient}) : _httpClient = httpClient;
 
+  /// Transient network hiccups ("No route to host", brief connection drops)
+  /// are common on mobile — especially the first request after the phone
+  /// switches networks, or right after Render's free-tier instance wakes
+  /// from a cold start. Rather than surface a scary error to the customer
+  /// for something that would succeed a second later, retry the AI call up
+  /// to 2 extra times with a short backoff before giving up for real.
+  Future<T> _withRetry<T>(Future<T> Function() call) async {
+    Object? lastError;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await call();
+      } catch (e) {
+        lastError = e;
+        if (attempt < 2) await Future.delayed(Duration(milliseconds: 500 * (attempt + 1)));
+      }
+    }
+    throw lastError!;
+  }
+
   Future<AIDiagnosisSession> startSession({String? categoryId}) async {
     try {
-      final response = await _httpClient.post(
-        ApiConfig.aiSessions,
-        data: {if (categoryId != null) 'category_id': categoryId},
-      );
+      final response = await _withRetry(() => _httpClient.post(
+            ApiConfig.aiSessions,
+            data: {if (categoryId != null) 'category_id': categoryId},
+          ));
       final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
       return AIDiagnosisSession.fromJson(data);
     } catch (e) {
@@ -432,10 +451,10 @@ class AIService {
 
   Future<String> sendMessage(String sessionId, String message) async {
     try {
-      final response = await _httpClient.post(
-        '${ApiConfig.aiSessions}/$sessionId/messages',
-        data: {'message': message},
-      );
+      final response = await _withRetry(() => _httpClient.post(
+            '${ApiConfig.aiSessions}/$sessionId/messages',
+            data: {'message': message},
+          ));
       final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
       return data['reply'] as String;
     } catch (e) {
