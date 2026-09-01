@@ -297,8 +297,15 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
       return;
     }
 
+    // issueSummary goes to the AI (includes attachment URLs so it has real
+    // context). displaySummary is what the customer sees in the chat bubble —
+    // just their own title + description, no raw upload URLs.
     final issueSummary = StringBuffer(title);
-    if (description.isNotEmpty) issueSummary.write('\n\n$description');
+    final displaySummary = StringBuffer(title);
+    if (description.isNotEmpty) {
+      issueSummary.write('\n\n$description');
+      displaySummary.write('\n\n$description');
+    }
     if (imageUrls.isNotEmpty) {
       issueSummary.write('\n\n(Customer attached ${imageUrls.length} photo(s): ${imageUrls.join(', ')})');
     }
@@ -325,6 +332,7 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
     await context.read<AIProvider>().startWithIssue(
           categoryId: categoryId,
           issueSummary: issueSummary.toString(),
+          displayText: displaySummary.toString(),
         );
 
     if (!mounted) return;

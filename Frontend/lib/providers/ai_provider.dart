@@ -26,7 +26,14 @@ class AIProvider extends ChangeNotifier {
   /// Starts a new session and immediately sends the customer's issue
   /// title+description as the opening message, so the AI has real context
   /// (matches spec step 4: "Send issue details ... to the Groq AI service").
-  Future<void> startWithIssue({String? categoryId, required String issueSummary}) async {
+  /// [displayText], if given, is shown in the chat bubble instead of
+  /// [issueSummary] — used so attachment URLs sent to the AI don't clutter
+  /// what the customer sees.
+  Future<void> startWithIssue({
+    String? categoryId,
+    required String issueSummary,
+    String? displayText,
+  }) async {
     _isStarting = true;
     _error = null;
     _messages = [];
@@ -35,7 +42,7 @@ class AIProvider extends ChangeNotifier {
     try {
       _session = await _aiService.startSession(categoryId: categoryId);
       _error = null;
-      await sendMessage(issueSummary);
+      await sendMessage(issueSummary, displayText: displayText);
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -44,7 +51,10 @@ class AIProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> sendMessage(String message) async {
+  /// Sends [message] to the AI. If [displayText] is given, it's shown in the
+  /// chat bubble instead of [message] — used so attachment URLs sent to the
+  /// AI don't clutter what the customer sees.
+  Future<void> sendMessage(String message, {String? displayText}) async {
     final session = _session;
     if (session == null || message.trim().isEmpty) return;
 
@@ -57,7 +67,7 @@ class AIProvider extends ChangeNotifier {
         id: 'local-${DateTime.now().microsecondsSinceEpoch}',
         sessionId: session.id,
         role: 'user',
-        content: message,
+        content: displayText ?? message,
         createdAt: DateTime.now(),
       ),
     ];
