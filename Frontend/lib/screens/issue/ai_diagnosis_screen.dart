@@ -329,7 +329,7 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('AI Diagnosis')),
+      appBar: AppBar(title: const Text('AI Assessment')),
       body: SafeArea(
         child: Consumer<AIProvider>(
           builder: (context, ai, _) {
@@ -346,7 +346,7 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
                       const Icon(Icons.error_outline, color: AppTheme.errorColor, size: 40),
                       const SizedBox(height: 12),
                       Text(
-                        'AI diagnosis is unavailable right now.\n${ai.error}',
+                        'AI assessment is unavailable right now.\n${ai.error}',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.grey[600], fontSize: 13),
                       ),

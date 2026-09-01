@@ -625,7 +625,7 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
                     ? const SizedBox(
                         height: 20, width: 20,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Continue to AI Diagnosis'),
+                    : const Text('Continue to AI Assessment'),
               ),
             ),
           ],
