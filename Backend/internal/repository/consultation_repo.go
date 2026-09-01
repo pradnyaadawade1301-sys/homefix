@@ -30,7 +30,9 @@ func (r *ConsultationRepository) Create(ctx context.Context, customerID, categor
 		INSERT INTO consultations (customer_id, category_id, fee, status, scheduled_at)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, customer_id, technician_id, category_id, status, fee, duration_seconds,
-		          payment_status, escalated_booking_id, decline_reason, scheduled_at, started_at, ended_at, created_at, updated_at
+		          payment_status, escalated_booking_id, decline_reason,
+		          recommendation_summary, recommendation_price, recommendation_status, recommendation_sent_at,
+		          scheduled_at, started_at, ended_at, created_at, updated_at
 	`, customerID, categoryID, fee, status, scheduledAt)
 	return scanConsultation(row)
 }
