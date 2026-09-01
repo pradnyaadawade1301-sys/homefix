@@ -559,10 +559,10 @@ func (r *BookingRepository) UpsertEstimate(ctx context.Context, bookingID string
 
 	var estimateID string
 	err = tx.QueryRow(ctx, `
-		INSERT INTO booking_estimates (booking_id, status, total, note)
+		INSERT INTO booking_estimates (booking_id, status, total_amount, note)
 		VALUES ($1, 'pending', $2, $3)
 		ON CONFLICT (booking_id) DO UPDATE
-			SET status = 'pending', total = EXCLUDED.total, note = EXCLUDED.note, updated_at = now()
+			SET status = 'pending', total_amount = EXCLUDED.total_amount, note = EXCLUDED.note, updated_at = now()
 		RETURNING id
 	`, bookingID, total, note).Scan(&estimateID)
 	if err != nil {
@@ -591,7 +591,7 @@ func (r *BookingRepository) UpsertEstimate(ctx context.Context, bookingID string
 func (r *BookingRepository) GetEstimate(ctx context.Context, bookingID string) (*models.BookingEstimate, error) {
 	var e models.BookingEstimate
 	err := r.db.QueryRow(ctx, `
-		SELECT id, booking_id, status, total, COALESCE(note,''), created_at, updated_at
+		SELECT id, booking_id, status, total_amount, COALESCE(note,''), created_at, updated_at
 		FROM booking_estimates WHERE booking_id = $1
 	`, bookingID).Scan(&e.ID, &e.BookingID, &e.Status, &e.Total, &e.Note, &e.CreatedAt, &e.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
