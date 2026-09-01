@@ -29,12 +29,22 @@ type Consultation struct {
 	// DeclineReason is set when a technician declines a scheduled slot (or
 	// rejects an instant request) and explains why — surfaced to the customer
 	// so "declined" isn't a dead end with no context. Nil for every other status.
-	DeclineReason *string    `json:"decline_reason,omitempty"`
-	ScheduledAt   *time.Time `json:"scheduled_at,omitempty"` // nil = instant ("Consult Now")
-	StartedAt     *time.Time `json:"started_at,omitempty"`
-	EndedAt       *time.Time `json:"ended_at,omitempty"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	DeclineReason *string `json:"decline_reason,omitempty"`
+
+	// Post-call recommendation — set by ConsultationService.RecommendOnsite
+	// once the technician sends their simple problem+price summary after the
+	// call ends. RecommendationStatus is nil until a recommendation is sent,
+	// then "pending" -> "accepted" (via Escalate) or "declined".
+	RecommendationSummary *string    `json:"recommendation_summary,omitempty"`
+	RecommendationPrice   *float64   `json:"recommendation_price,omitempty"`
+	RecommendationStatus  *string    `json:"recommendation_status,omitempty"`
+	RecommendationSentAt  *time.Time `json:"recommendation_sent_at,omitempty"`
+
+	ScheduledAt *time.Time `json:"scheduled_at,omitempty"` // nil = instant ("Consult Now")
+	StartedAt   *time.Time `json:"started_at,omitempty"`
+	EndedAt     *time.Time `json:"ended_at,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 // ConsultationWithDetails adds the display info the app actually renders: which

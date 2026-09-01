@@ -147,6 +147,8 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.POST("/consultations/:id/cancel", h.Consultation.Cancel)
 		authed.POST("/consultations/:id/accept", middleware.RequireRole("technician"), h.Consultation.Accept)
 		authed.POST("/consultations/:id/reject", middleware.RequireRole("technician"), h.Consultation.Reject)
+		authed.POST("/consultations/:id/recommend-onsite", middleware.RequireRole("technician"), h.Consultation.RecommendOnsite)
+		authed.POST("/consultations/:id/recommend-onsite/decline", h.Consultation.DeclineRecommendation)
 		authed.POST("/consultations/:id/start", h.Consultation.Start)
 		authed.POST("/consultations/:id/end", h.Consultation.End)
 		authed.POST("/consultations/:id/payment", h.Consultation.Pay)

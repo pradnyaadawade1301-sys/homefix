@@ -38,7 +38,9 @@ func (r *ConsultationRepository) Create(ctx context.Context, customerID, categor
 func (r *ConsultationRepository) GetByID(ctx context.Context, id string) (*models.Consultation, error) {
 	row := r.db.QueryRow(ctx, `
 		SELECT id, customer_id, technician_id, category_id, status, fee, duration_seconds,
-		       payment_status, escalated_booking_id, decline_reason, scheduled_at, started_at, ended_at, created_at, updated_at
+		       payment_status, escalated_booking_id, decline_reason,
+		       recommendation_summary, recommendation_price, recommendation_status, recommendation_sent_at,
+		       scheduled_at, started_at, ended_at, created_at, updated_at
 		FROM consultations WHERE id = $1
 	`, id)
 	c, err := scanConsultation(row)
@@ -54,6 +56,7 @@ func (r *ConsultationRepository) GetWithDetails(ctx context.Context, id string) 
 	row := r.db.QueryRow(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
 		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason,
+		       co.recommendation_summary, co.recommendation_price, co.recommendation_status, co.recommendation_sent_at,
 		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''),
 		       COALESCE(tu.name, ''), COALESCE(tu.phone, '')
@@ -69,6 +72,7 @@ func (r *ConsultationRepository) GetWithDetails(ctx context.Context, id string) 
 	err := row.Scan(
 		&d.ID, &d.CustomerID, &d.TechnicianID, &d.CategoryID, &d.Status, &d.Fee,
 		&d.DurationSeconds, &d.PaymentStatus, &d.EscalatedBookingID, &d.DeclineReason,
+		&d.RecommendationSummary, &d.RecommendationPrice, &d.RecommendationStatus, &d.RecommendationSentAt,
 		&d.ScheduledAt, &d.StartedAt, &d.EndedAt, &d.CreatedAt, &d.UpdatedAt,
 		&d.CategoryName, &d.CustomerName, &d.CustomerPhone, &d.TechnicianName, &d.TechnicianPhone,
 	)
@@ -158,6 +162,28 @@ func (r *ConsultationRepository) SetEscalatedBooking(ctx context.Context, id, bo
 	return err
 }
 
+// SetRecommendation stores the technician's post-call "here's what I found and
+// what it'll cost" note and flips recommendation_status to "pending" so the
+// customer sees an Accept/Decline prompt. sentAt is set to now() here rather
+// than left to the caller so it always reflects when the DB write actually
+// happened.
+func (r *ConsultationRepository) SetRecommendation(ctx context.Context, id, summary string, price *float64) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE consultations
+		SET recommendation_summary = $2, recommendation_price = $3, recommendation_status = 'pending',
+		    recommendation_sent_at = now(), updated_at = now()
+		WHERE id = $1
+	`, id, summary, price)
+	return err
+}
+
+// UpdateRecommendationStatus moves a pending recommendation to "accepted" (see
+// ConsultationService.Escalate) or "declined" (see DeclineRecommendation).
+func (r *ConsultationRepository) UpdateRecommendationStatus(ctx context.Context, id, status string) error {
+	_, err := r.db.Exec(ctx, `UPDATE consultations SET recommendation_status = $2, updated_at = now() WHERE id = $1`, id, status)
+	return err
+}
+
 // Cancel is the customer giving up while still searching/ringing/scheduled/confirmed
 // for a technician. Once a technician has accepted (or later), the customer must end
 // the call properly instead of silently cancelling it.
@@ -190,6 +216,7 @@ func (r *ConsultationRepository) ListUpcomingForTechnician(ctx context.Context, 
 	rows, err := r.db.Query(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
 		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason,
+		       co.recommendation_summary, co.recommendation_price, co.recommendation_status, co.recommendation_sent_at,
 		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''), '', ''
 		FROM consultations co
@@ -256,6 +283,7 @@ func (r *ConsultationRepository) ListForCustomer(ctx context.Context, customerID
 	rows, err := r.db.Query(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
 		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason,
+		       co.recommendation_summary, co.recommendation_price, co.recommendation_status, co.recommendation_sent_at,
 		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''),
 		       COALESCE(tu.name, ''), COALESCE(tu.phone, '')
@@ -302,6 +330,7 @@ func (r *ConsultationRepository) listForTechnicianByStatus(ctx context.Context, 
 	rows, err := r.db.Query(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
 		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason,
+		       co.recommendation_summary, co.recommendation_price, co.recommendation_status, co.recommendation_sent_at,
 		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''), '', ''
 		FROM consultations co
@@ -324,6 +353,7 @@ func scanConsultationRows(rows pgx.Rows) ([]models.ConsultationWithDetails, erro
 		if err := rows.Scan(
 			&d.ID, &d.CustomerID, &d.TechnicianID, &d.CategoryID, &d.Status, &d.Fee,
 			&d.DurationSeconds, &d.PaymentStatus, &d.EscalatedBookingID, &d.DeclineReason,
+			&d.RecommendationSummary, &d.RecommendationPrice, &d.RecommendationStatus, &d.RecommendationSentAt,
 			&d.ScheduledAt, &d.StartedAt, &d.EndedAt, &d.CreatedAt, &d.UpdatedAt,
 			&d.CategoryName, &d.CustomerName, &d.CustomerPhone, &d.TechnicianName, &d.TechnicianPhone,
 		); err != nil {
@@ -339,6 +369,7 @@ func scanConsultation(row pgx.Row) (*models.Consultation, error) {
 	err := row.Scan(
 		&c.ID, &c.CustomerID, &c.TechnicianID, &c.CategoryID, &c.Status, &c.Fee,
 		&c.DurationSeconds, &c.PaymentStatus, &c.EscalatedBookingID, &c.DeclineReason,
+		&c.RecommendationSummary, &c.RecommendationPrice, &c.RecommendationStatus, &c.RecommendationSentAt,
 		&c.ScheduledAt, &c.StartedAt, &c.EndedAt, &c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {

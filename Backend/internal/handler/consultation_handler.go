@@ -101,6 +101,42 @@ func (h *ConsultationHandler) Reject(c *gin.Context) {
 	utils.Success(c, http.StatusOK, gin.H{"status": "rejected"})
 }
 
+// RecommendOnsite - POST /consultations/:id/recommend-onsite. Technician sends a
+// simple problem-summary + optional suggested price right after the call ends.
+// The customer sees this and can Accept (-> Escalate, creates a booking) or
+// Decline (-> DeclineRecommendation) it.
+func (h *ConsultationHandler) RecommendOnsite(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var body struct {
+		Summary string   `json:"summary" binding:"required"`
+		Price   *float64 `json:"price"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	result, err := h.consultSvc.RecommendOnsiteByUser(c.Request.Context(), c.Param("id"), userID, body.Summary, body.Price)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, result)
+}
+
+// DeclineRecommendation - POST /consultations/:id/recommend-onsite/decline.
+// Customer declines the technician's post-call recommendation; no booking is
+// created.
+func (h *ConsultationHandler) DeclineRecommendation(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if err := h.consultSvc.DeclineRecommendation(c.Request.Context(), c.Param("id"), userID); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"status": "declined"})
+}
+
 // ConfirmScheduled - POST /consultations/:id/confirm-scheduled. Technician confirms
 // they can hold a "Schedule for later" slot ahead of time — distinct from Accept,
 // which is for a live incoming call. Nobody is connected yet; this just locks in

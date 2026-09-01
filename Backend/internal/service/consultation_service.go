@@ -447,6 +447,77 @@ func (s *ConsultationService) Rate(ctx context.Context, consultationID, customer
 // into a real booking for the SAME technician (reusing the normal booking-creation
 // path, so it shows up in the technician's job list exactly like any other booking),
 // and links the two records together.
+// RecommendOnsite is the technician sending a simple "here's what I found and
+// what it'll cost" note right after the call ends, instead of the call just
+// hanging up with nothing further. Only the technician who was actually on
+// this call can send one, and only once the call has actually happened
+// (status must be "ended" or "in_call" — a stray recommend on a call that
+// never connected would be confusing on the customer's side).
+func (s *ConsultationService) RecommendOnsite(ctx context.Context, consultationID, technicianID, summary string, price *float64) (*models.ConsultationWithDetails, error) {
+	c, err := s.consultRepo.GetByID(ctx, consultationID)
+	if err != nil {
+		return nil, err
+	}
+	if c == nil {
+		return nil, errors.New("consultation not found")
+	}
+	if c.TechnicianID == nil || *c.TechnicianID != technicianID {
+		return nil, errors.New("this consultation was not offered to you")
+	}
+	if c.Status != "ended" && c.Status != "in_call" {
+		return nil, errors.New("can only send a recommendation for a call that has taken place")
+	}
+	if summary == "" {
+		return nil, errors.New("summary is required")
+	}
+	if err := s.consultRepo.SetRecommendation(ctx, consultationID, summary, price); err != nil {
+		return nil, err
+	}
+	// Notify the customer there's something waiting for their Accept/Decline —
+	// otherwise this just silently sits in the DB until they happen to reopen
+	// the call-ended screen on their own.
+	if s.fcm != nil {
+		_ = s.fcm.SendToUser(ctx, c.CustomerID, "Technician's recommendation is ready",
+			"Your technician sent a recommendation after the call. Review it to book a visit.",
+			map[string]string{"consultation_id": consultationID, "type": "consultation_recommendation"})
+	}
+	return s.consultRepo.GetWithDetails(ctx, consultationID)
+}
+
+// RecommendOnsiteByUser is the Send-button counterpart of RecommendOnsite,
+// resolving the logged-in technician's own profile server-side — mirrors
+// AcceptByUser/RejectByUser above.
+func (s *ConsultationService) RecommendOnsiteByUser(ctx context.Context, consultationID, userID, summary string, price *float64) (*models.ConsultationWithDetails, error) {
+	tech, err := s.techRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if tech == nil {
+		return nil, errors.New("technician profile not found")
+	}
+	return s.RecommendOnsite(ctx, consultationID, tech.ID, summary, price)
+}
+
+// DeclineRecommendation is the customer tapping [Decline] on the technician's
+// post-call recommendation — no booking gets created, and the recommendation
+// can't be re-accepted afterwards (they'd need a fresh call for that).
+func (s *ConsultationService) DeclineRecommendation(ctx context.Context, consultationID, customerID string) error {
+	c, err := s.consultRepo.GetByID(ctx, consultationID)
+	if err != nil {
+		return err
+	}
+	if c == nil {
+		return errors.New("consultation not found")
+	}
+	if c.CustomerID != customerID {
+		return errors.New("this consultation does not belong to you")
+	}
+	if c.RecommendationStatus == nil || *c.RecommendationStatus != "pending" {
+		return errors.New("there is no pending recommendation to decline")
+	}
+	return s.consultRepo.UpdateRecommendationStatus(ctx, consultationID, "declined")
+}
+
 func (s *ConsultationService) Escalate(ctx context.Context, consultationID, addressID, problemDescription string, scheduledAt *time.Time) (*models.Booking, error) {
 	c, err := s.consultRepo.GetByID(ctx, consultationID)
 	if err != nil {
@@ -456,6 +527,16 @@ func (s *ConsultationService) Escalate(ctx context.Context, consultationID, addr
 		return nil, errors.New("consultation not found")
 	}
 
+	// If the technician sent a post-call recommendation and the caller (the
+	// customer, accepting it) didn't type their own problem description,
+	// fall back to the technician's summary/price rather than creating a
+	// booking with an empty problem description or the plain category base
+	// price. Explicit values from the request always win, so a customer
+	// typing their own note still overrides the technician's summary.
+	if problemDescription == "" && c.RecommendationSummary != nil {
+		problemDescription = *c.RecommendationSummary
+	}
+
 	booking := &models.Booking{
 		CustomerID:         c.CustomerID,
 		CategoryID:         c.CategoryID,
@@ -463,6 +544,9 @@ func (s *ConsultationService) Escalate(ctx context.Context, consultationID, addr
 		TechnicianID:       c.TechnicianID,
 		ProblemDescription: problemDescription,
 		ScheduledAt:        scheduledAt, // nil = ASAP; set = customer picked a date/time slot
+	}
+	if c.RecommendationPrice != nil {
+		booking.EstimatedPrice = c.RecommendationPrice
 	}
 
 	var preferredTechnicianID string
@@ -475,6 +559,13 @@ func (s *ConsultationService) Escalate(ctx context.Context, consultationID, addr
 	}
 	if err := s.consultRepo.SetEscalatedBooking(ctx, consultationID, created.ID); err != nil {
 		return nil, err
+	}
+	// A pending recommendation being turned into a booking IS the "accept" —
+	// close it out so it can't also be separately declined afterwards.
+	if c.RecommendationStatus != nil && *c.RecommendationStatus == "pending" {
+		if err := s.consultRepo.UpdateRecommendationStatus(ctx, consultationID, "accepted"); err != nil {
+			return nil, err
+		}
 	}
 	return created, nil
 }
