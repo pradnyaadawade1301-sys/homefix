@@ -15,7 +15,6 @@ class ApiConfig {
   // static const String baseUrl = 'http://192.168.1.19:8090/api/v1'; // Real device via LAN Wi-Fi
   // static const String baseUrl = 'http://10.0.2.2:8090/api/v1'; // Android emulator
   static const String baseUrl = 'https://homefix-b61f.onrender.com/api/v1'; // Render production
-
   // Auth endpoints (backend: internal/router/router.go -> auth group)
   static const String authSignup = '/auth/signup';
   static const String authLogin = '/auth/login';
@@ -81,7 +80,8 @@ class ApiConfig {
   static const String consultationCancel = '/consultations'; // + /:id/cancel -> POST (customer, while searching)
   static const String consultationCall = '/consultations'; // + /:id/call -> GET {consultation, room_id, ice_servers}
   static const String consultationEnd = '/consultations'; // + /:id/end -> POST {status, duration_seconds, amount}
-  static const String consultationOnsite = '/consultations'; // + /:id/recommend-onsite -> POST (not yet backed — see escalate)
+  static const String consultationOnsite = '/consultations'; // + /:id/recommend-onsite -> POST (technician) {summary, price?}
+  static const String consultationRecommendDecline = '/consultations'; // + /:id/recommend-onsite/decline -> POST (customer)
   static const String consultationEscalate = '/consultations'; // + /:id/escalate -> POST {address_id, problem_description}
   static const String consultationPayment = '/consultations'; // + /:id/payment -> POST {payment_method}
   static const String consultationRating = '/consultations'; // + /:id/rating -> POST {rating, comment}

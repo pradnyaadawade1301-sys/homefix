@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../models/booking_model.dart';
+import '../../models/consultation_model.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/consultation_provider.dart';
 import '../home/technician_list_screen.dart';
 
-/// Shown right after a Live Video Consultation call ends. Lets the customer
-/// pick a date/time slot and address to turn the consultation into a real
-/// on-site booking with the same technician (POST /consultations/:id/escalate),
-/// or rate the call and leave without booking.
+/// Shown right after a Live Video Consultation call ends. If the technician
+/// sent a post-call recommendation (see TechnicianPostCallScreen), it's shown
+/// front-and-center with Accept/Decline. Either way, the customer can also
+/// pick a date/time slot and address themselves to turn the consultation
+/// into a real on-site booking with the same technician
+/// (POST /consultations/:id/escalate), or rate the call and leave without
+/// booking.
 class PostCallScreen extends StatefulWidget {
   final String consultationId;
   final String categoryId;
@@ -37,10 +41,80 @@ class _PostCallScreenState extends State<PostCallScreen> {
   bool _booked = false;
   int? _rating;
 
+  // The technician's post-call recommendation, if any — fetched separately
+  // from the addresses since it lives on the Consultation itself, not
+  // something this screen already had.
+  Consultation? _consultation;
+  bool _isLoadingRecommendation = true;
+  bool _isDecliningRecommendation = false;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => context.read<AddressProvider>().fetchAddresses());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AddressProvider>().fetchAddresses();
+      _loadRecommendation();
+    });
+  }
+
+  Future<void> _loadRecommendation() async {
+    try {
+      final consultation = await context.read<ConsultationProvider>().refreshStatus(widget.consultationId);
+      if (!mounted) return;
+      setState(() {
+        _consultation = consultation;
+        _isLoadingRecommendation = false;
+      });
+    } catch (_) {
+      // Non-fatal — the self-serve "Book Visit Slot" flow below still works
+      // without knowing about a recommendation.
+      if (mounted) setState(() => _isLoadingRecommendation = false);
+    }
+  }
+
+  Future<void> _declineRecommendation() async {
+    setState(() => _isDecliningRecommendation = true);
+    try {
+      await context.read<ConsultationProvider>().declineRecommendation(widget.consultationId);
+      if (!mounted) return;
+      setState(() {
+        _consultation = _consultation?.copyWith(recommendationStatus: 'declined');
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not decline: $e')));
+    } finally {
+      if (mounted) setState(() => _isDecliningRecommendation = false);
+    }
+  }
+
+  /// Accepting a recommendation books ASAP (no date/time picker needed —
+  /// that's what makes Accept faster than the manual "Book Visit Slot" flow
+  /// below) with just an address. The technician's summary/price are filled
+  /// in automatically server-side (see ConsultationService.Escalate falling
+  /// back to the recommendation when problemDescription/EstimatedPrice
+  /// aren't explicitly provided), so this doesn't need to resend them.
+  Future<void> _acceptRecommendation() async {
+    if (_selectedAddressId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select an address below, then tap Accept again')),
+      );
+      return;
+    }
+    setState(() => _isBooking = true);
+    try {
+      await context.read<ConsultationProvider>().escalateToBooking(
+            widget.consultationId,
+            addressId: _selectedAddressId!,
+          );
+      if (!mounted) return;
+      setState(() => _booked = true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not book the visit: $e')));
+    } finally {
+      if (mounted) setState(() => _isBooking = false);
+    }
   }
 
   @override
@@ -205,6 +279,40 @@ class _PostCallScreenState extends State<PostCallScreen> {
               ),
             ),
             const SizedBox(height: 18),
+            if (_isLoadingRecommendation) ...[
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Center(child: SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))),
+              ),
+            ] else if (_consultation?.hasPendingRecommendation == true) ...[
+              _RecommendationCard(
+                summary: _consultation!.recommendationSummary ?? '',
+                price: _consultation!.recommendationPrice,
+                isBooking: _isBooking,
+                isDeclining: _isDecliningRecommendation,
+                onAccept: _acceptRecommendation,
+                onDecline: _declineRecommendation,
+              ),
+              const SizedBox(height: 18),
+            ] else if (_consultation?.recommendationStatus == 'declined') ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(12)),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, size: 16, color: Colors.grey[600]),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'You declined the technician\'s recommendation. You can still book a visit slot yourself below.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+            ],
             const Text('How was the call?', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
             const SizedBox(height: 8),
             Row(
@@ -357,6 +465,106 @@ class _PostCallScreenState extends State<PostCallScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The technician's post-call recommendation, front-and-center with an
+/// Accept/Decline choice — this is the whole point of PostCallScreen when a
+/// recommendation exists, so it's styled to stand out from the plain
+/// self-serve "Book Visit Slot" flow below it.
+class _RecommendationCard extends StatelessWidget {
+  final String summary;
+  final double? price;
+  final bool isBooking;
+  final bool isDeclining;
+  final VoidCallback onAccept;
+  final VoidCallback onDecline;
+
+  const _RecommendationCard({
+    required this.summary,
+    required this.price,
+    required this.isBooking,
+    required this.isDeclining,
+    required this.onAccept,
+    required this.onDecline,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final busy = isBooking || isDeclining;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.25), width: 1.4),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.assignment_turned_in_outlined, size: 18, color: AppTheme.primaryColor),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text("Technician's recommendation",
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+              ),
+              if (price != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '~₹${price!.toStringAsFixed(0)}',
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppTheme.primaryColor),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(summary, style: const TextStyle(fontSize: 13.5, height: 1.4)),
+          const SizedBox(height: 4),
+          Text(
+            price != null
+                ? 'Suggested price for an on-site visit — the technician may confirm the final cost after inspecting.'
+                : 'The technician suggests an on-site visit to look into this further.',
+            style: TextStyle(fontSize: 11.5, color: Colors.grey[500]),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: busy ? null : onDecline,
+                  child: isDeclining
+                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Decline'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: busy ? null : onAccept,
+                  child: isBooking
+                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Accept & Book Visit'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Pick an address below, then tap Accept.',
+            style: TextStyle(fontSize: 11, color: Colors.grey[400]),
+          ),
+        ],
       ),
     );
   }

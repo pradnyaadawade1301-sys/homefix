@@ -64,6 +64,11 @@ class Consultation {
   // Why the technician declined/rejected — set only when status == rejected.
   // Shown to the customer so "declined" isn't a dead end with no explanation.
   final String? declineReason;
+  // Post-call recommendation — see ConsultationService.RecommendOnsite on the
+  // backend. Null status = no recommendation sent for this call yet.
+  final String? recommendationSummary;
+  final double? recommendationPrice;
+  final String? recommendationStatus; // pending | accepted | declined
   final DateTime createdAt;
 
   Consultation({
@@ -86,8 +91,16 @@ class Consultation {
     this.amount,
     this.paymentStatus,
     this.declineReason,
+    this.recommendationSummary,
+    this.recommendationPrice,
+    this.recommendationStatus,
     required this.createdAt,
   });
+
+  /// True while there's a technician recommendation the customer hasn't
+  /// responded to yet — drives whether PostCallScreen shows the Accept/
+  /// Decline card.
+  bool get hasPendingRecommendation => recommendationStatus == 'pending';
 
   factory Consultation.fromJson(Map<String, dynamic> json) {
     return Consultation(
@@ -113,6 +126,9 @@ class Consultation {
       amount: (json['amount'] as num?)?.toDouble(),
       paymentStatus: json['payment_status'] as String?,
       declineReason: json['decline_reason'] as String?,
+      recommendationSummary: json['recommendation_summary'] as String?,
+      recommendationPrice: (json['recommendation_price'] as num?)?.toDouble(),
+      recommendationStatus: json['recommendation_status'] as String?,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String) ?? DateTime.now()
           : DateTime.now(),
@@ -132,6 +148,9 @@ class Consultation {
     double? amount,
     String? paymentStatus,
     String? declineReason,
+    String? recommendationSummary,
+    double? recommendationPrice,
+    String? recommendationStatus,
   }) {
     return Consultation(
       id: id,
@@ -153,6 +172,9 @@ class Consultation {
       amount: amount ?? this.amount,
       paymentStatus: paymentStatus ?? this.paymentStatus,
       declineReason: declineReason ?? this.declineReason,
+      recommendationSummary: recommendationSummary ?? this.recommendationSummary,
+      recommendationPrice: recommendationPrice ?? this.recommendationPrice,
+      recommendationStatus: recommendationStatus ?? this.recommendationStatus,
       createdAt: createdAt,
     );
   }

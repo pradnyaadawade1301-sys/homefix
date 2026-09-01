@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'app.dart';
 import 'services/notification_service.dart';
@@ -15,14 +16,11 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
 
-  // Initialize Firebase and FCM
-  await fcmNotificationService.initialize();
+  FirebaseMessaging messaging = FirebaseMessaging.instance;
+  String? token = await messaging.getToken();
+  print("FCM TOKEN: $token");
 
-  // Set the background message handler (must be top-level function)
-  FirebaseMessaging.onBackgroundMessage(firebaseBackgroundMessageHandler);
-
-  debugPrint('[FCM] App starting with Firebase initialized');
-
-  runApp(const MyApp());
+  runApp(MyApp());
 }

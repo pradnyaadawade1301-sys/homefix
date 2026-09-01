@@ -186,6 +186,39 @@ class ConsultationProvider extends ChangeNotifier {
     }
   }
 
+  /// Technician: sends a simple post-call recommendation (problem summary +
+  /// optional suggested price) after the call ends. Updates [current] so
+  /// TechnicianPostCallScreen can show a "sent" confirmation.
+  Future<Consultation> sendRecommendation(String consultationId, {required String summary, double? price}) async {
+    try {
+      final consultation = await _consultationService.recommendOnsite(consultationId, summary: summary, price: price);
+      _current = consultation;
+      _error = null;
+      notifyListeners();
+      return consultation;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Customer: declines the technician's post-call recommendation.
+  Future<void> declineRecommendation(String consultationId) async {
+    try {
+      await _consultationService.declineRecommendation(consultationId);
+      if (_current?.id == consultationId) {
+        _current = _current!.copyWith(recommendationStatus: 'declined');
+      }
+      _error = null;
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   Future<void> rateConsultation(String consultationId, {required int rating, String? comment}) async {
     try {
       await _consultationService.rate(consultationId, rating: rating, comment: comment);

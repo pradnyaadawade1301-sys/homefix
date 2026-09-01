@@ -117,13 +117,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// Lets someone who skipped the first-launch Guided Tour (or just wants a
   /// refresher on how the app works) restart it from here.
   Future<void> _replayGuidedTour(BuildContext context) async {
-    // Clear the "already seen" flag up front — if the HomeScreen lookup below
-    // fails for any reason, the tour will still show automatically the next
-    // time HomeScreen builds, instead of silently doing nothing.
+    // Clear the "already seen" flag up front — if both lookups below fail,
+    // the tour will still show automatically next time the relevant home
+    // screen builds, instead of silently doing nothing.
     await GuidedTour.reset();
     if (!context.mounted) return;
 
-    // Normally Profile is one of HomeScreen's bottom-nav tabs, so it's
+    // Customer: Profile is one of HomeScreen's bottom-nav tabs, so it's
     // already inside the same widget tree as HomeScreenState — reuse that
     // instance so we don't rebuild Home from scratch under it.
     final homeState = context.findAncestorStateOfType<HomeScreenState>();
@@ -132,11 +132,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    // Fallback: Profile was opened as its own pushed screen (e.g. from a
-    // notification or deep link) rather than as a tab, so there's no
-    // HomeScreen above it to run the tour on. Pop back to the app's root
-    // screen — since the "seen" flag was just cleared, HomeScreen will kick
-    // the tour off itself the moment it's back on screen.
+    // Technician: unlike the customer's Profile tab, ProfileScreen here is
+    // PUSHED on top of TechnicianJobsScreen rather than nested inside its
+    // IndexedStack — so it's a previous route, not an ancestor, and
+    // findAncestorStateOfType can never find it. TechnicianJobsScreen keeps
+    // a GlobalKey around for exactly this kind of reach-back.
+    final techState = TechnicianJobsScreen.globalKey.currentState;
+    if (techState != null) {
+      Navigator.of(context).pop(); // back to the jobs screen first...
+      await techState.replayGuidedTour(); // ...then replay on that same instance.
+      return;
+    }
+
+    // Fallback: neither home screen instance is reachable (e.g. Profile was
+    // opened from a notification/deep link with no home screen underneath
+    // yet). Pop back to the app's root screen — since the "seen" flag was
+    // just cleared, it'll show the tour itself once it builds/re-initializes.
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 

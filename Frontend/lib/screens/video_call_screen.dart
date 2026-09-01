@@ -6,6 +6,7 @@ import '../providers/consultation_provider.dart';
 import '../services/signaling_service.dart';
 import '../services/webrtc_service.dart';
 import 'consultation/post_call_screen.dart';
+import 'consultation/technician_post_call_screen.dart';
 
 /// Actual video call UI - customer aur technician dono isi screen ko
 /// use karte hain, bas [isCaller] flag alag hota hai.
@@ -25,6 +26,10 @@ class VideoCallScreen extends StatefulWidget {
   final String? categoryId;
   final String? categoryName;
   final String? technicianName;
+  // Customer's display name — only set on the technician side (isCaller ==
+  // false) when opened from IncomingConsultationScreen, so
+  // TechnicianPostCallScreen can show "Send recommendation to <name>".
+  final String? customerName;
 
   const VideoCallScreen({
     super.key,
@@ -37,6 +42,7 @@ class VideoCallScreen extends StatefulWidget {
     this.categoryId,
     this.categoryName,
     this.technicianName,
+    this.customerName,
   });
 
   @override
@@ -212,14 +218,29 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       }
 
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(MaterialPageRoute(
-        builder: (_) => PostCallScreen(
-          consultationId: widget.consultationId!,
-          categoryId: widget.categoryId ?? '',
-          categoryName: widget.categoryName ?? '',
-          technicianName: widget.technicianName,
-        ),
-      ));
+
+      if (widget.isCaller) {
+        // Customer side.
+        Navigator.of(context).pushReplacement(MaterialPageRoute(
+          builder: (_) => PostCallScreen(
+            consultationId: widget.consultationId!,
+            categoryId: widget.categoryId ?? '',
+            categoryName: widget.categoryName ?? '',
+            technicianName: widget.technicianName,
+          ),
+        ));
+      } else {
+        // Technician side — previously just Navigator.pop()'d here with no
+        // way to tell the customer what was found on the call. Now opens a
+        // simple "send a recommendation" form instead.
+        Navigator.of(context).pushReplacement(MaterialPageRoute(
+          builder: (_) => TechnicianPostCallScreen(
+            consultationId: widget.consultationId!,
+            categoryName: widget.categoryName ?? '',
+            customerName: widget.customerName,
+          ),
+        ));
+      }
       return;
     }
 

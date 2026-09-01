@@ -146,6 +146,32 @@ class ConsultationService {
     }
   }
 
+  /// Technician: sends a simple post-call recommendation (problem summary +
+  /// optional suggested price) so the customer can Accept (-> Escalate,
+  /// creates a booking) or Decline it.
+  Future<Consultation> recommendOnsite(String id, {required String summary, double? price}) async {
+    try {
+      final response = await _httpClient.post(
+        '${ApiConfig.consultationOnsite}/$id/recommend-onsite',
+        data: {'summary': summary, if (price != null) 'price': price},
+      );
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return Consultation.fromJson(data);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Customer: declines the technician's post-call recommendation — no
+  /// booking is created.
+  Future<void> declineRecommendation(String id) async {
+    try {
+      await _httpClient.post('${ApiConfig.consultationRecommendDecline}/$id/recommend-onsite/decline');
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
   /// Customer: turns a finished consultation into a real booking (optionally
   /// with a scheduled date/time slot) for the same technician — this is the
   /// "on-site visit" / "book a slot" step after a video call.
