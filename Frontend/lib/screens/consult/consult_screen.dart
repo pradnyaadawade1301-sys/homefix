@@ -355,7 +355,38 @@ class _VideoRow extends StatelessWidget {
                   ),
                 ],
               ),
-              if (helper != null) ...[
+                         if (consultation.hasPendingRecommendation) ...[
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.25)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.assignment_turned_in_outlined, size: 18, color: AppTheme.primaryColor),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'New recommendation from your technician — tap to review',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.primaryColor),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text('NEW', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else if (helper != null) ...[
                 const SizedBox(height: 10),
                 Container(
                   width: double.infinity,

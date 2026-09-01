@@ -16,6 +16,7 @@ import 'repeat_technicians_screen.dart';
 import '../consult/consult_screen.dart';
 import '../issue/issue_details_screen.dart';
 import '../../widgets/guided_tour.dart';
+import 'package:flutter/services.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -26,6 +27,7 @@ class HomeScreen extends StatefulWidget {
 
 class HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  DateTime? _lastBackPressTime;
 
   // One GlobalKey per bottom-nav destination so the Guided Tour can find each
   // icon's real on-screen position (see widgets/guided_tour.dart) — no
@@ -46,12 +48,11 @@ class HomeScreenState extends State<HomeScreen> {
 
  static const _navItems = [
   _NavItemData(icon: Icons.home_rounded, label: 'Home'),
-  _NavItemData(icon: Icons.history_rounded, label: 'History'),
-  _NavItemData(icon: Icons.psychology_outlined, label: 'AI Assessment'),
-  _NavItemData(icon: Icons.chat_bubble_outline_rounded, label: 'Consult'),
+  _NavItemData(icon: Icons.history_rounded, label: 'Booking'),
+  _NavItemData(icon: Icons.psychology_outlined, label: 'AI'),
+  _NavItemData(icon: Icons.chat_bubble_outline_rounded, label: 'Chat'),
   _NavItemData(icon: Icons.person_rounded, label: 'Profile'),
 ];
-
   @override
   void initState() {
     super.initState();
@@ -119,13 +120,40 @@ class HomeScreenState extends State<HomeScreen> {
     await _startGuidedTourIfNeeded(force: true);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
+  Future<bool> _onWillPop() async {
+  if (_selectedIndex != 0) {
+    setState(() => _selectedIndex = 0);
+    return false;
+  }
+  final now = DateTime.now();
+  if (_lastBackPressTime == null || now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+    _lastBackPressTime = now;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Press back again to exit'), duration: Duration(seconds: 2)),
+    );
+    return false;
+  }
+  return true;
+}
+
+@override
+Widget build(BuildContext context) {
+  return PopScope(
+    canPop: false,
+    onPopInvokedWithResult: (didPop, result) async {
+      if (didPop) return;
+      final shouldPop = await _onWillPop();
+      if (shouldPop && mounted) {
+        Navigator.of(context).maybePop();
+        SystemNavigator.pop();
+      }
+    },
+    child: Scaffold(
       body: IndexedStack(index: _selectedIndex, children: _tabs),
       bottomNavigationBar: _buildBottomNav(),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildBottomNav() {
     return Container(
