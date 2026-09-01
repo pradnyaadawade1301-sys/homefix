@@ -24,6 +24,7 @@ dependencies:
   # Authentication & Security
   flutter_secure_storage: ^10.3.1
   jwt_decoder: ^2.0.1
+  video_player: ^2.9.2
 
   # WebRTC & Calling
   # True peer-to-peer video call for Live Consultation (lib/screens/consultation/):

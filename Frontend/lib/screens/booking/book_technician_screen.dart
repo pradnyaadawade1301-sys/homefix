@@ -21,6 +21,8 @@ class BookTechnicianScreen extends StatefulWidget {
   final String? problemDescription;
   final Technician? preferredTechnician;
 
+
+
   const BookTechnicianScreen({
     Key? key,
     required this.categoryId,
@@ -42,8 +44,7 @@ const List<_TimeSlot> _timeSlots = [
   _TimeSlot('11 AM – 1 PM', 11),
   _TimeSlot('2 PM – 4 PM', 14),
   _TimeSlot('4 PM – 6 PM', 16),
-];
-
+]; 
 class _TimeSlot {
   final String label;
   final int startHour;

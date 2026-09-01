@@ -518,7 +518,7 @@ func (s *ConsultationService) DeclineRecommendation(ctx context.Context, consult
 	return s.consultRepo.UpdateRecommendationStatus(ctx, consultationID, "declined")
 }
 
-func (s *ConsultationService) Escalate(ctx context.Context, consultationID, addressID, problemDescription string, scheduledAt *time.Time) (*models.Booking, error) {
+func (s *ConsultationService) Escalate(ctx context.Context, consultationID, addressID, problemDescription, notes string, scheduledAt *time.Time) (*models.Booking, error) {
 	c, err := s.consultRepo.GetByID(ctx, consultationID)
 	if err != nil {
 		return nil, err
@@ -543,7 +543,8 @@ func (s *ConsultationService) Escalate(ctx context.Context, consultationID, addr
 		AddressID:          addressID,
 		TechnicianID:       c.TechnicianID,
 		ProblemDescription: problemDescription,
-		ScheduledAt:        scheduledAt, // nil = ASAP; set = customer picked a date/time slot
+		ScheduledAt:        scheduledAt,
+		Notes:              &notes, // nil = ASAP; set = customer picked a date/time slot
 	}
 	if c.RecommendationPrice != nil {
 		booking.EstimatedPrice = c.RecommendationPrice
