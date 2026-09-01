@@ -55,7 +55,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           if (provider.isLoading && provider.categories.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
-          final categories = provider.categories.where((c) => c.name != 'Refrigerator').toList();
+          final categories = provider.categories.where((c) => c.name != 'Refrigerator' && c.name != 'Roofer').toList();
           if (categories.isEmpty) {
             return Center(
               child: Text(

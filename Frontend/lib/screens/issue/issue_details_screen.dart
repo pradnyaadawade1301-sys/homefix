@@ -5,21 +5,31 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:video_player/video_player.dart';
 import '../../core/theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/ai_provider.dart';
 import '../../providers/booking_provider.dart';
+import '../../providers/category_provider.dart';
 import '../../services/service_locator.dart';
 import 'ai_diagnosis_screen.dart';
 
 /// Step 3 of the customer flow ("ServiceSelection" -> Issue Details Screen):
 /// title, description, multiple images, optional voice note. On submit, opens
 /// an AI Diagnosis chat session seeded with this issue (step 4).
+///
+/// [categoryId]/[categoryName] are optional: when the caller already knows
+/// the category (tapping a category card elsewhere in the app), pass both
+/// and the form opens straight away. When opened with neither — e.g. the
+/// bottom-nav "AI Assessment" tab, which has no category context yet — this
+/// screen shows an inline category dropdown at the top of the very same form
+/// instead of requiring a separate picker screen first. Either way it's the
+/// exact same screen and the exact same flow into [AIDiagnosisScreen].
 class IssueDetailsScreen extends StatefulWidget {
-  final String categoryId;
-  final String categoryName;
+  final String? categoryId;
+  final String? categoryName;
 
-  const IssueDetailsScreen({Key? key, required this.categoryId, required this.categoryName}) : super(key: key);
+  const IssueDetailsScreen({Key? key, this.categoryId, this.categoryName}) : super(key: key);
 
   @override
   State<IssueDetailsScreen> createState() => _IssueDetailsScreenState();
@@ -33,8 +43,13 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
   final List<File> _videos = [];
   bool _isUploading = false;
 
-  // Guided questions — quick chip-style answers that fold into the Job
-  // Brief the technician sees before Accept (see JobBrief in booking_model).
+  String? _selectedCategoryId;
+  String? _selectedCategoryName;
+
+  bool get _needsCategoryPicker => widget.categoryId == null;
+  String? get _categoryId => widget.categoryId ?? _selectedCategoryId;
+  String? get _categoryName => widget.categoryName ?? _selectedCategoryName;
+
   static const _startedOptions = ['Today', '1-2 days', '3-7 days', 'Over a week'];
   String? _startedWhen;
   bool? _isContinuous;
@@ -42,7 +57,6 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
   bool _isEmergency = false;
   final _unusualSignsController = TextEditingController();
 
-  // Voice recording state.
   final _audioRecorder = AudioRecorder();
   bool _isRecording = false;
   bool _isTranscribing = false;
@@ -50,13 +64,89 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
   Duration _recordingElapsed = Duration.zero;
   Timer? _recordingTicker;
 
-  Future<void> _pickImage(ImageSource source) async {
-    if (_images.length >= 5) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You can add up to 5 images')),
-      );
-      return;
+  static const int _maxImages = 5;
+  static const int _maxVideos = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_needsCategoryPicker) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final provider = context.read<CategoryProvider>();
+        if (provider.categories.isEmpty) provider.fetchCategories();
+      });
     }
+  }
+
+  bool get _canAddMore => _images.length < _maxImages || _videos.length < _maxVideos;
+
+  /// Single entry point for adding any media — replaces the old always-visible
+  /// "Camera" + "Gallery" boxes with one "+ Add" tile that opens a bottom
+  /// sheet of options. Options that are no longer available (e.g. video slot
+  /// already filled) are simply omitted rather than shown disabled.
+  Future<void> _openAddMediaSheet() async {
+    final canAddPhoto = _images.length < _maxImages;
+    final canAddVideo = _videos.length < _maxVideos;
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 16),
+              if (canAddPhoto) ...[
+                ListTile(
+                  leading: const Icon(Icons.camera_alt_outlined, color: AppTheme.primaryColor),
+                  title: const Text('Take a photo'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined, color: AppTheme.primaryColor),
+                  title: const Text('Choose from gallery'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+              ],
+              if (canAddVideo) ...[
+                ListTile(
+                  leading: const Icon(Icons.videocam_outlined, color: AppTheme.primaryColor),
+                  title: const Text('Record a video'),
+                  subtitle: const Text('Up to 2 minutes', style: TextStyle(fontSize: 11.5)),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _pickVideo(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.video_library_outlined, color: AppTheme.primaryColor),
+                  title: const Text('Choose video from gallery'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _pickVideo(ImageSource.gallery);
+                  },
+                ),
+              ],
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    if (_images.length >= _maxImages) return;
     final picked = await _picker.pickImage(source: source, imageQuality: 80);
     if (picked != null) {
       setState(() => _images.add(File(picked.path)));
@@ -67,15 +157,10 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
     setState(() => _images.removeAt(index));
   }
 
-  Future<void> _pickVideo() async {
-    if (_videos.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You can add up to 1 video')),
-      );
-      return;
-    }
+  Future<void> _pickVideo(ImageSource source) async {
+    if (_videos.isNotEmpty) return;
     final picked = await _picker.pickVideo(
-      source: ImageSource.camera,
+      source: source,
       maxDuration: const Duration(minutes: 2),
     );
     if (picked != null) {
@@ -87,9 +172,16 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
     setState(() => _videos.removeAt(index));
   }
 
+  void _openVideoPreview(File file) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black,
+      builder: (_) => _VideoPreviewDialog(file: file),
+    );
+  }
+
   Future<void> _toggleRecording() async {
     if (_isRecording) {
-      // Stop recording, then upload + transcribe.
       final path = await _audioRecorder.stop();
       _recordingTicker?.cancel();
       final elapsed = _recordingStartedAt != null ? DateTime.now().difference(_recordingStartedAt!) : Duration.zero;
@@ -100,10 +192,6 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
       });
       if (path == null) return;
 
-      // A recording under ~1 second is almost always an accidental tap
-      // rather than real speech, and is exactly what makes Whisper
-      // hallucinate unrelated text (e.g. "Thank you.") instead of failing
-      // cleanly — so catch it here before even uploading.
       if (elapsed < const Duration(milliseconds: 1000)) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -137,7 +225,6 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
       return;
     }
 
-    // Start recording — request mic permission implicitly via the record package.
     final hasPermission = await _audioRecorder.hasPermission();
     if (!hasPermission) {
       if (!mounted) return;
@@ -149,9 +236,6 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
 
     final dir = await getTemporaryDirectory();
     final filePath = '${dir.path}/voice_note_${DateTime.now().millisecondsSinceEpoch}.m4a';
-    // Explicit AAC-LC config at a healthy bitrate/sample rate — the record
-    // package's bare default can end up choosing a low-quality encoder on
-    // some Android devices, which also makes Whisper's output less reliable.
     await _audioRecorder.start(
       const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000, sampleRate: 44100),
       path: filePath,
@@ -165,9 +249,6 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
     setState(() => _isRecording = true);
   }
 
-  /// Server sends a clear, already-user-facing message for the "no real
-  /// speech in that clip" case (see ai_handler.go / groq_service.go) —
-  /// surface that as-is instead of a generic "Could not transcribe" wrapper.
   String _transcribeErrorMessage(Object e) {
     final message = e.toString().replaceFirst('Exception: ', '');
     if (message.toLowerCase().contains("couldn't hear any speech") ||
@@ -178,6 +259,15 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
   }
 
   Future<void> _continue() async {
+    final categoryId = _categoryId;
+    final categoryName = _categoryName;
+    if (categoryId == null || categoryName == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select what the issue is with')),
+      );
+      return;
+    }
+
     final title = _titleController.text.trim();
     final description = _descriptionController.text.trim();
     if (title.isEmpty) {
@@ -219,9 +309,6 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
     if (!mounted) return;
     setState(() => _isUploading = false);
 
-    // Fold guided-question answers into the pending Job Brief so the
-    // technician can see them later — done here rather than only at final
-    // booking-create time because this is the one place we know them.
     final brief = JobBrief(
       startedWhen: _startedWhen,
       isContinuous: _isContinuous,
@@ -236,15 +323,15 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
     bookingProvider.setPendingJobBriefImages(imageUrls);
 
     await context.read<AIProvider>().startWithIssue(
-          categoryId: widget.categoryId,
+          categoryId: categoryId,
           issueSummary: issueSummary.toString(),
         );
 
     if (!mounted) return;
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => AIDiagnosisScreen(
-        categoryId: widget.categoryId,
-        categoryName: widget.categoryName,
+        categoryId: categoryId,
+        categoryName: categoryName,
         problemDescription: '$title${description.isNotEmpty ? '\n$description' : ''}',
       ),
     ));
@@ -260,14 +347,122 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
     super.dispose();
   }
 
+  Widget _buildCategoryPicker() {
+    return Consumer<CategoryProvider>(
+      builder: (context, provider, _) {
+        final categories = provider.categories.where((c) => c.name != 'Refrigerator' && c.name != 'Roofer').toList();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("What's the issue with?", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              const SizedBox(height: 8),
+              if (provider.isLoading && categories.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                )
+              else
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedCategoryId,
+                  isExpanded: true,
+                  hint: const Text('Select a category'),
+                  decoration: const InputDecoration(border: OutlineInputBorder()),
+                  items: categories
+                      .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
+                      .toList(),
+                  onChanged: (value) {
+                    final cat = categories.where((c) => c.id == value).toList();
+                    setState(() {
+                      _selectedCategoryId = value;
+                      _selectedCategoryName = cat.isNotEmpty ? cat.first.name : null;
+                    });
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// A single media thumbnail (photo or video) with a clearly visible remove
+  /// button — a solid white-bordered circle sitting mostly outside the
+  /// thumbnail's corner, easy to tap and easy to see against any image.
+  Widget _mediaThumb({required Widget child, required VoidCallback onRemove, VoidCallback? onTap}) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 10, top: 6),
+      child: SizedBox(
+        width: 88,
+        height: 88,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            GestureDetector(
+              onTap: onTap,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(width: 80, height: 80, child: child),
+              ),
+            ),
+            Positioned(
+              top: -8,
+              right: -8,
+              child: GestureDetector(
+                onTap: onRemove,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.errorColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 4)],
+                  ),
+                  child: const Icon(Icons.close_rounded, color: Colors.white, size: 16),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _addMediaTile() {
+    return GestureDetector(
+      onTap: _openAddMediaSheet,
+      child: Container(
+        width: 80,
+        height: 80,
+        margin: const EdgeInsets.only(right: 10, top: 6),
+        decoration: BoxDecoration(
+          color: AppTheme.primaryColor.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.35)),
+        ),
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_circle_outline_rounded, color: AppTheme.primaryColor, size: 26),
+            SizedBox(height: 4),
+            Text('Add', style: TextStyle(color: AppTheme.primaryColor, fontSize: 11.5, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final title = _categoryName != null ? 'Describe your $_categoryName issue' : 'AI Assessment';
     return Scaffold(
-      appBar: AppBar(title: Text('Describe your ${widget.categoryName} issue')),
+      appBar: AppBar(title: Text(title)),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            if (_needsCategoryPicker) _buildCategoryPicker(),
             const Text('Issue title', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
             const SizedBox(height: 8),
             TextField(
@@ -359,132 +554,32 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Photos', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                Text('${_images.length}/5', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                const Text('Photos & Video', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                Text('${_images.length}/$_maxImages photos, ${_videos.length}/$_maxVideos video',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 11.5)),
               ],
             ),
             const SizedBox(height: 10),
             SizedBox(
-              height: 104,
+              height: 110,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
-                  ..._images.asMap().entries.map((e) => Padding(
-                        padding: const EdgeInsets.only(right: 10),
-                        child: Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.file(e.value, width: 80, height: 80, fit: BoxFit.cover),
-                            ),
-                            Positioned(
-                              top: -6,
-                              right: -6,
-                              child: GestureDetector(
-                                onTap: () => _removeImage(e.key),
-                                child: Container(
-                                  padding: const EdgeInsets.all(2),
-                                  decoration: const BoxDecoration(color: AppTheme.errorColor, shape: BoxShape.circle),
-                                  child: const Icon(Icons.close, color: Colors.white, size: 14),
-                                ),
-                              ),
-                            ),
-                          ],
+                  ..._images.asMap().entries.map((e) => _mediaThumb(
+                        child: Image.file(e.value, fit: BoxFit.cover),
+                        onRemove: () => _removeImage(e.key),
+                      )),
+                  ..._videos.asMap().entries.map((e) => _mediaThumb(
+                        onTap: () => _openVideoPreview(e.value),
+                        onRemove: () => _removeVideo(e.key),
+                        child: Container(
+                          color: Colors.black87,
+                          child: const Center(
+                            child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 34),
+                          ),
                         ),
                       )),
-                  if (_images.length < 5) ...[
-                    GestureDetector(
-                      onTap: () => _pickImage(ImageSource.camera),
-                      child: Container(
-                        width: 80,
-                        height: 80,
-                        margin: const EdgeInsets.only(right: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey[300]!, style: BorderStyle.solid),
-                        ),
-                        child: const Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.camera_alt_outlined, color: Colors.grey),
-                            SizedBox(height: 4),
-                            Text('Camera', style: TextStyle(color: Colors.grey, fontSize: 11)),
-                          ],
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => _pickImage(ImageSource.gallery),
-                      child: Container(
-                        width: 80,
-                        height: 80,
-                        margin: const EdgeInsets.only(right: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey[300]!, style: BorderStyle.solid),
-                        ),
-                        child: const Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.add_a_photo_outlined, color: Colors.grey),
-                            SizedBox(height: 4),
-                            Text('Gallery', style: TextStyle(color: Colors.grey, fontSize: 11)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                  ..._videos.asMap().entries.map((e) => Padding(
-                        padding: const EdgeInsets.only(right: 10),
-                        child: Stack(
-                          children: [
-                            Container(
-                              width: 80,
-                              height: 80,
-                              decoration: BoxDecoration(
-                                color: Colors.black87,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(Icons.play_circle_fill, color: Colors.white, size: 32),
-                            ),
-                            Positioned(
-                              top: -6,
-                              right: -6,
-                              child: GestureDetector(
-                                onTap: () => _removeVideo(e.key),
-                                child: Container(
-                                  padding: const EdgeInsets.all(2),
-                                  decoration: const BoxDecoration(color: AppTheme.errorColor, shape: BoxShape.circle),
-                                  child: const Icon(Icons.close, color: Colors.white, size: 14),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )),
-                  if (_videos.isEmpty)
-                    GestureDetector(
-                      onTap: _pickVideo,
-                      child: Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey[300]!, style: BorderStyle.solid),
-                        ),
-                        child: const Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.videocam_outlined, color: Colors.grey),
-                            SizedBox(height: 4),
-                            Text('Video', style: TextStyle(color: Colors.grey, fontSize: 11)),
-                          ],
-                        ),
-                      ),
-                    ),
+                  if (_canAddMore) _addMediaTile(),
                 ],
               ),
             ),
@@ -527,6 +622,76 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Full-screen video preview — opened by tapping a video thumbnail. Simple
+/// tap-to-toggle playback with a close button; no scrubber/controls beyond
+/// that since these are short (<=2 min) attachment clips, not long-form video.
+class _VideoPreviewDialog extends StatefulWidget {
+  final File file;
+  const _VideoPreviewDialog({required this.file});
+
+  @override
+  State<_VideoPreviewDialog> createState() => _VideoPreviewDialogState();
+}
+
+class _VideoPreviewDialogState extends State<_VideoPreviewDialog> {
+  late final VideoPlayerController _controller;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.file(widget.file)
+      ..initialize().then((_) {
+        if (!mounted) return;
+        setState(() => _initialized = true);
+        _controller.play();
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.black,
+      insetPadding: const EdgeInsets.all(0),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          if (_initialized)
+            GestureDetector(
+              onTap: () => setState(() {
+                _controller.value.isPlaying ? _controller.pause() : _controller.play();
+              }),
+              child: AspectRatio(
+                aspectRatio: _controller.value.aspectRatio,
+                child: VideoPlayer(_controller),
+              ),
+            )
+          else
+            const CircularProgressIndicator(color: Colors.white),
+          Positioned(
+            top: 12,
+            right: 12,
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                child: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
