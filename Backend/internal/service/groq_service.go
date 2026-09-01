@@ -155,6 +155,9 @@ Guidelines:
   gas, structural, or physical part replacement should be "onsite".
 - estimated_cost_min/max should be realistic ranges in Indian Rupees for a home-service visit.
 - Never claim to be a licensed professional; you are a triage/estimation assistant only.
+- BE CONCISE: possible_fault must be one short phrase (under 10 words). Limit causes to at most 2
+  items, each a short phrase (under 8 words), not full sentences. Limit follow_up_questions to at
+  most 3 short, direct questions (under 12 words each). Do not repeat information across fields.
 - Output JSON only. Do not wrap it in backticks or add any explanation text.`
 
 // StartSession opens a new AI diagnosis session persisted in Postgres.
@@ -364,7 +367,7 @@ func (s *GroqService) TranscribeAudio(ctx context.Context, audioData []byte, fil
 		}
 
 		var result struct {
-			Text     string `json:"text"`
+			Text     string  `json:"text"`
 			Duration float64 `json:"duration"`
 			Segments []struct {
 				Text         string  `json:"text"`
