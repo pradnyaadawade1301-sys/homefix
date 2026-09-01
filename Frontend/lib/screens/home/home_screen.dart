@@ -194,6 +194,10 @@ class _HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin {
   final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
+  // Categories matching whatever's currently typed in the search bar — shown
+  // as a tappable dropdown right under the field, live as the user types.
+  List<Category> _searchSuggestions = [];
   late final AnimationController _bannerAnimController;
   late final Animation<double> _floatAnim;
   late final Animation<double> _sparkleAnim;
@@ -212,6 +216,11 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
     _sparkleAnim = Tween<double>(begin: 0.6, end: 1.0).animate(
       CurvedAnimation(parent: _bannerAnimController, curve: Curves.easeInOut),
     );
+    _searchController.addListener(_onSearchChanged);
+    // Rebuild on focus change too, so the suggestions dropdown hides itself
+    // the moment the field loses focus (e.g. user taps elsewhere), not just
+    // when the text changes.
+    _searchFocusNode.addListener(() => setState(() {}));
   }
 
   void _loadData() {
@@ -219,6 +228,24 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
     context.read<TechnicianProvider>().fetchTechnicians();
     context.read<LocationProvider>().resolveLocation();
     context.read<BookingProvider>().fetchRepeatTechnicians();
+  }
+
+  /// Filters the already-loaded categories list (no new API call) against
+  /// whatever's typed so far, live as the user types — e.g. typing "a"
+  /// surfaces "AC Repair", "Appliance Repair", etc.
+  void _onSearchChanged() {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      setState(() => _searchSuggestions = []);
+      return;
+    }
+    final categories = context.read<CategoryProvider>().categories;
+    setState(() {
+      _searchSuggestions = categories
+          .where((c) => c.isActive && c.name.toLowerCase().contains(query))
+          .take(5)
+          .toList();
+    });
   }
 
   void _openTechnicianList({String? categoryId, String? categoryName, String? initialQuery}) {
@@ -241,12 +268,24 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
 
   void _submitSearch(String value) {
     if (value.trim().isEmpty) return;
+    setState(() => _searchSuggestions = []);
     _openTechnicianList(initialQuery: value.trim());
+  }
+
+  /// Tapping a suggestion goes straight to that category's technician list —
+  /// same destination as tapping the category tile on the home grid.
+  void _selectSuggestion(Category cat) {
+    _searchController.text = cat.name;
+    _searchFocusNode.unfocus();
+    setState(() => _searchSuggestions = []);
+    _openTechnicianList(categoryId: cat.id, categoryName: cat.name);
   }
 
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _bannerAnimController.dispose();
     super.dispose();
   }
@@ -483,37 +522,78 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
   }
 
   Widget _buildSearchBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2E7D32), width: 1.4),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
-      ),
-      child: TextField(
-        controller: _searchController,
-        textInputAction: TextInputAction.search,
-        onSubmitted: _submitSearch,
-        decoration: InputDecoration(
-          hintText: 'Search service...',
-          hintStyle: TextStyle(color: Colors.grey[500]),
-          prefixIcon: Icon(Icons.search_rounded, color: Colors.grey[500]),
-          suffixIcon: GestureDetector(
-            onTap: _openCategories,
-            child: Container(
-              margin: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor,
-                borderRadius: BorderRadius.circular(10),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF2E7D32), width: 1.4),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
+          ),
+          child: TextField(
+            controller: _searchController,
+            focusNode: _searchFocusNode,
+            textInputAction: TextInputAction.search,
+            onSubmitted: _submitSearch,
+            style: const TextStyle(fontSize: 14),
+            decoration: InputDecoration(
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+              hintText: 'Search service...',
+              hintStyle: TextStyle(color: Colors.grey[500], fontSize: 14),
+              prefixIcon: GestureDetector(
+                onTap: () => _submitSearch(_searchController.text),
+                child: Icon(Icons.search_rounded, color: Colors.grey[500], size: 20),
               ),
-              child: const Icon(Icons.tune_rounded, color: Colors.white, size: 20),
+              prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 20),
+              suffixIcon: GestureDetector(
+                onTap: _openCategories,
+                child: Container(
+                  margin: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.tune_rounded, color: Colors.white, size: 18),
+                ),
+              ),
+              suffixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
             ),
           ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
         ),
-      ),
+        // --- Suggestions dropdown: only visible while focused, something's
+        // typed, and at least one category matches it. ---
+        if (_searchFocusNode.hasFocus && _searchSuggestions.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, 4))],
+            ),
+            child: ListView.separated(
+              shrinkWrap: true,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _searchSuggestions.length,
+              separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey[200]),
+              itemBuilder: (context, i) {
+                final cat = _searchSuggestions[i];
+                return ListTile(
+                  dense: true,
+                  leading: Icon(Icons.search_rounded, size: 18, color: Colors.grey[500]),
+                  title: Text(cat.name, style: const TextStyle(fontSize: 14)),
+                  onTap: () => _selectSuggestion(cat),
+                );
+              },
+            ),
+          ),
+      ],
     );
   }
 
@@ -567,24 +647,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // "Get 30% Off Today!" pill badge.
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF241C15),
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: RichText(
-                      text: const TextSpan(
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-                        children: [
-                          TextSpan(text: '🏷️ Get '),
-                          TextSpan(text: '30%', style: TextStyle(color: Color(0xFFFFC94A))),
-                          TextSpan(text: ' Off Today!'),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
+                 
                   // Heading — last line in white, rest in dark ink.
                   const Text.rich(
                     TextSpan(

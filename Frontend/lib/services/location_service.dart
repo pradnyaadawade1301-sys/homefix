@@ -12,6 +12,10 @@ class LocationResult {
   final String? address;
   final String? city;
   final String? state;
+  // Sublocality-level precision (e.g. "Vashi") from the free `geocoding`
+  // package — used for the header's "precise area" display instead of the
+  // paid Google Places API, which may not be configured (see PlacesService).
+  final String? area;
 
   LocationResult({
     this.latitude,
@@ -21,6 +25,7 @@ class LocationResult {
     this.address,
     this.city,
     this.state,
+    this.area,
   });
 
   bool get hasLocation => latitude != null && longitude != null;
@@ -30,7 +35,7 @@ class LocationResult {
   String toString() {
     return 'LocationResult(lat: $latitude, lng: $longitude, '
         'status: $status, address: $address, city: $city, state: $state, '
-        'error: $errorMessage)';
+        'area: $area, error: $errorMessage)';
   }
 }
 
@@ -69,7 +74,7 @@ class LocationService {
       }
 
       if (permission == loc.PermissionStatus.deniedForever) {
-        debugPrint('[LocationService] Permission denied forever — user must enable from system settings.');
+        debugPrint('[LocationService] Permission denied forever â€” user must enable from system settings.');
         return LocationStatus.deniedForever;
       }
 
@@ -142,7 +147,11 @@ class LocationService {
   }
 
   /// Reverse geocode latitude/longitude into a human-readable address.
-  /// Returns a map with [address], [city], [state] keys.
+  /// Returns a map with [address], [city], [state], [area] keys — [area] is
+  /// the sublocality (e.g. "Vashi"), the same level of precision the "Use
+  /// current location" button in Saved Addresses already shows, sourced from
+  /// the free `geocoding` package rather than the (possibly unconfigured)
+  /// Google Places API.
   Future<Map<String, String>> reverseGeocode(double latitude, double longitude) async {
     debugPrint('[LocationService] Reverse geocoding: lat=$latitude, lng=$longitude');
     try {
@@ -161,19 +170,22 @@ class LocationService {
 
         final city = pm.locality ?? pm.subAdministrativeArea ?? '';
         final state = pm.administrativeArea ?? '';
+        final area = pm.subLocality ?? '';
 
-        debugPrint('[LocationService] Reverse geocode result: address="$address", city="$city", state="$state"');
+        debugPrint('[LocationService] Reverse geocode result: address="$address", city="$city", '
+            'state="$state", area="$area"');
         return {
           'address': address,
           'city': city,
           'state': state,
+          'area': area,
         };
       }
       debugPrint('[LocationService] No placemarks found for coordinates.');
-      return {'address': '', 'city': '', 'state': ''};
+      return {'address': '', 'city': '', 'state': '', 'area': ''};
     } catch (e) {
       debugPrint('[LocationService] Reverse geocode error: $e');
-      return {'address': '', 'city': '', 'state': ''};
+      return {'address': '', 'city': '', 'state': '', 'area': ''};
     }
   }
 
@@ -197,7 +209,7 @@ class LocationService {
     // Step 2: GPS check
     bool gpsOn = await isGpsEnabled();
     if (!gpsOn) {
-      debugPrint('[LocationService] GPS is disabled — requesting user to enable...');
+      debugPrint('[LocationService] GPS is disabled â€” requesting user to enable...');
       gpsOn = await requestGpsEnabled();
       if (!gpsOn) {
         debugPrint('[LocationService] Location resolution failed: GPS still disabled after request.');
@@ -232,6 +244,7 @@ class LocationService {
       address: geocodeResult['address'],
       city: geocodeResult['city'],
       state: geocodeResult['state'],
+      area: geocodeResult['area'],
     );
   }
 
@@ -254,4 +267,3 @@ class LocationService {
     return 'GPS is disabled. Please enable location services to use this feature.';
   }
 }
-

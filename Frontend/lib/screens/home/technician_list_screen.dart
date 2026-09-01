@@ -109,21 +109,7 @@ class _TechnicianListScreenState extends State<TechnicianListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.categoryName ?? 'All Technicians'),
-        actions: [
-          if (widget.categoryId != null)
-            IconButton(
-              icon: const Icon(Icons.map_rounded),
-              tooltip: 'Show nearby on map',
-              onPressed: () {
-                Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => NearbyTechniciansScreen(
-                    categoryId: widget.categoryId!,
-                    categoryName: widget.categoryName ?? 'Technicians',
-                  ),
-                ));
-              },
-            ),
-        ],
+      
       ),
       body: Column(
         children: [

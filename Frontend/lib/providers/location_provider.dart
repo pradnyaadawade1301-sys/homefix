@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../services/location_service.dart';
-import '../services/places_service.dart';
 
 /// Provides the user's current location state to the entire app.
 ///
@@ -13,12 +12,6 @@ class LocationProvider extends ChangeNotifier {
 
   /// Current resolved location result (null until first resolution).
   LocationResult? _locationResult;
-
-  /// More specific area/sublocality from Google Places reverse geocoding
-  /// (e.g. "Sector 15, Vashi") — used in place of the generic city/state
-  /// display when available, matching the precision Saved Addresses already
-  /// gets via PlacesService.
-  String? _preciseArea;
 
   /// Whether a location resolution is currently in progress.
   bool _isResolving = false;
@@ -53,20 +46,32 @@ class LocationProvider extends ChangeNotifier {
   /// State name from reverse geocoding.
   String? get state => _locationResult?.state;
 
-  /// Short display: precise area (from Google Places) if available, otherwise
-  /// "City, State", otherwise "Set your location".
-  String get displayCityState {
-    if (_preciseArea != null && _preciseArea!.isNotEmpty) {
-      return _preciseArea!;
-    }
-    if (_locationResult?.city != null && _locationResult!.city!.isNotEmpty) {
-      if (_locationResult?.state != null && _locationResult!.state!.isNotEmpty) {
-        return '${_locationResult!.city!}, ${_locationResult!.state!}';
-      }
-      return _locationResult!.city!;
-    }
-    return 'Set your location';
-  }
+  /// Sublocality-level precision (e.g. "Vashi"), same field the "Use current
+  /// location" button in Saved Addresses already shows — sourced from the
+  /// free `geocoding` package, not the (possibly unconfigured) Places API.
+  String? get area => _locationResult?.area;
+
+  /// Short display: precise sublocality area (e.g. "Vashi") if the device's
+  /// reverse geocode returned one, otherwise "City, State", otherwise
+  /// "Set your location".
+ /// Short display: "Area, City" (e.g. "Vashi, Navi Mumbai") when both are
+/// available, falling back progressively to just area, or just "City,
+/// State", or "Set your location".
+String get displayCityState {
+  final area = _locationResult?.area;
+  final city = _locationResult?.city;
+  final state = _locationResult?.state;
+
+  final hasArea = area != null && area.isNotEmpty;
+  final hasCity = city != null && city.isNotEmpty;
+  final hasState = state != null && state.isNotEmpty;
+
+  if (hasArea && hasCity) return '$area, $city';
+  if (hasArea) return area;
+  if (hasCity && hasState) return '$city, $state';
+  if (hasCity) return city;
+  return 'Set your location';
+}
 
   /// Short display: "City" if available, otherwise full address or fallback.
   String get displayCity {
@@ -102,24 +107,6 @@ class LocationProvider extends ChangeNotifier {
       if (!hasLocation) {
         _lastError = _locationResult?.errorMessage ?? 'Could not determine your location.';
         debugPrint('[LocationProvider] Location resolution failed: $_lastError');
-      } else {
-        // Try to get a more precise area (sublocality/society level) via
-        // Google Places, same as Saved Addresses does — falls back silently
-        // to the plain city/state from LocationService if not configured or
-        // if the request fails.
-        _preciseArea = null;
-        try {
-          final placesService = PlacesService();
-          if (placesService.isConfigured) {
-            final details = await placesService.reverseGeocode(latitude!, longitude!);
-            if (details != null && details.line1.isNotEmpty) {
-              _preciseArea = details.line1;
-              debugPrint('[LocationProvider] Precise area: $_preciseArea');
-            }
-          }
-        } catch (e) {
-          debugPrint('[LocationProvider] Precise area lookup failed (non-fatal): $e');
-        }
       }
     } catch (e) {
       debugPrint('[LocationProvider] Unexpected error during location resolution: $e');
@@ -159,7 +146,7 @@ class LocationProvider extends ChangeNotifier {
     try {
       final enabled = await _locationService.requestGpsEnabled();
       if (enabled) {
-        // GPS just enabled — full resolution
+        // GPS just enabled â€” full resolution
         await resolveLocation();
       }
       return enabled;

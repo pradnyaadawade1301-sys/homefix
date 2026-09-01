@@ -33,9 +33,16 @@ func NewUploadHandler(uploadDir, publicBaseURL string) *UploadHandler {
 
 var allowedUploadExt = map[string]bool{
 	".jpg": true, ".jpeg": true, ".png": true, ".webp": true, ".pdf": true,
+	// Video — issue-report attachments (see Frontend IssueDetailsScreen,
+	// which records up to a 2-minute clip). .mp4/.m4v are Android's usual
+	// output, .mov is iOS's.
+	".mp4": true, ".mov": true, ".m4v": true, ".webm": true, ".3gp": true,
 }
 
-const maxUploadBytes = 10 << 20 // 10 MB
+// 10MB was fine for photos/PDFs alone, but a 2-minute camera video easily
+// exceeds that — 150MB comfortably covers a 2-minute clip at typical mobile
+// camera bitrates while still bounding worst-case abuse.
+const maxUploadBytes = 150 << 20 // 150 MB
 
 // Upload handles POST /api/v1/uploads (multipart/form-data, field name "file").
 // Used for technician government ID and profile photo uploads. Returns {"url": "..."}.
@@ -54,7 +61,7 @@ func (h *UploadHandler) Upload(c *gin.Context) {
 
 	ext := strings.ToLower(filepath.Ext(fileHeader.Filename))
 	if !allowedUploadExt[ext] {
-		utils.Error(c, http.StatusBadRequest, "unsupported file type (allowed: jpg, jpeg, png, webp, pdf)")
+		utils.Error(c, http.StatusBadRequest, "unsupported file type (allowed: jpg, jpeg, png, webp, pdf, mp4, mov, m4v, webm, 3gp)")
 		return
 	}
 
