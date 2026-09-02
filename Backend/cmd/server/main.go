@@ -87,7 +87,12 @@ func main() {
 	authService := service.NewAuthService(userRepo, mailService, cfg.JWTAccessSecret, cfg.JWTRefreshSecret, cfg.JWTAccessTTLMin, cfg.JWTRefreshTTLHrs, cfg.GoogleClientID)
 	userService := service.NewUserService(userRepo)
 	techService := service.NewTechnicianService(techRepo, catRepo, reviewRepo)
-	bookingService := service.NewBookingService(bookingRepo, catRepo, techRepo, paymentRepo, fcmService, razorpayService)
+	// NOTE: BookingService only takes fcm (5 params) — it does NOT take
+	// razorpayService. Payment/refund flows for bookings go through
+	// RazorpayService directly (see PaymentHandler), not through
+	// BookingService, so passing razorpayService here was a leftover extra
+	// argument that doesn't match NewBookingService's actual signature.
+	bookingService := service.NewBookingService(bookingRepo, catRepo, techRepo, paymentRepo, fcmService)
 	consultService := service.NewConsultationService(consultRepo, techRepo, bookingService, reviewRepo, fcmService)
 	walletService := service.NewWalletService(walletRepo)
 	reviewService := service.NewReviewService(reviewRepo, bookingRepo)

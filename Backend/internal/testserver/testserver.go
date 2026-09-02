@@ -60,7 +60,7 @@ func New(pool *pgxpool.Pool) *Server {
 	authService := service.NewAuthService(userRepo, service.NewMailService("", 0, "", "", ""), JWTAccessSecret, JWTRefreshSecret, 15, 720, "")
 	userService := service.NewUserService(userRepo)
 	techService := service.NewTechnicianService(techRepo, catRepo, reviewRepo)
-	bookingService := service.NewBookingService(bookingRepo, catRepo, techRepo, paymentRepo, nil, razorpayService)
+	bookingService := service.NewBookingService(bookingRepo, catRepo, techRepo, paymentRepo, nil)
 	consultService := service.NewConsultationService(consultRepo, techRepo, bookingService, reviewRepo, nil)
 	walletService := service.NewWalletService(walletRepo)
 	reviewService := service.NewReviewService(reviewRepo, bookingRepo)

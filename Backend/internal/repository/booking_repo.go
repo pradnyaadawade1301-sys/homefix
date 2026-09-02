@@ -163,6 +163,48 @@ func (r *BookingRepository) SetFinalPrice(ctx context.Context, bookingID string,
 	return err
 }
 
+// SetWarranty is only ever called from BookingService.Complete, after it has
+// already validated warrantyDays against the category's allowed options —
+// this is just the write, not where the "which durations are allowed" rule
+// lives. enabled=false always clears days/expiry, even if stale values were
+// somehow passed, so a booking can never end up "enabled but no expiry" or
+// vice versa.
+func (r *BookingRepository) SetWarranty(ctx context.Context, bookingID string, enabled bool, days *int) error {
+	if !enabled || days == nil {
+		_, err := r.db.Exec(ctx, `
+			UPDATE bookings
+			SET warranty_enabled = false, warranty_days = NULL, warranty_expires_at = NULL, updated_at = now()
+			WHERE id = $1
+		`, bookingID)
+		return err
+	}
+	_, err := r.db.Exec(ctx, `
+		UPDATE bookings
+		SET warranty_enabled = true, warranty_days = $2,
+		    warranty_expires_at = now() + make_interval(days => $2),
+		    updated_at = now()
+		WHERE id = $1
+	`, bookingID, *days)
+	return err
+}
+
+// SetVisitFeeRequired marks a booking as needing the ₹99 pre-visit inspection
+// fee before the technician can head out — called once, right when a
+// consultation is escalated into a booking (see ConsultationService.Escalate).
+func (r *BookingRepository) SetVisitFeeRequired(ctx context.Context, bookingID string, amount float64) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE bookings SET visit_fee_amount = $1, visit_fee_status = 'pending', updated_at = now() WHERE id = $2
+	`, amount, bookingID)
+	return err
+}
+
+// SetVisitFeeStatus moves the visit-fee status forward (pending -> paid on
+// verified payment, paid -> refunded on cancellation).
+func (r *BookingRepository) SetVisitFeeStatus(ctx context.Context, bookingID, status string) error {
+	_, err := r.db.Exec(ctx, `UPDATE bookings SET visit_fee_status = $1, updated_at = now() WHERE id = $2`, status, bookingID)
+	return err
+}
+
 func (r *BookingRepository) History(ctx context.Context, bookingID string) ([]models.BookingStatusHistory, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, booking_id, status, COALESCE(note,''), created_at
