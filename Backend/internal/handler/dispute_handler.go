@@ -71,9 +71,10 @@ func (h *DisputeHandler) AddEvidence(c *gin.Context) {
 }
 
 func (h *DisputeHandler) Get(c *gin.Context) {
-	d, evidence, err := h.svc.Get(c.Request.Context(), c.Param("id"))
+	userID := c.GetString("user_id")
+	d, evidence, err := h.svc.GetForUser(c.Request.Context(), c.Param("id"), userID)
 	if err != nil {
-		utils.Error(c, http.StatusInternalServerError, err.Error())
+		utils.Error(c, http.StatusForbidden, err.Error())
 		return
 	}
 	if d == nil {

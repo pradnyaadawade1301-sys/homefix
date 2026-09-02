@@ -64,7 +64,7 @@ func New(pool *pgxpool.Pool) *Server {
 	consultService := service.NewConsultationService(consultRepo, techRepo, bookingService, reviewRepo, nil)
 	walletService := service.NewWalletService(walletRepo)
 	reviewService := service.NewReviewService(reviewRepo, bookingRepo)
-	disputeService := service.NewDisputeService(disputeRepo, bookingRepo, razorpayService, paymentRepo)
+    disputeService := service.NewDisputeService(disputeRepo, bookingRepo, consultRepo, techRepo, razorpayService, paymentRepo)
 	inventoryService := service.NewInventoryService(inventoryRepo)
 	cmsService := service.NewCmsService(cmsRepo)
 	analyticsService := service.NewAnalyticsService(analyticsRepo)

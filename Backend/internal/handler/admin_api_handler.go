@@ -6,20 +6,22 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"homefix-backend/internal/repository"
+	"homefix-backend/internal/service"
 	"homefix-backend/internal/utils"
 )
 
 // AdminAPIHandler powers the new React Admin Panel — a JSON API, separate
 // from the older cookie-session /admin panel (internal/admin, still used for
-// the hidden ops tools: CMS, disputes, inventory). This handler only covers
-// the read surfaces the React Admin Panel needs: Dashboard, Orders,
-// Customers, Bookings, Technicians. All routes require role "admin" (see
-// router.go).
+// the hidden ops tools: CMS and inventory). This handler covers the read
+// surfaces the React Admin Panel needs: Dashboard, Orders, Customers,
+// Bookings, Technicians, and Disputes (view + resolve). All routes require
+// role "admin" (see router.go).
 type AdminAPIHandler struct {
 	userRepo       *repository.UserRepository
 	bookingRepo    *repository.BookingRepository
 	technicianRepo *repository.TechnicianRepository
 	paymentRepo    *repository.PaymentRepository
+	disputeService *service.DisputeService
 }
 
 func NewAdminAPIHandler(
@@ -27,12 +29,14 @@ func NewAdminAPIHandler(
 	bookingRepo *repository.BookingRepository,
 	technicianRepo *repository.TechnicianRepository,
 	paymentRepo *repository.PaymentRepository,
+	disputeService *service.DisputeService,
 ) *AdminAPIHandler {
 	return &AdminAPIHandler{
 		userRepo:       userRepo,
 		bookingRepo:    bookingRepo,
 		technicianRepo: technicianRepo,
 		paymentRepo:    paymentRepo,
+		disputeService: disputeService,
 	}
 }
 
@@ -79,6 +83,12 @@ func (h *AdminAPIHandler) Dashboard(c *gin.Context) {
 		}
 	}
 
+	openDisputes, err := h.disputeService.CountOpen(ctx)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
 	utils.Success(c, http.StatusOK, gin.H{
 		"total_customers":    len(customers),
 		"total_technicians":  len(technicians),
@@ -86,6 +96,7 @@ func (h *AdminAPIHandler) Dashboard(c *gin.Context) {
 		"active_bookings":    activeBookings,
 		"completed_bookings": completedBookings,
 		"total_revenue":      totalRevenue,
+		"open_disputes":      openDisputes,
 	})
 }
 
@@ -135,4 +146,54 @@ func (h *AdminAPIHandler) Technicians(c *gin.Context) {
 		return
 	}
 	utils.Success(c, http.StatusOK, technicians)
+}
+
+// Disputes — GET /admin/disputes?status=
+// Same read as the hidden /admin panel's dispute list (DisputeService.ListAll),
+// just returned as JSON for the React panel instead of rendered HTML.
+func (h *AdminAPIHandler) Disputes(c *gin.Context) {
+	status := c.Query("status")
+	disputes, err := h.disputeService.ListAll(c.Request.Context(), status)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, disputes)
+}
+
+// ResolveDispute — PATCH /admin/disputes/:id/resolve
+// Mirrors the hidden /admin panel's resolve action: status must be one of
+// resolved_refund | resolved_partial | resolved_rejected. refund_amount is
+// only required/used for the two refund outcomes.
+type resolveDisputeBody struct {
+	Status       string   `json:"status" binding:"required"`
+	AdminNotes   string   `json:"admin_notes"`
+	RefundAmount *float64 `json:"refund_amount"`
+}
+
+func (h *AdminAPIHandler) ResolveDispute(c *gin.Context) {
+	var body resolveDisputeBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	adminID := c.GetString("user_id")
+	d, err := h.disputeService.Resolve(c.Request.Context(), c.Param("id"), body.Status, body.AdminNotes, adminID, body.RefundAmount)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, d)
+}
+
+// ReviewDispute — PATCH /admin/disputes/:id/review
+// Marks a dispute "under_review" — the same first step available in the
+// hidden /admin panel, before an admin picks a final resolution.
+func (h *AdminAPIHandler) ReviewDispute(c *gin.Context) {
+	id := c.Param("id")
+	if err := h.disputeService.MarkUnderReview(c.Request.Context(), id); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"id": id, "status": "under_review"})
 }
