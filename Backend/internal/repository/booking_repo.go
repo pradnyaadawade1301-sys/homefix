@@ -33,22 +33,17 @@ func (r *BookingRepository) Create(ctx context.Context, b *models.Booking) (*mod
 	defer tx.Rollback(ctx)
 
 	err = tx.QueryRow(ctx, `
-		INSERT INTO bookings (customer_id, category_id, address_id, status, problem_description, notes, images, scheduled_at, estimated_price, is_warranty_claim, warranty_claim_of)
-		VALUES ($1,$2,$3,'requested',$4,$5,$6,$7,$8,$9,$10)
+		INSERT INTO bookings (customer_id, category_id, address_id, status, problem_description, notes, images, scheduled_at, estimated_price)
+		VALUES ($1,$2,$3,'requested',$4,$5,$6,$7,$8)
 		RETURNING id, status, payment_status, created_at, updated_at
 	`, b.CustomerID, b.CategoryID, b.AddressID, b.ProblemDescription, b.Notes, b.Images, b.ScheduledAt, b.EstimatedPrice,
-		b.IsWarrantyClaim, b.WarrantyClaimOf,
 	).Scan(&b.ID, &b.Status, &b.PaymentStatus, &b.CreatedAt, &b.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
 
-	note := "Booking created"
-	if b.IsWarrantyClaim {
-		note = "Warranty claim booking created"
-	}
 	_, err = tx.Exec(ctx, `INSERT INTO booking_status_history (booking_id, status, note) VALUES ($1,$2,$3)`,
-		b.ID, models.BookingRequested, note)
+		b.ID, models.BookingRequested, "Booking created")
 	if err != nil {
 		return nil, err
 	}
@@ -63,16 +58,10 @@ func (r *BookingRepository) GetByID(ctx context.Context, id string) (*models.Boo
 	var b models.Booking
 	err := r.db.QueryRow(ctx, `
 		SELECT id, customer_id, technician_id, category_id, address_id, status, payment_status,
-		       COALESCE(problem_description,''), notes, COALESCE(images, '{}'), scheduled_at, estimated_price, final_price, otp_code, otp_verified_at,
-		       visit_fee_amount, visit_fee_status,
-		       warranty_enabled, warranty_days, warranty_expires_at, is_warranty_claim, warranty_claim_of, service_code,
-		       created_at, updated_at
+		       COALESCE(problem_description,''), notes, COALESCE(images, '{}'), scheduled_at, estimated_price, final_price, otp_code, otp_verified_at, created_at, updated_at
 		FROM bookings WHERE id = $1
 	`, id).Scan(&b.ID, &b.CustomerID, &b.TechnicianID, &b.CategoryID, &b.AddressID, &b.Status, &b.PaymentStatus,
-		&b.ProblemDescription, &b.Notes, &b.Images, &b.ScheduledAt, &b.EstimatedPrice, &b.FinalPrice, &b.OTPCode, &b.OTPVerifiedAt,
-		&b.VisitFeeAmount, &b.VisitFeeStatus,
-		&b.WarrantyEnabled, &b.WarrantyDays, &b.WarrantyExpiresAt, &b.IsWarrantyClaim, &b.WarrantyClaimOf, &b.ServiceCode,
-		&b.CreatedAt, &b.UpdatedAt)
+		&b.ProblemDescription, &b.Notes, &b.Images, &b.ScheduledAt, &b.EstimatedPrice, &b.FinalPrice, &b.OTPCode, &b.OTPVerifiedAt, &b.CreatedAt, &b.UpdatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -119,23 +108,6 @@ func (r *BookingRepository) listByColumn(ctx context.Context, col, val string) (
 // reported a successful transaction.
 func (r *BookingRepository) SetPaymentStatus(ctx context.Context, bookingID, status string) error {
 	_, err := r.db.Exec(ctx, `UPDATE bookings SET payment_status = $1, updated_at = now() WHERE id = $2`, status, bookingID)
-	return err
-}
-
-// SetVisitFeeRequired marks a booking as needing the ₹99 pre-visit inspection
-// fee before the technician can head out — called once, right when a
-// consultation is escalated into a booking (see ConsultationService.Escalate).
-func (r *BookingRepository) SetVisitFeeRequired(ctx context.Context, bookingID string, amount float64) error {
-	_, err := r.db.Exec(ctx, `
-		UPDATE bookings SET visit_fee_amount = $1, visit_fee_status = 'pending', updated_at = now() WHERE id = $2
-	`, amount, bookingID)
-	return err
-}
-
-// SetVisitFeeStatus moves the visit-fee status forward (pending -> paid on
-// verified payment, paid -> refunded on cancellation).
-func (r *BookingRepository) SetVisitFeeStatus(ctx context.Context, bookingID, status string) error {
-	_, err := r.db.Exec(ctx, `UPDATE bookings SET visit_fee_status = $1, updated_at = now() WHERE id = $2`, status, bookingID)
 	return err
 }
 
@@ -188,31 +160,6 @@ func (r *BookingRepository) UpdateStatus(ctx context.Context, bookingID, status,
 
 func (r *BookingRepository) SetFinalPrice(ctx context.Context, bookingID string, price float64) error {
 	_, err := r.db.Exec(ctx, `UPDATE bookings SET final_price = $1, updated_at = now() WHERE id = $2`, price, bookingID)
-	return err
-}
-
-// SetWarranty is only ever called from BookingService.Complete, after it has
-// already validated warrantyDays against the category's allowed options —
-// this is just the write, not where the "which durations are allowed" rule
-// lives. enabled=false always clears days/expiry, even if stale values were
-// somehow passed, so a booking can never end up "enabled but no expiry" or
-// vice versa.
-func (r *BookingRepository) SetWarranty(ctx context.Context, bookingID string, enabled bool, days *int) error {
-	if !enabled || days == nil {
-		_, err := r.db.Exec(ctx, `
-			UPDATE bookings
-			SET warranty_enabled = false, warranty_days = NULL, warranty_expires_at = NULL, updated_at = now()
-			WHERE id = $1
-		`, bookingID)
-		return err
-	}
-	_, err := r.db.Exec(ctx, `
-		UPDATE bookings
-		SET warranty_enabled = true, warranty_days = $2,
-		    warranty_expires_at = now() + make_interval(days => $2),
-		    updated_at = now()
-		WHERE id = $1
-	`, bookingID, *days)
 	return err
 }
 
@@ -359,22 +306,18 @@ const detailedSelect = `
 	SELECT b.id, b.customer_id, b.technician_id, b.category_id, b.address_id, b.status,
 	       COALESCE(b.problem_description,''), b.notes, COALESCE(b.images, '{}'), b.scheduled_at, b.estimated_price, b.final_price,
 	       b.otp_code, b.otp_verified_at,
-	       b.visit_fee_amount, b.visit_fee_status,
-	       b.warranty_enabled, b.warranty_days, b.warranty_expires_at, b.is_warranty_claim, b.warranty_claim_of, b.service_code,
 	       b.created_at, b.updated_at,
 	       c.name AS category_name,
 	       a.label, a.line1, COALESCE(a.line2,''), a.city, a.state, a.pincode,
 	       cu.name AS customer_name, cu.phone AS customer_phone,
 	       t.id, COALESCE(tu.name,''), COALESCE(tu.phone,''),
-	       t.experience_years, t.rating_avg, t.rating_count, t.is_verified,
-	       ob.service_code
+	       t.experience_years, t.rating_avg, t.rating_count, t.is_verified
 	FROM bookings b
 	JOIN categories c ON c.id = b.category_id
 	JOIN addresses a ON a.id = b.address_id
 	JOIN users cu ON cu.id = b.customer_id
 	LEFT JOIN technicians t ON t.id = b.technician_id
 	LEFT JOIN users tu ON tu.id = t.user_id
-	LEFT JOIN bookings ob ON ob.id = b.warranty_claim_of
 `
 
 func scanBookingDetail(row pgx.Row) (*models.BookingDetail, error) {
@@ -391,15 +334,12 @@ func scanBookingDetail(row pgx.Row) (*models.BookingDetail, error) {
 		&d.ID, &d.CustomerID, &d.TechnicianID, &d.CategoryID, &d.AddressID, &d.Status,
 		&d.ProblemDescription, &d.Notes, &d.Images, &d.ScheduledAt, &d.EstimatedPrice, &d.FinalPrice,
 		&d.OTPCode, &d.OTPVerifiedAt,
-		&d.VisitFeeAmount, &d.VisitFeeStatus,
-		&d.WarrantyEnabled, &d.WarrantyDays, &d.WarrantyExpiresAt, &d.IsWarrantyClaim, &d.WarrantyClaimOf, &d.ServiceCode,
 		&d.CreatedAt, &d.UpdatedAt,
 		&d.CategoryName,
 		&addr.Label, &addr.Line1, &addr.Line2, &addr.City, &addr.State, &addr.Pincode,
 		&custName, &custPhone,
 		&techID, &techName, &techPhone,
 		&techExp, &techRating, &techRatingCount, &techVerified,
-		&d.WarrantyClaimOfServiceCode,
 	)
 	if err != nil {
 		return nil, err
