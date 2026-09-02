@@ -654,16 +654,29 @@ func (r *BookingRepository) SetEstimateStatus(ctx context.Context, bookingID, st
 }
 
 // --- Before/after service photos ---
-
+//
+// NOTE: the underlying table is `booking_job_photos` (see migration
+// 018_booking_job_photos.sql) — it also requires a technician_id (NOT NULL,
+// no default) and stores the URL in `image_url`, not `photo_url`. Both are
+// bridged here so the rest of the codebase can keep using the simpler
+// BookingServicePhoto shape (just booking/photo_url/photo_type).
 func (r *BookingRepository) AddServicePhoto(ctx context.Context, bookingID, photoURL, photoType string) (*models.BookingServicePhoto, error) {
+	var b models.Booking
+	if err := r.db.QueryRow(ctx, `SELECT technician_id FROM bookings WHERE id = $1`, bookingID).Scan(&b.TechnicianID); err != nil {
+		return nil, err
+	}
+	if b.TechnicianID == nil {
+		return nil, errors.New("cannot add a service photo before a technician is assigned to this booking")
+	}
+
 	var p models.BookingServicePhoto
 	p.BookingID = bookingID
 	p.PhotoURL = photoURL
 	p.PhotoType = photoType
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO booking_service_photos (booking_id, photo_url, photo_type)
-		VALUES ($1,$2,$3) RETURNING id, created_at
-	`, bookingID, photoURL, photoType).Scan(&p.ID, &p.CreatedAt)
+		INSERT INTO booking_job_photos (booking_id, technician_id, photo_type, image_url)
+		VALUES ($1,$2,$3,$4) RETURNING id, created_at
+	`, bookingID, *b.TechnicianID, photoType, photoURL).Scan(&p.ID, &p.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -672,8 +685,8 @@ func (r *BookingRepository) AddServicePhoto(ctx context.Context, bookingID, phot
 
 func (r *BookingRepository) ListServicePhotos(ctx context.Context, bookingID string) ([]models.BookingServicePhoto, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, booking_id, photo_url, photo_type, created_at
-		FROM booking_service_photos WHERE booking_id = $1 ORDER BY created_at ASC
+		SELECT id, booking_id, image_url, photo_type, created_at
+		FROM booking_job_photos WHERE booking_id = $1 ORDER BY created_at ASC
 	`, bookingID)
 	if err != nil {
 		return nil, err
