@@ -274,8 +274,8 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
   /// Mirrors the backend's own cancellation guard (see BookingService.Cancel):
   /// once the technician has actually started the job, or the booking is
   /// already completed/cancelled, there's nothing left to cancel.
-  bool _canCancel(String status) {
-    return !['in_progress', 'completed', 'cancelled'].contains(status);
+    bool _canCancel(String status) {
+    return status == 'requested' || status == 'accepted';
   }
 
   Widget _cancelBookingButton(BuildContext context, BookingProvider provider, Booking booking) {

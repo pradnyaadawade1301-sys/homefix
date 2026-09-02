@@ -125,6 +125,32 @@ class Booking {
   final BookingCustomerInfo? customer;
   final BookingTechnicianInfo? technician;
 
+  // --- Warranty (see backend migration 022) ---
+  // Set once, at completion, by the technician (if the category allows it —
+  // see Category.warrantyOptions).
+  final bool warrantyEnabled;
+  final int? warrantyDays;
+  final DateTime? warrantyExpiresAt;
+  // True only for a booking that WAS a warranty claim (created via "Claim
+  // Warranty" on the original booking) — not to be confused with
+  // warrantyEnabled, which is about whether THIS booking itself offers a
+  // warranty once completed.
+  final bool isWarrantyClaim;
+  final String? warrantyClaimOf;
+  // Human-readable service code of the original booking this one is a claim
+  // against (e.g. "SRV-001042") — only present when isWarrantyClaim is true,
+  // via the detail endpoint.
+  final String? warrantyClaimOfServiceCode;
+
+  /// True only when the customer can actually tap "Claim Warranty" right
+  /// now: warranty was offered, it hasn't expired, and this booking isn't
+  /// itself already a warranty claim (a claim can't be claimed again).
+  bool get canClaimWarranty =>
+      warrantyEnabled &&
+      !isWarrantyClaim &&
+      warrantyExpiresAt != null &&
+      warrantyExpiresAt!.isAfter(DateTime.now());
+
   Booking({
     required this.id,
     required this.customerId,
@@ -147,6 +173,12 @@ class Booking {
     this.address,
     this.customer,
     this.technician,
+    this.warrantyEnabled = false,
+    this.warrantyDays,
+    this.warrantyExpiresAt,
+    this.isWarrantyClaim = false,
+    this.warrantyClaimOf,
+    this.warrantyClaimOfServiceCode,
   });
 
   /// Price to display: final price once the job is done, otherwise the estimate.
@@ -208,6 +240,12 @@ class Booking {
       technician: json['technician'] != null
           ? BookingTechnicianInfo.fromJson(json['technician'] as Map<String, dynamic>)
           : null,
+      warrantyEnabled: json['warranty_enabled'] as bool? ?? false,
+      warrantyDays: json['warranty_days'] as int?,
+      warrantyExpiresAt: json['warranty_expires_at'] != null ? DateTime.tryParse(json['warranty_expires_at'] as String) : null,
+      isWarrantyClaim: json['is_warranty_claim'] as bool? ?? false,
+      warrantyClaimOf: json['warranty_claim_of'] as String?,
+      warrantyClaimOfServiceCode: json['warranty_claim_of_service_code'] as String?,
     );
   }
 }
@@ -721,6 +759,11 @@ class Category {
   final String? iconUrl;
   final double basePrice;
   final bool isActive;
+  // Admin-configured whitelist of warranty durations (in days) a technician
+  // may offer for a job in this category — see backend
+  // CategoryHandler.UpdateWarrantyOptions. A technician completing a job
+  // must pick warranty duration from exactly this list (or offer none).
+  final List<int> warrantyOptions;
 
   Category({
     required this.id,
@@ -729,6 +772,7 @@ class Category {
     this.iconUrl,
     required this.basePrice,
     required this.isActive,
+    this.warrantyOptions = const [],
   });
 
   factory Category.fromJson(Map<String, dynamic> json) {
@@ -739,6 +783,7 @@ class Category {
       iconUrl: json['icon_url'] as String?,
       basePrice: (json['base_price'] as num?)?.toDouble() ?? 0.0,
       isActive: json['is_active'] as bool? ?? true,
+      warrantyOptions: (json['warranty_options'] as List?)?.map((e) => (e as num).toInt()).toList() ?? const [],
     );
   }
 

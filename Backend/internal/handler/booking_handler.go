@@ -239,6 +239,12 @@ func (h *BookingHandler) Arrived(c *gin.Context) {
 
 type completeBody struct {
 	FinalPrice float64 `json:"final_price" binding:"required"`
+	// Warranty is optional and off by default — the technician must
+	// explicitly opt in. WarrantyDays is only read/required when
+	// WarrantyEnabled is true, and is validated server-side (see
+	// BookingService.Complete) against the category's configured options.
+	WarrantyEnabled bool `json:"warranty_enabled"`
+	WarrantyDays    *int `json:"warranty_days"`
 }
 
 func (h *BookingHandler) Complete(c *gin.Context) {
@@ -248,11 +254,32 @@ func (h *BookingHandler) Complete(c *gin.Context) {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := h.bookingService.Complete(c.Request.Context(), bookingID, body.FinalPrice); err != nil {
+	if err := h.bookingService.Complete(c.Request.Context(), bookingID, body.FinalPrice, body.WarrantyEnabled, body.WarrantyDays); err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	utils.Success(c, http.StatusOK, gin.H{"message": "booking completed"})
+}
+
+type warrantyClaimBody struct {
+	Note string `json:"note"`
+}
+
+// RaiseWarrantyClaim - POST /bookings/:id/warranty-claim. Customer raises a
+// claim against one of their own completed, still-under-warranty bookings —
+// creates a brand-new linked booking (see BookingService.RaiseWarrantyClaim).
+func (h *BookingHandler) RaiseWarrantyClaim(c *gin.Context) {
+	userID := c.GetString("user_id")
+	originalID := c.Param("id")
+	var body warrantyClaimBody
+	_ = c.ShouldBindJSON(&body)
+
+	created, err := h.bookingService.RaiseWarrantyClaim(c.Request.Context(), userID, originalID, body.Note)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusCreated, created)
 }
 
 type cancelBody struct {

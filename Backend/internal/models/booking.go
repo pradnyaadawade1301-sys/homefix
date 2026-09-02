@@ -74,8 +74,21 @@ type Booking struct {
 	// 022_visit_fee.sql and BookingService.UpdateStatus.
 	VisitFeeAmount *float64 `json:"visit_fee_amount,omitempty"`
 	VisitFeeStatus string   `json:"visit_fee_status"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	// --- Warranty (see migration 022) ---
+	// WarrantyEnabled/WarrantyDays/WarrantyExpiresAt are set once, at
+	// completion, by BookingService.Complete — WarrantyDays is validated
+	// there against the category's allowed options, so this is never an
+	// arbitrary technician-typed number.
+	WarrantyEnabled   bool       `json:"warranty_enabled"`
+	WarrantyDays      *int       `json:"warranty_days,omitempty"`
+	WarrantyExpiresAt *time.Time `json:"warranty_expires_at,omitempty"`
+	// IsWarrantyClaim/WarrantyClaimOf mark this booking as itself a warranty
+	// claim raised against an earlier, completed booking (see
+	// BookingService.RaiseWarrantyClaim) — otherwise both are zero-valued.
+	IsWarrantyClaim bool      `json:"is_warranty_claim"`
+	WarrantyClaimOf *string   `json:"warranty_claim_of,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 // BookingEstimateItem is a single line in a service estimate, e.g.
@@ -172,6 +185,11 @@ type BookingDetail struct {
 	Address      *BookingAddressInfo    `json:"address,omitempty"`
 	Customer     *BookingCustomerInfo   `json:"customer,omitempty"`
 	Technician   *BookingTechnicianInfo `json:"technician,omitempty"`
+	// WarrantyClaimOfServiceCode is the human-readable service code (e.g.
+	// "SRV-001042") of the original booking this one is a warranty claim
+	// against — set only when Booking.IsWarrantyClaim is true. Lets the UI
+	// show "Warranty claim for SRV-001042" without a second lookup.
+	WarrantyClaimOfServiceCode *string `json:"warranty_claim_of_service_code,omitempty"`
 }
 
 type BookingStatusHistory struct {

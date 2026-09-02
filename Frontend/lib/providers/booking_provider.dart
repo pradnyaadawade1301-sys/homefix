@@ -332,13 +332,18 @@ Future<bool> verifyArrivalOtp(String bookingId, String technicianId, String otp)
   }
 }
 
-Future<void> completeBooking(String bookingId, double finalPrice) async {
+Future<void> completeBooking(
+  String bookingId,
+  double finalPrice, {
+  bool warrantyEnabled = false,
+  int? warrantyDays,
+}) async {
   _isLoading = true;
   _error = null;
   notifyListeners();
 
   try {
-    await _bookingService.completeBooking(bookingId, finalPrice);
+    await _bookingService.completeBooking(bookingId, finalPrice, warrantyEnabled: warrantyEnabled, warrantyDays: warrantyDays);
     _error = null;
     final idx = _bookings.indexWhere((b) => b.id == bookingId);
     if (idx != -1) {
@@ -347,6 +352,27 @@ Future<void> completeBooking(String bookingId, double finalPrice) async {
     }
   } catch (e) {
     _error = e.toString();
+  } finally {
+    _isLoading = false;
+    notifyListeners();
+  }
+}
+
+/// Customer taps "Claim Warranty" on a completed booking still within its
+/// warranty window. On success, the new claim booking is prepended to the
+/// list so it shows up immediately without a full refresh.
+Future<bool> raiseWarrantyClaim(String bookingId, {String note = ''}) async {
+  _isLoading = true;
+  _error = null;
+  notifyListeners();
+  try {
+    final claim = await _bookingService.raiseWarrantyClaim(bookingId, note: note);
+    _bookings.insert(0, claim);
+    _error = null;
+    return true;
+  } catch (e) {
+    _error = e.toString();
+    return false;
   } finally {
     _isLoading = false;
     notifyListeners();

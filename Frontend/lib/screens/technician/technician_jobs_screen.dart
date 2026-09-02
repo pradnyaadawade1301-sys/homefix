@@ -735,56 +735,142 @@ class JobActionRow extends StatelessWidget {
 }
 
 void _showInvoiceDialog(BuildContext context, BookingProvider provider, Booking booking) {
-  final controller = TextEditingController(
-    text: (booking.estimatedPrice ?? 0) > 0 ? (booking.estimatedPrice ?? 0).toStringAsFixed(0) : '',
-  );
   showDialog(
     context: context,
-    builder: (dialogContext) => AlertDialog(
+    builder: (dialogContext) => _InvoiceDialog(provider: provider, booking: booking),
+  );
+}
+
+/// "Generate invoice" dialog — final amount, plus (if the booking's category
+/// has any warranty durations configured by admin — see
+/// Category.warrantyOptions) an optional "Offer a warranty" toggle and a
+/// duration picker constrained to exactly that category's allowed options,
+/// matching the backend's validation in BookingService.Complete.
+class _InvoiceDialog extends StatefulWidget {
+  final BookingProvider provider;
+  final Booking booking;
+  const _InvoiceDialog({required this.provider, required this.booking});
+
+  @override
+  State<_InvoiceDialog> createState() => _InvoiceDialogState();
+}
+
+class _InvoiceDialogState extends State<_InvoiceDialog> {
+  late final TextEditingController _controller;
+  bool _warrantyEnabled = false;
+  int? _selectedDays;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: (widget.booking.estimatedPrice ?? 0) > 0 ? (widget.booking.estimatedPrice ?? 0).toStringAsFixed(0) : '',
+    );
+    // Nothing in the technician flow currently fetches categories, so make
+    // sure they're loaded here — otherwise Category.warrantyOptions would
+    // silently read as empty and the warranty toggle just wouldn't appear.
+    final categoryProvider = context.read<CategoryProvider>();
+    if (categoryProvider.categories.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => categoryProvider.fetchCategories());
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  List<int> _warrantyOptionsFor(BuildContext context) {
+    final categories = context.watch<CategoryProvider>().categories;
+    final match = categories.where((c) => c.id == widget.booking.categoryId).toList();
+    return match.isNotEmpty ? match.first.warrantyOptions : const [];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final warrantyOptions = _warrantyOptionsFor(context);
+
+    return AlertDialog(
       title: const Text('Generate invoice'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Enter the final amount the customer should pay. This is sent to them immediately as the amount due.',
-            style: TextStyle(fontSize: 13, color: Colors.grey),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: controller,
-            autofocus: true,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              prefixText: '₹ ',
-              labelText: 'Final amount',
-              border: OutlineInputBorder(),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter the final amount the customer should pay. This is sent to them immediately as the amount due.',
+              style: TextStyle(fontSize: 13, color: Colors.grey),
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                prefixText: '₹ ',
+                labelText: 'Final amount',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            if (warrantyOptions.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Offer a warranty', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                subtitle: const Text('Customer can raise a free revisit within this window', style: TextStyle(fontSize: 11.5)),
+                value: _warrantyEnabled,
+                onChanged: (v) => setState(() {
+                  _warrantyEnabled = v;
+                  if (v && _selectedDays == null) _selectedDays = warrantyOptions.first;
+                }),
+              ),
+              if (_warrantyEnabled) ...[
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: warrantyOptions.map((d) {
+                    final selected = _selectedDays == d;
+                    return ChoiceChip(
+                      label: Text('$d days', style: const TextStyle(fontSize: 12.5)),
+                      selected: selected,
+                      onSelected: (_) => setState(() => _selectedDays = d),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ],
+          ],
+        ),
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(),
+          onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
         ElevatedButton(
           onPressed: () {
-            final price = double.tryParse(controller.text.trim());
+            final price = double.tryParse(_controller.text.trim());
             if (price == null || price <= 0) {
-              ScaffoldMessenger.of(dialogContext).showSnackBar(
+              ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Enter a valid amount')),
               );
               return;
             }
-            Navigator.of(dialogContext).pop();
-            provider.completeBooking(booking.id, price);
+            Navigator.of(context).pop();
+            widget.provider.completeBooking(
+              widget.booking.id,
+              price,
+              warrantyEnabled: _warrantyEnabled,
+              warrantyDays: _warrantyEnabled ? _selectedDays : null,
+            );
           },
           child: const Text('Send invoice'),
         ),
       ],
-    ),
-  );
+    );
+  }
 }
 
 class _EstimateAwareAction extends StatefulWidget {

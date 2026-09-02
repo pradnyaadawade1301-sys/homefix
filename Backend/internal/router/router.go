@@ -96,6 +96,7 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.GET("/users/me/addresses", h.User.ListAddresses)
 
 		authed.POST("/categories", middleware.RequireRole("admin"), h.Category.Create)
+		authed.PATCH("/categories/:id/warranty-options", middleware.RequireRole("admin"), h.Category.UpdateWarrantyOptions)
 
 		authed.POST("/technicians", h.Technician.Register)
 		authed.GET("/technicians/me", h.Technician.Me)
@@ -117,6 +118,7 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.POST("/bookings/:id/accept", middleware.RequireRole("technician"), h.Booking.Accept)
 		authed.PATCH("/bookings/:id/status", middleware.RequireRole("technician", "admin"), h.Booking.UpdateStatus)
 		authed.POST("/bookings/:id/complete", middleware.RequireRole("technician", "admin"), h.Booking.Complete)
+		authed.POST("/bookings/:id/warranty-claim", h.Booking.RaiseWarrantyClaim)
 		authed.POST("/bookings/:id/cancel", h.Booking.Cancel)
 		authed.POST("/bookings/:id/messages", h.Booking.SendMessage)
 		authed.GET("/bookings/:id/messages", h.Booking.ListMessages)

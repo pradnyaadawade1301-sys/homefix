@@ -16,21 +16,10 @@ type BookingService struct {
 	techRepo    *repository.TechnicianRepository
 	paymentRepo *repository.PaymentRepository
 	fcm         *FirebaseService
-	// razorpay is used only to reverse an already-paid visit fee when a
-	// booking is cancelled (RefundVisitFee) — see Cancel below. May be nil in
-	// tests that don't exercise that path.
-	razorpay *RazorpayService
 }
 
-func NewBookingService(bookingRepo *repository.BookingRepository, catRepo *repository.CategoryRepository, techRepo *repository.TechnicianRepository, paymentRepo *repository.PaymentRepository, fcm *FirebaseService, razorpay *RazorpayService) *BookingService {
-	return &BookingService{bookingRepo: bookingRepo, catRepo: catRepo, techRepo: techRepo, paymentRepo: paymentRepo, fcm: fcm, razorpay: razorpay}
-}
-
-// RequireVisitFee marks a booking as needing the ₹99 pre-visit inspection fee
-// before the technician can be sent out — called once, right when a
-// consultation is escalated into a booking (see ConsultationService.Escalate).
-func (s *BookingService) RequireVisitFee(ctx context.Context, bookingID string) error {
-	return s.bookingRepo.SetVisitFeeRequired(ctx, bookingID, models.DefaultVisitFeeAmount)
+func NewBookingService(bookingRepo *repository.BookingRepository, catRepo *repository.CategoryRepository, techRepo *repository.TechnicianRepository, paymentRepo *repository.PaymentRepository, fcm *FirebaseService) *BookingService {
+	return &BookingService{bookingRepo: bookingRepo, catRepo: catRepo, techRepo: techRepo, paymentRepo: paymentRepo, fcm: fcm}
 }
 
 // Create makes a new booking. If preferredTechnicianID is non-empty (customer
@@ -168,12 +157,6 @@ func (s *BookingService) UpdateStatus(ctx context.Context, bookingID, status, no
 	if b == nil {
 		return errors.New("booking not found")
 	}
-	// A booking escalated from a consultation requires the ₹99 visit fee to
-	// be paid before the technician can be marked on the way out — see
-	// migration 022_visit_fee.sql and ConsultationService.Escalate.
-	if status == models.BookingOnTheWay && b.VisitFeeStatus == models.VisitFeePending {
-		return errors.New("visit fee must be paid before the technician can head out")
-	}
 	if err := s.bookingRepo.UpdateStatus(ctx, bookingID, status, note); err != nil {
 		return err
 	}
@@ -197,10 +180,15 @@ func (s *BookingService) UpdateStatus(ctx context.Context, bookingID, status, no
 
 // Complete records the technician's final_price — this IS the invoice, since
 // it's the only number the app ever asks the customer to pay (see
-// UpiService.CreateOrder, which validates the payment amount against it). The
-// FCM push here is the only signal the customer gets that a bill is ready;
-// without it they'd only find out by happening to reopen the booking.
-func (s *BookingService) Complete(ctx context.Context, bookingID string, finalPrice float64) error {
+// UpiService.CreateOrder, which validates the payment amount against it).
+// warrantyEnabled/warrantyDays are the technician's optional "Warranty: Yes"
+// choice — warrantyDays MUST be one of the category's configured
+// warranty_options (see CategoryRepository/UpdateWarrantyOptions); a
+// technician can never set an arbitrary or unlimited period, and if
+// warrantyEnabled is false any warrantyDays value is ignored. The FCM push
+// here is the only signal the customer gets that a bill is ready; without it
+// they'd only find out by happening to reopen the booking.
+func (s *BookingService) Complete(ctx context.Context, bookingID string, finalPrice float64, warrantyEnabled bool, warrantyDays *int) error {
 	b, err := s.bookingRepo.GetByID(ctx, bookingID)
 	if err != nil {
 		return err
@@ -209,7 +197,35 @@ func (s *BookingService) Complete(ctx context.Context, bookingID string, finalPr
 		return errors.New("booking not found")
 	}
 
+	if warrantyEnabled {
+		if warrantyDays == nil {
+			return errors.New("warranty duration is required when warranty is enabled")
+		}
+		cat, err := s.catRepo.GetByID(ctx, b.CategoryID)
+		if err != nil {
+			return err
+		}
+		if cat == nil {
+			return errors.New("category not found")
+		}
+		allowed := false
+		for _, d := range cat.WarrantyOptions {
+			if int(d) == *warrantyDays {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return fmt.Errorf("warranty duration must be one of the allowed options for this category: %v days", cat.WarrantyOptions)
+		}
+	} else {
+		warrantyDays = nil
+	}
+
 	if err := s.bookingRepo.SetFinalPrice(ctx, bookingID, finalPrice); err != nil {
+		return err
+	}
+	if err := s.bookingRepo.SetWarranty(ctx, bookingID, warrantyEnabled, warrantyDays); err != nil {
 		return err
 	}
 	if err := s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingCompleted, "Job completed"); err != nil {
@@ -217,29 +233,88 @@ func (s *BookingService) Complete(ctx context.Context, bookingID string, finalPr
 	}
 
 	if s.fcm != nil {
-		_ = s.fcm.SendToUser(ctx, b.CustomerID, "Invoice ready",
-			fmt.Sprintf("Your technician has completed the job. Amount due: \u20b9%.2f. Tap to pay.", finalPrice),
+		body := fmt.Sprintf("Your technician has completed the job. Amount due: \u20b9%.2f. Tap to pay.", finalPrice)
+		if warrantyEnabled && warrantyDays != nil {
+			body += fmt.Sprintf(" This service is covered by a %d-day warranty.", *warrantyDays)
+		}
+		_ = s.fcm.SendToUser(ctx, b.CustomerID, "Invoice ready", body,
 			map[string]string{"booking_id": bookingID, "type": "invoice_ready", "final_price": fmt.Sprintf("%.2f", finalPrice)})
 	}
 	return nil
 }
 
-// Cancel moves a booking to "cancelled" and, if the customer had already paid
-// the ₹99 visit fee, refunds it automatically — see
-// RazorpayService.RefundVisitFee.
-func (s *BookingService) Cancel(ctx context.Context, bookingID, reason string) error {
-	if err := s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingCancelled, reason); err != nil {
-		return err
+// RaiseWarrantyClaim is the customer tapping "Claim Warranty" on a completed,
+// still-under-warranty booking. It creates a brand-new booking — reusing the
+// entire existing accept/track/complete/pay lifecycle rather than a separate
+// claims system — tagged as a warranty claim and linked back to the original
+// via warranty_claim_of, so it shows up traceably on both sides.
+func (s *BookingService) RaiseWarrantyClaim(ctx context.Context, customerID, originalBookingID, note string) (*models.Booking, error) {
+	original, err := s.bookingRepo.GetByID(ctx, originalBookingID)
+	if err != nil {
+		return nil, err
 	}
-	if s.razorpay != nil {
-		b, err := s.bookingRepo.GetByID(ctx, bookingID)
-		if err == nil && b != nil && b.VisitFeeStatus == models.VisitFeePaid {
-			if err := s.razorpay.RefundVisitFee(ctx, bookingID); err != nil {
-				return err
+	if original == nil {
+		return nil, errors.New("original booking not found")
+	}
+	if original.CustomerID != customerID {
+		return nil, errors.New("this booking does not belong to you")
+	}
+	if original.Status != models.BookingCompleted {
+		return nil, errors.New("a warranty claim can only be raised against a completed booking")
+	}
+	if original.IsWarrantyClaim {
+		return nil, errors.New("a warranty claim cannot itself be claimed again")
+	}
+	if !original.WarrantyEnabled || original.WarrantyExpiresAt == nil {
+		return nil, errors.New("no warranty was provided for this service")
+	}
+	if time.Now().After(*original.WarrantyExpiresAt) {
+		return nil, errors.New("the warranty period for this service has expired")
+	}
+
+	desc := "Warranty claim for booking " + original.ServiceCode
+	if note != "" {
+		desc += ": " + note
+	}
+	originalID := original.ID
+	newBooking := &models.Booking{
+		CustomerID:         customerID,
+		CategoryID:         original.CategoryID,
+		AddressID:          original.AddressID,
+		ProblemDescription: desc,
+		IsWarrantyClaim:    true,
+		WarrantyClaimOf:    &originalID,
+	}
+	created, err := s.bookingRepo.Create(ctx, newBooking)
+	if err != nil {
+		return nil, err
+	}
+
+	// Prefer routing straight back to whoever did the original job — same
+	// technician already knows the site/problem. Falls back to sitting as
+	// "requested" for any technician in the category if that fails (e.g.
+	// they're no longer active), same as a normal booking with no
+	// preference would.
+	if original.TechnicianID != nil {
+		if err := s.bookingRepo.AssignTechnician(ctx, created.ID, *original.TechnicianID); err == nil {
+			created.TechnicianID = original.TechnicianID
+			created.Status = models.BookingAccepted
+			if s.fcm != nil {
+				tech, techErr := s.techRepo.GetByID(ctx, *original.TechnicianID)
+				if techErr == nil && tech != nil {
+					_ = s.fcm.SendToUser(ctx, tech.UserID, "Warranty claim raised",
+						"A customer has raised a warranty claim on a completed job ("+original.ServiceCode+").",
+						map[string]string{"booking_id": created.ID, "type": "warranty_claim", "original_booking_id": originalID})
+				}
 			}
 		}
 	}
-	return nil
+
+	return created, nil
+}
+
+func (s *BookingService) Cancel(ctx context.Context, bookingID, reason string) error {
+	return s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingCancelled, reason)
 }
 
 func (s *BookingService) History(ctx context.Context, bookingID string) ([]models.BookingStatusHistory, error) {

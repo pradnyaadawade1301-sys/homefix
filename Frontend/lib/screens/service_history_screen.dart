@@ -325,9 +325,132 @@ class _HistoryCard extends StatelessWidget {
                 ),
               ),
             ),
+          if (booking.isWarrantyClaim) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.verified_outlined, size: 14, color: AppTheme.primaryColor),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      booking.warrantyClaimOfServiceCode != null
+                          ? 'Warranty claim for ${booking.warrantyClaimOfServiceCode}'
+                          : 'Warranty claim',
+                      style: const TextStyle(fontSize: 11.5, color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else if (completed && booking.warrantyEnabled) ...[
+            const SizedBox(height: 10),
+            if (booking.canClaimWarranty) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppTheme.successColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.shield_outlined, size: 14, color: AppTheme.successColor),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Under warranty until ${booking.warrantyExpiresAt!.day}/${booking.warrantyExpiresAt!.month}/${booking.warrantyExpiresAt!.year}',
+                        style: const TextStyle(fontSize: 11.5, color: AppTheme.successColor, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                height: 38,
+                child: OutlinedButton.icon(
+                  onPressed: () => _claimWarranty(context),
+                  icon: const Icon(Icons.build_outlined, size: 16),
+                  label: const Text('Claim Warranty — Free Revisit'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.successColor,
+                    side: const BorderSide(color: AppTheme.successColor),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ] else
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.shield_outlined, size: 14, color: Colors.grey[600]),
+                    const SizedBox(width: 6),
+                    Text('Warranty expired', style: TextStyle(fontSize: 11.5, color: Colors.grey[600], fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
           ],
         ],
       ),
+    );
+  }
+
+  Future<void> _claimWarranty(BuildContext context) async {
+    final controller = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Claim Warranty'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'This raises a free revisit request for the same issue. Wherever possible it\'s routed straight back to the technician who did the original job.',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'What\'s the issue? (optional)',
+                hintText: 'e.g. Same noise came back after a week',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Raise Claim')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+
+    final provider = context.read<BookingProvider>();
+    final ok = await provider.raiseWarrantyClaim(booking.id, note: controller.text.trim());
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(ok ? 'Warranty claim raised — check My Bookings' : (provider.error ?? 'Could not raise claim'))),
     );
   }
 }

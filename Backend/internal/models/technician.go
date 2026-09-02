@@ -3,13 +3,20 @@ package models
 import "time"
 
 type Category struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description,omitempty"`
-	IconURL     string    `json:"icon_url,omitempty"`
-	BasePrice   float64   `json:"base_price"`
-	IsActive    bool      `json:"is_active"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description,omitempty"`
+	IconURL     string  `json:"icon_url,omitempty"`
+	BasePrice   float64 `json:"base_price"`
+	IsActive    bool    `json:"is_active"`
+	// WarrantyOptions is the admin-configured whitelist of warranty
+	// durations (in days) a technician may offer for a job in this
+	// category — e.g. [7,15,30,90]. BookingService.Complete rejects any
+	// warranty_days value not in this list, so this is the single place
+	// that controls what's offerable; a technician can never enter an
+	// arbitrary or "unlimited" period.
+	WarrantyOptions []int32   `json:"warranty_options"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 // TechnicianPublic is the customer-facing shape returned by the public browse/detail

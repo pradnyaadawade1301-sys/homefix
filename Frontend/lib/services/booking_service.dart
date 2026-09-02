@@ -229,12 +229,38 @@ class BookingService {
     }
   }
 
-  Future<void> completeBooking(String bookingId, double finalPrice) async {
+  Future<void> completeBooking(
+    String bookingId,
+    double finalPrice, {
+    bool warrantyEnabled = false,
+    int? warrantyDays,
+  }) async {
     try {
       await _httpClient.post(
         '${ApiConfig.bookingComplete}/$bookingId/complete',
-        data: {'final_price': finalPrice},
+        data: {
+          'final_price': finalPrice,
+          'warranty_enabled': warrantyEnabled,
+          if (warrantyDays != null) 'warranty_days': warrantyDays,
+        },
       );
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Customer taps "Claim Warranty" on a completed, still-under-warranty
+  /// booking — POST /bookings/:id/warranty-claim. Returns the brand-new
+  /// linked booking created for the revisit (see backend
+  /// BookingService.RaiseWarrantyClaim).
+  Future<Booking> raiseWarrantyClaim(String bookingId, {String note = ''}) async {
+    try {
+      final response = await _httpClient.post(
+        '${ApiConfig.baseUrl}/bookings/$bookingId/warranty-claim',
+        data: {if (note.isNotEmpty) 'note': note},
+      );
+      final body = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return Booking.fromJson(body);
     } catch (e) {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
