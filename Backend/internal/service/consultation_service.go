@@ -561,6 +561,12 @@ func (s *ConsultationService) Escalate(ctx context.Context, consultationID, addr
 	if err := s.consultRepo.SetEscalatedBooking(ctx, consultationID, created.ID); err != nil {
 		return nil, err
 	}
+	// Bookings that come from a VC consultation require the ₹99 pre-visit
+	// inspection fee before the technician can head out — direct bookings
+	// (never routed through Escalate) don't.
+	if err := s.bookingSvc.RequireVisitFee(ctx, created.ID); err != nil {
+		return nil, err
+	}
 	// A pending recommendation being turned into a booking IS the "accept" —
 	// close it out so it can't also be separately declined afterwards.
 	if c.RecommendationStatus != nil && *c.RecommendationStatus == "pending" {

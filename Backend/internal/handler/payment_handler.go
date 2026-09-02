@@ -40,6 +40,20 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 	utils.Success(c, http.StatusCreated, order)
 }
 
+// CreateVisitFeeOrder — POST /bookings/:id/visit-fee/order. Creates the fixed
+// ₹99 pre-visit inspection order for a booking that requires one. The app
+// opens Razorpay Checkout with the returned order_id exactly like the normal
+// flow, then hits the same POST /payments/confirm to capture it.
+func (h *PaymentHandler) CreateVisitFeeOrder(c *gin.Context) {
+	userID := c.GetString("user_id")
+	order, err := h.razorpay.CreateVisitFeeOrder(c.Request.Context(), c.Param("id"), userID)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusCreated, order)
+}
+
 type confirmPaymentBody struct {
 	// RazorpayOrderID/RazorpayPaymentID/RazorpaySignature come straight from
 	// Razorpay Checkout's OWN success callback on the app — never values the

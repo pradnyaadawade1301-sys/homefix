@@ -121,6 +121,21 @@ func (s *RazorpayService) CreateOrder(ctx context.Context, bookingID, userID str
 
 	gstAmount := effectiveBase * s.gstPct / 100
 	totalAmount := effectiveBase + gstAmount
+
+	// If this booking already had its ₹99 visit fee paid separately, credit
+	// it against this final invoice so the customer is never double-charged.
+	var visitFeeCredit *float64
+	if booking.VisitFeeStatus == models.VisitFeePaid {
+		if vf, err := s.paymentRepo.GetByBookingIDAndType(ctx, bookingID, models.PaymentTypeVisitFee); err == nil && vf != nil && vf.Status == models.PaymentPaid {
+			credit := vf.Amount
+			if credit > totalAmount {
+				credit = totalAmount // never credit more than the invoice is worth
+			}
+			visitFeeCredit = &credit
+			totalAmount -= credit
+		}
+	}
+
 	amountPaise := int64(totalAmount*100 + 0.5) // Razorpay wants amount in the smallest currency unit (paise)
 
 	orderData := map[string]interface{}{
@@ -154,6 +169,82 @@ func (s *RazorpayService) CreateOrder(ctx context.Context, bookingID, userID str
 		RepeatDiscountPercent:  repeatDiscountPercent,
 		RepeatDiscountAmount:   repeatDiscountAmount,
 		RazorpayOrderID:        &orderID,
+		PaymentType:            models.PaymentTypeService,
+		VisitFeeCredit:         visitFeeCredit,
+	}
+	created, err := s.paymentRepo.Create(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+
+	return &RazorpayOrder{
+		Payment:     created,
+		OrderID:     orderID,
+		KeyID:       s.keyID,
+		AmountPaise: amountPaise,
+		Currency:    "INR",
+	}, nil
+}
+
+// CreateVisitFeeOrder creates a fixed ₹99 pre-visit inspection order for a
+// booking that requires one (visit_fee_status == "pending" — set by
+// ConsultationService.Escalate). No GST/commission split is applied to this
+// small charge; it's simply credited against the final service invoice once
+// the job is complete (see CreateOrder below).
+func (s *RazorpayService) CreateVisitFeeOrder(ctx context.Context, bookingID, userID string) (*RazorpayOrder, error) {
+	booking, err := s.bookingRepo.GetByID(ctx, bookingID)
+	if err != nil {
+		return nil, err
+	}
+	if booking == nil {
+		return nil, errors.New("booking not found")
+	}
+	if booking.CustomerID != userID {
+		return nil, errors.New("this booking does not belong to you")
+	}
+	if booking.VisitFeeStatus != models.VisitFeePending {
+		return nil, fmt.Errorf("visit fee is not payable for this booking (status: %s)", booking.VisitFeeStatus)
+	}
+
+	amount := models.DefaultVisitFeeAmount
+	if booking.VisitFeeAmount != nil {
+		amount = *booking.VisitFeeAmount
+	}
+
+	ref, err := generateTransactionRef()
+	if err != nil {
+		return nil, fmt.Errorf("razorpay: failed to generate transaction ref: %w", err)
+	}
+
+	amountPaise := int64(amount*100 + 0.5)
+	orderData := map[string]interface{}{
+		"amount":   amountPaise,
+		"currency": "INR",
+		"receipt":  ref,
+		"notes": map[string]interface{}{
+			"booking_id":   bookingID,
+			"user_id":      userID,
+			"payment_type": models.PaymentTypeVisitFee,
+		},
+	}
+	orderResp, err := s.client.Order.Create(orderData, nil)
+	if err != nil {
+		return nil, fmt.Errorf("razorpay: failed to create visit-fee order: %w", err)
+	}
+	orderID, _ := orderResp["id"].(string)
+	if orderID == "" {
+		return nil, errors.New("razorpay: visit-fee order creation did not return an order id")
+	}
+
+	p := &models.Payment{
+		BookingID:       bookingID,
+		UserID:          userID,
+		TransactionRef:  ref,
+		Amount:          amount,
+		BaseAmount:      &amount,
+		Currency:        "INR",
+		PaymentType:     models.PaymentTypeVisitFee,
+		RazorpayOrderID: &orderID,
 	}
 	created, err := s.paymentRepo.Create(ctx, p)
 	if err != nil {
@@ -217,6 +308,27 @@ func (s *RazorpayService) VerifyAndCapture(ctx context.Context, razorpayOrderID,
 	}
 	if booking == nil {
 		return nil, errors.New("razorpay: booking not found for this payment")
+	}
+
+	// Visit-fee payments are a much simpler capture: no commission split, no
+	// technician wallet credit yet (that happens off the final invoice) —
+	// just mark it paid and flip the booking's gate so the technician can be
+	// sent "on the way".
+	if p.PaymentType == models.PaymentTypeVisitFee {
+		if method == "" {
+			method = "razorpay"
+		}
+		invoiceNumber := fmt.Sprintf("VF-%s-%s", time.Now().Format("200601"), p.ID[:8])
+		if err := s.paymentRepo.MarkVerifiedPaidRazorpay(
+			ctx, razorpayOrderID, razorpayPaymentID, razorpaySignature, method, invoiceNumber,
+			0, 0, 0, 0,
+		); err != nil {
+			return nil, err
+		}
+		if err := s.bookingRepo.SetVisitFeeStatus(ctx, booking.ID, models.VisitFeePaid); err != nil {
+			return nil, err
+		}
+		return s.paymentRepo.GetByRazorpayOrderID(ctx, razorpayOrderID)
 	}
 
 	platformCommission := p.Amount * s.commissionPct / 100
@@ -334,6 +446,38 @@ func (s *RazorpayService) GetInvoice(ctx context.Context, paymentID, requestingU
 		return nil, errors.New("invoice not found")
 	}
 	return inv, nil
+}
+
+// RefundVisitFee reverses a paid ₹99 visit-fee payment when a booking is
+// cancelled after the customer already paid it — issues a real Razorpay
+// refund (falling back to a wallet credit if that call fails) and moves the
+// booking's visit_fee_status to "refunded". Called automatically from
+// BookingService.Cancel; never touches booking.payment_status (that's the
+// separate final-invoice flow).
+func (s *RazorpayService) RefundVisitFee(ctx context.Context, bookingID string) error {
+	p, err := s.paymentRepo.GetByBookingIDAndType(ctx, bookingID, models.PaymentTypeVisitFee)
+	if err != nil {
+		return err
+	}
+	if p == nil || p.Status != models.PaymentPaid {
+		return nil // nothing paid, nothing to refund
+	}
+
+	if p.RazorpayPaymentID != nil && *p.RazorpayPaymentID != "" {
+		amountPaise := int(p.Amount*100 + 0.5)
+		if _, err := s.client.Payment.Refund(*p.RazorpayPaymentID, amountPaise, nil, nil); err != nil {
+			fmt.Printf("[razorpay] visit-fee refund API call failed for payment %s (%s): %v\n", p.ID, *p.RazorpayPaymentID, err)
+		}
+	}
+
+	if err := s.paymentRepo.Refund(ctx, p.ID, time.Now()); err != nil {
+		return err
+	}
+	if err := s.bookingRepo.SetVisitFeeStatus(ctx, bookingID, models.VisitFeeRefunded); err != nil {
+		return err
+	}
+	_, _ = s.walletRepo.Credit(ctx, p.UserID, p.Amount, "visit_fee_refund", &p.ID)
+	return nil
 }
 
 // Refund reverses a verified payment: the booking's payment_status moves to

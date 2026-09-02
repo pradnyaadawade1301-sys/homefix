@@ -58,10 +58,12 @@ func (r *BookingRepository) GetByID(ctx context.Context, id string) (*models.Boo
 	var b models.Booking
 	err := r.db.QueryRow(ctx, `
 		SELECT id, customer_id, technician_id, category_id, address_id, status, payment_status,
-		       COALESCE(problem_description,''), notes, COALESCE(images, '{}'), scheduled_at, estimated_price, final_price, otp_code, otp_verified_at, created_at, updated_at
+		       COALESCE(problem_description,''), notes, COALESCE(images, '{}'), scheduled_at, estimated_price, final_price, otp_code, otp_verified_at,
+		       visit_fee_amount, visit_fee_status, created_at, updated_at
 		FROM bookings WHERE id = $1
 	`, id).Scan(&b.ID, &b.CustomerID, &b.TechnicianID, &b.CategoryID, &b.AddressID, &b.Status, &b.PaymentStatus,
-		&b.ProblemDescription, &b.Notes, &b.Images, &b.ScheduledAt, &b.EstimatedPrice, &b.FinalPrice, &b.OTPCode, &b.OTPVerifiedAt, &b.CreatedAt, &b.UpdatedAt)
+		&b.ProblemDescription, &b.Notes, &b.Images, &b.ScheduledAt, &b.EstimatedPrice, &b.FinalPrice, &b.OTPCode, &b.OTPVerifiedAt,
+		&b.VisitFeeAmount, &b.VisitFeeStatus, &b.CreatedAt, &b.UpdatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -108,6 +110,23 @@ func (r *BookingRepository) listByColumn(ctx context.Context, col, val string) (
 // reported a successful transaction.
 func (r *BookingRepository) SetPaymentStatus(ctx context.Context, bookingID, status string) error {
 	_, err := r.db.Exec(ctx, `UPDATE bookings SET payment_status = $1, updated_at = now() WHERE id = $2`, status, bookingID)
+	return err
+}
+
+// SetVisitFeeRequired marks a booking as needing the ₹99 pre-visit inspection
+// fee before the technician can head out — called once, right when a
+// consultation is escalated into a booking (see ConsultationService.Escalate).
+func (r *BookingRepository) SetVisitFeeRequired(ctx context.Context, bookingID string, amount float64) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE bookings SET visit_fee_amount = $1, visit_fee_status = 'pending', updated_at = now() WHERE id = $2
+	`, amount, bookingID)
+	return err
+}
+
+// SetVisitFeeStatus moves the visit-fee status forward (pending -> paid on
+// verified payment, paid -> refunded on cancellation).
+func (r *BookingRepository) SetVisitFeeStatus(ctx context.Context, bookingID, status string) error {
+	_, err := r.db.Exec(ctx, `UPDATE bookings SET visit_fee_status = $1, updated_at = now() WHERE id = $2`, status, bookingID)
 	return err
 }
 
@@ -306,6 +325,7 @@ const detailedSelect = `
 	SELECT b.id, b.customer_id, b.technician_id, b.category_id, b.address_id, b.status,
 	       COALESCE(b.problem_description,''), b.notes, COALESCE(b.images, '{}'), b.scheduled_at, b.estimated_price, b.final_price,
 	       b.otp_code, b.otp_verified_at,
+	       b.visit_fee_amount, b.visit_fee_status,
 	       b.created_at, b.updated_at,
 	       c.name AS category_name,
 	       a.label, a.line1, COALESCE(a.line2,''), a.city, a.state, a.pincode,
@@ -334,6 +354,7 @@ func scanBookingDetail(row pgx.Row) (*models.BookingDetail, error) {
 		&d.ID, &d.CustomerID, &d.TechnicianID, &d.CategoryID, &d.AddressID, &d.Status,
 		&d.ProblemDescription, &d.Notes, &d.Images, &d.ScheduledAt, &d.EstimatedPrice, &d.FinalPrice,
 		&d.OTPCode, &d.OTPVerifiedAt,
+		&d.VisitFeeAmount, &d.VisitFeeStatus,
 		&d.CreatedAt, &d.UpdatedAt,
 		&d.CategoryName,
 		&addr.Label, &addr.Line1, &addr.Line2, &addr.City, &addr.State, &addr.Pincode,

@@ -162,6 +162,7 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.GET("/webrtc/ice-servers", h.WebRTC.IceServers)
 
 		authed.POST("/payments/orders", h.Payment.CreateOrder)
+		authed.POST("/bookings/:id/visit-fee/order", h.Payment.CreateVisitFeeOrder)
 		authed.POST("/payments/confirm", h.Payment.Confirm)
 		authed.POST("/payments/fail", h.Payment.Fail)
 		authed.GET("/payments/history", h.Payment.History)
@@ -200,9 +201,6 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 			adminAPI.GET("/customers", h.AdminAPI.Customers)
 			adminAPI.GET("/bookings", h.AdminAPI.Bookings)
 			adminAPI.GET("/technicians", h.AdminAPI.Technicians)
-			adminAPI.GET("/disputes", h.AdminAPI.Disputes)
-			adminAPI.PATCH("/disputes/:id/review", h.AdminAPI.ReviewDispute)
-			adminAPI.PATCH("/disputes/:id/resolve", h.AdminAPI.ResolveDispute)
 		}
 
 		// ---- New React Finance Panel (JSON API) ----

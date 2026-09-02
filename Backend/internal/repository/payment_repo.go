@@ -22,7 +22,7 @@ const paymentColumns = `id, booking_id, user_id, transaction_ref, upi_txn_id, in
 	       amount, base_amount, gst_amount, gst_percent, cgst_amount, sgst_amount, currency, method, status, upi_status, upi_response_code, upi_approval_ref,
 	       verified, is_repeat_customer, repeat_discount_percent, repeat_discount_amount,
 	       razorpay_order_id, razorpay_payment_id, razorpay_signature,
-	       platform_commission, technician_earning, refunded_at, created_at, updated_at`
+	       platform_commission, technician_earning, payment_type, visit_fee_credit, refunded_at, created_at, updated_at`
 
 func scanPayment(row pgx.Row) (*models.Payment, error) {
 	var p models.Payment
@@ -30,7 +30,7 @@ func scanPayment(row pgx.Row) (*models.Payment, error) {
 		&p.Amount, &p.BaseAmount, &p.GstAmount, &p.GstPercent, &p.CgstAmount, &p.SgstAmount, &p.Currency, &p.Method, &p.Status, &p.UpiStatus, &p.UpiResponseCode, &p.UpiApprovalRef,
 		&p.Verified, &p.IsRepeatCustomer, &p.RepeatDiscountPercent, &p.RepeatDiscountAmount,
 		&p.RazorpayOrderID, &p.RazorpayPaymentID, &p.RazorpaySignature,
-		&p.PlatformCommission, &p.TechnicianEarning, &p.RefundedAt, &p.CreatedAt, &p.UpdatedAt)
+		&p.PlatformCommission, &p.TechnicianEarning, &p.PaymentType, &p.VisitFeeCredit, &p.RefundedAt, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -38,16 +38,21 @@ func scanPayment(row pgx.Row) (*models.Payment, error) {
 }
 
 func (r *PaymentRepository) Create(ctx context.Context, p *models.Payment) (*models.Payment, error) {
+	paymentType := p.PaymentType
+	if paymentType == "" {
+		paymentType = models.PaymentTypeService
+	}
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO payments (booking_id, user_id, transaction_ref, amount, base_amount, gst_amount, gst_percent, currency,
-		                       is_repeat_customer, repeat_discount_percent, repeat_discount_amount, razorpay_order_id, status)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'created')
+		                       is_repeat_customer, repeat_discount_percent, repeat_discount_amount, razorpay_order_id, payment_type, visit_fee_credit, status)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'created')
 		RETURNING id, status, created_at, updated_at
 	`, p.BookingID, p.UserID, p.TransactionRef, p.Amount, p.BaseAmount, p.GstAmount, p.GstPercent, p.Currency,
-		p.IsRepeatCustomer, p.RepeatDiscountPercent, p.RepeatDiscountAmount, p.RazorpayOrderID).Scan(&p.ID, &p.Status, &p.CreatedAt, &p.UpdatedAt)
+		p.IsRepeatCustomer, p.RepeatDiscountPercent, p.RepeatDiscountAmount, p.RazorpayOrderID, paymentType, p.VisitFeeCredit).Scan(&p.ID, &p.Status, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
+	p.PaymentType = paymentType
 	return p, nil
 }
 
@@ -86,6 +91,19 @@ func (r *PaymentRepository) GetByBookingID(ctx context.Context, bookingID string
 	p, err := scanPayment(r.db.QueryRow(ctx, `
 		SELECT `+paymentColumns+` FROM payments WHERE booking_id = $1 ORDER BY created_at DESC LIMIT 1
 	`, bookingID))
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+	return p, err
+}
+
+// GetByBookingIDAndType returns the most recent payment of a given type
+// (service | visit_fee) for a booking — used to check whether a booking's
+// visit fee was actually paid and to credit it against the final invoice.
+func (r *PaymentRepository) GetByBookingIDAndType(ctx context.Context, bookingID, paymentType string) (*models.Payment, error) {
+	p, err := scanPayment(r.db.QueryRow(ctx, `
+		SELECT `+paymentColumns+` FROM payments WHERE booking_id = $1 AND payment_type = $2 ORDER BY created_at DESC LIMIT 1
+	`, bookingID, paymentType))
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
@@ -202,7 +220,7 @@ func (r *PaymentRepository) GetInvoiceDetail(ctx context.Context, paymentID stri
 		       p.upi_status, p.upi_response_code, p.upi_approval_ref,
 		       p.verified, p.is_repeat_customer, p.repeat_discount_percent, p.repeat_discount_amount,
 		       p.razorpay_order_id, p.razorpay_payment_id, p.razorpay_signature,
-		       p.platform_commission, p.technician_earning, p.refunded_at, p.created_at, p.updated_at,
+		       p.platform_commission, p.technician_earning, p.payment_type, p.visit_fee_credit, p.refunded_at, p.created_at, p.updated_at,
 		       b.service_code, COALESCE(b.problem_description,''),
 		       c.name AS category_name,
 		       cu.name AS customer_name, cu.phone AS customer_phone,
@@ -226,7 +244,7 @@ func (r *PaymentRepository) GetInvoiceDetail(ctx context.Context, paymentID stri
 		&inv.Payment.UpiStatus, &inv.Payment.UpiResponseCode, &inv.Payment.UpiApprovalRef,
 		&inv.Payment.Verified, &inv.Payment.IsRepeatCustomer, &inv.Payment.RepeatDiscountPercent, &inv.Payment.RepeatDiscountAmount,
 		&inv.Payment.RazorpayOrderID, &inv.Payment.RazorpayPaymentID, &inv.Payment.RazorpaySignature,
-		&inv.Payment.PlatformCommission, &inv.Payment.TechnicianEarning, &inv.Payment.RefundedAt, &inv.Payment.CreatedAt, &inv.Payment.UpdatedAt,
+		&inv.Payment.PlatformCommission, &inv.Payment.TechnicianEarning, &inv.Payment.PaymentType, &inv.Payment.VisitFeeCredit, &inv.Payment.RefundedAt, &inv.Payment.CreatedAt, &inv.Payment.UpdatedAt,
 		&inv.ServiceCode, &inv.ProblemDescription,
 		&inv.CategoryName,
 		&inv.CustomerName, &inv.CustomerPhone,
@@ -261,6 +279,7 @@ func (r *PaymentRepository) GetInvoiceDetail(ctx context.Context, paymentID stri
 		inv.SgstAmount = *inv.Payment.SgstAmount
 	}
 	inv.TotalAmount = inv.Payment.Amount
+	inv.VisitFeeCredit = inv.Payment.VisitFeeCredit
 
 	addrParts := []string{line1}
 	if line2 != "" {

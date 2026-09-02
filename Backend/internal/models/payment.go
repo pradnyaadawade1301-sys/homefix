@@ -9,6 +9,14 @@ const (
 	PaymentRefunded = "refunded"
 )
 
+// Payment "type" — see migration 022_visit_fee.sql. PaymentTypeService is the
+// normal final-invoice payment (default, unchanged for every existing row);
+// PaymentTypeVisitFee is the ₹99 pre-visit inspection charge.
+const (
+	PaymentTypeService  = "service"
+	PaymentTypeVisitFee = "visit_fee"
+)
+
 type Payment struct {
 	ID                 string     `json:"id"`
 	BookingID          string     `json:"booking_id"`
@@ -40,6 +48,10 @@ type Payment struct {
 	RazorpaySignature  *string    `json:"razorpay_signature,omitempty"`
 	PlatformCommission *float64   `json:"platform_commission,omitempty"`
 	TechnicianEarning  *float64   `json:"technician_earning,omitempty"`
+	// PaymentType distinguishes the ₹99 visit-fee charge from the normal final
+	// service payment (default "service" for every pre-existing row).
+	PaymentType     string   `json:"payment_type"`
+	VisitFeeCredit  *float64 `json:"visit_fee_credit,omitempty"` // set only on a "service" payment that credited back an already-paid visit fee
 	RefundedAt         *time.Time `json:"refunded_at,omitempty"`
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
@@ -98,6 +110,7 @@ type InvoiceDetail struct {
 	CgstAmount  float64 `json:"cgst_amount"`
 	SgstPercent float64 `json:"sgst_percent"` // the other half
 	SgstAmount  float64 `json:"sgst_amount"`
+	VisitFeeCredit *float64 `json:"visit_fee_credit,omitempty"` // already-paid ₹99 visit fee, deducted from this total
 	TotalAmount float64 `json:"total_amount"`
 
 	IsRepeatCustomer      bool     `json:"is_repeat_customer"`

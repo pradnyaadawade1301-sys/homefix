@@ -19,6 +19,20 @@ const (
 	BookingRepairInProgress = "repair_in_progress"
 )
 
+// Visit-fee status values — see migration 022_visit_fee.sql. A booking created
+// directly (not via consultation escalation) is "not_required" and skips the
+// visit-fee gate entirely.
+const (
+	VisitFeeNotRequired = "not_required"
+	VisitFeePending     = "pending"
+	VisitFeePaid        = "paid"
+	VisitFeeRefunded    = "refunded"
+)
+
+// DefaultVisitFeeAmount is the fixed ₹99 pre-visit inspection charge applied
+// when a Live Video Consultation is escalated into an on-site booking.
+const DefaultVisitFeeAmount = 99.0
+
 // ValidBookingStatuses is the whitelist enforced by BookingService.UpdateStatus
 // so a typo'd status string can't get silently stuck in a booking's history.
 var ValidBookingStatuses = map[string]bool{
@@ -55,6 +69,11 @@ type Booking struct {
 	// it hidden from the technician's side.
 	OTPCode       *string    `json:"otp_code,omitempty"`
 	OTPVerifiedAt *time.Time `json:"otp_verified_at,omitempty"` // set once the technician has confirmed the customer's OTP on-site
+	// VisitFeeAmount/VisitFeeStatus gate the "on_the_way" transition when the
+	// booking came from a consultation escalation — see migration
+	// 022_visit_fee.sql and BookingService.UpdateStatus.
+	VisitFeeAmount *float64 `json:"visit_fee_amount,omitempty"`
+	VisitFeeStatus string   `json:"visit_fee_status"`
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
 }
