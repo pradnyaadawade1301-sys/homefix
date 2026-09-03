@@ -22,5 +22,5 @@ void main() async {
   String? token = await messaging.getToken();
   print("FCM TOKEN: $token");
 
-  runApp(MyApp());
+  runApp(const MyApp());
 }

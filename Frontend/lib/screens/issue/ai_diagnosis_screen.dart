@@ -8,7 +8,6 @@ import '../../providers/booking_provider.dart';
 import '../../providers/category_provider.dart';
 import '../home/technician_list_screen.dart';
 import '../home/technician_detail_screen.dart';
-import '../consultation/searching_technician_screen.dart';
 
 /// Steps 4-5 of the customer flow: AI Diagnosis chat (backed by the real Groq
 /// endpoint) followed by the customer's decision to Book a Technician Visit.
@@ -31,11 +30,10 @@ class AIDiagnosisScreen extends StatefulWidget {
 }
 
 /// The two ways a customer can proceed once the AI has given its first
-/// read on the problem (mirrors the "Possible Options" step of the product
-/// spec: Get Instant AI Guidance / Book Technician Directly). "Talk to an
-/// Expert" (live video) is still reachable via the error-fallback button
-/// further down this screen — it's just no longer in the main options
-/// card, per product request.
+/// read on the problem: Get Instant AI Guidance / Book Technician Directly.
+/// "Talk to an Expert" (live video) has been removed from this screen
+/// entirely per product request — [talkToExpert] is kept in the enum only
+/// so old/serialized state doesn't break, but nothing sets it anymore.
 enum _NextStepChoice { aiGuidance, talkToExpert, bookDirect }
 
 class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
@@ -105,31 +103,21 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
         );
   }
 
-  void _bookTechnician() {
+  void _bookTechnician() async {
     _foldAiDiagnosisIntoBrief();
     setState(() => _choice = _NextStepChoice.bookDirect);
-    Navigator.of(context).push(MaterialPageRoute(
+    await Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => TechnicianListScreen(
         categoryId: widget.categoryId,
         categoryName: widget.categoryName,
         problemDescription: widget.problemDescription,
       ),
     ));
-  }
-
-  // "Talk to an Expert" opens the live video consultation flow: it requests
-  // a consultation and shows a searching/matching state while a technician
-  // accepts, then drops the customer straight into the WebRTC call.
-  void _talkToExpert() {
-    _foldAiDiagnosisIntoBrief();
-    setState(() => _choice = _NextStepChoice.talkToExpert);
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => SearchingTechnicianScreen(
-        categoryId: widget.categoryId,
-        categoryName: widget.categoryName,
-        note: widget.problemDescription,
-      ),
-    ));
+    // Coming back here (customer hit the system/app-bar back button instead
+    // of completing a booking) should restore the "Possible Options" card —
+    // without this, _choice stayed bookDirect forever and the card never
+    // came back for the rest of the session.
+    if (mounted) setState(() => _choice = null);
   }
 
   // "Get Instant AI Guidance" just dismisses the options card so the
@@ -430,26 +418,14 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
                   }),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _talkToExpert,
-                            icon: const Icon(Icons.support_agent_rounded, size: 18),
-                            label: const Text('Talk to an Expert', style: TextStyle(fontSize: 13)),
-                            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _bookTechnician,
-                            icon: const Icon(Icons.build_rounded, size: 18),
-                            label: const Text('Book Directly', style: TextStyle(fontSize: 13)),
-                            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-                          ),
-                        ),
-                      ],
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _bookTechnician,
+                        icon: const Icon(Icons.build_rounded, size: 18),
+                        label: const Text('Book Directly', style: TextStyle(fontSize: 13)),
+                        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                      ),
                     ),
                   ),
                 ],

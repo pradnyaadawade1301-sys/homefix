@@ -95,35 +95,35 @@ class _ConsultationCard extends StatelessWidget {
     final isScheduled = consultation.scheduledAt != null;
     switch (consultation.status) {
       case ConsultationStatus.scheduled:
-        return _StatusInfo(
+        return const _StatusInfo(
           label: 'Awaiting confirmation',
           color: AppTheme.warningColor,
           icon: Icons.hourglass_top_rounded,
           message: 'Waiting for the technician to confirm your requested slot.',
         );
       case ConsultationStatus.confirmed:
-        return _StatusInfo(
+        return const _StatusInfo(
           label: 'Confirmed',
           color: AppTheme.successColor,
           icon: Icons.event_available_rounded,
           message: 'Your technician confirmed. The call will start automatically at your scheduled time.',
         );
       case ConsultationStatus.searching:
-        return _StatusInfo(
+        return const _StatusInfo(
           label: 'Searching',
           color: AppTheme.primaryColor,
           icon: Icons.search_rounded,
           message: 'Looking for an available technician...',
         );
       case ConsultationStatus.ringing:
-        return _StatusInfo(
+        return const _StatusInfo(
           label: 'Ringing',
           color: AppTheme.primaryColor,
           icon: Icons.phone_in_talk_rounded,
           message: 'Ringing the technician now...',
         );
       case ConsultationStatus.accepted:
-        return _StatusInfo(
+        return const _StatusInfo(
           label: 'Accepted',
           color: AppTheme.successColor,
           icon: Icons.check_circle_rounded,
@@ -143,14 +143,14 @@ class _ConsultationCard extends StatelessWidget {
           message: reason.isNotEmpty ? 'Reason: $reason' : defaultMessage,
         );
       case ConsultationStatus.noTechnician:
-        return _StatusInfo(
+        return const _StatusInfo(
           label: 'No technician available',
           color: AppTheme.errorColor,
           icon: Icons.person_off_rounded,
           message: 'No technician was available for this request. Please try again later.',
         );
       case ConsultationStatus.inCall:
-        return _StatusInfo(
+        return const _StatusInfo(
           label: 'In call',
           color: AppTheme.successColor,
           icon: Icons.videocam_rounded,

@@ -22,6 +22,7 @@ import 'screens/technician/technician_status_screen.dart';
 import 'services/auth_service.dart';
 import 'services/booking_service.dart';
 import 'services/consultation_service.dart';
+import 'services/dispute_service.dart';
 import 'services/location_service.dart';
 import 'services/service_locator.dart';
 import 'screens/technician/technician_jobs_screen.dart';
@@ -52,6 +53,7 @@ class _MyAppState extends State<MyApp> {
   late HttpClient _httpClient;
   late AuthService _authService;
   late BookingService _bookingService;
+  late DisputeService _disputeService;
   late CategoryService _categoryService;
   late TechnicianService _technicianService;
   late TechnicianKycService _technicianKycService;
@@ -75,6 +77,7 @@ class _MyAppState extends State<MyApp> {
     _httpClient = HttpClient(secureStorage: secureStorage);
     _authService = AuthService(httpClient: _httpClient, secureStorage: secureStorage);
     _bookingService = BookingService(httpClient: _httpClient);
+    _disputeService = DisputeService(httpClient: _httpClient);
     _categoryService = CategoryService(httpClient: _httpClient);
     _technicianService = TechnicianService(httpClient: _httpClient);
     _technicianKycService = TechnicianKycService(httpClient: _httpClient);
@@ -139,6 +142,7 @@ class _MyAppState extends State<MyApp> {
           create: (_) => BookingProvider(bookingService: _bookingService),
         ),
         Provider<BookingService>.value(value: _bookingService),
+        Provider<DisputeService>.value(value: _disputeService),
         ChangeNotifierProvider(
           create: (_) => CategoryProvider(categoryService: _categoryService),
         ),

@@ -325,6 +325,7 @@ class _HistoryCard extends StatelessWidget {
                 ),
               ),
             ),
+          ],
           if (booking.isWarrantyClaim) ...[
             const SizedBox(height: 10),
             Container(

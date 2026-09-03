@@ -5,7 +5,6 @@ import '../../models/booking_model.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/location_provider.dart';
 import 'technician_detail_screen.dart';
-import 'nearby_technicians_screen.dart';
 
 /// Step 3 of the customer flow ("Technician Selection"): HomeFox finds
 /// available technicians for the category and highlights one "Recommended
