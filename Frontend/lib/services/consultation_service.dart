@@ -13,10 +13,12 @@ class ConsultationService {
 
   /// Customer: kicks off a new consultation request. Backend starts matching
   /// a technician and returns status "searching".
-    Future<Consultation> requestConsultation({
+     Future<Consultation> requestConsultation({
     required String categoryId,
     required String categoryName,
     String? note,
+    String? area,
+    String? aiDiagnosisSessionId,
     String? preferredTechnicianId,
     DateTime? scheduledAt,
   }) async {
@@ -27,6 +29,8 @@ class ConsultationService {
           'category_id': categoryId,
           'category_name': categoryName,
           if (note != null && note.isNotEmpty) 'note': note,
+          if (area != null && area.isNotEmpty) 'area': area,
+          if (aiDiagnosisSessionId != null && aiDiagnosisSessionId.isNotEmpty) 'ai_diagnosis_session_id': aiDiagnosisSessionId,
           if (preferredTechnicianId != null) 'preferred_technician_id': preferredTechnicianId,
           if (scheduledAt != null) 'scheduled_at': scheduledAt.toUtc().toIso8601String(),
         },

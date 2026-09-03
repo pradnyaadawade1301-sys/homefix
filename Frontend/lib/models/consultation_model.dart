@@ -64,6 +64,18 @@ class Consultation {
   // Why the technician declined/rejected — set only when status == rejected.
   // Shown to the customer so "declined" isn't a dead end with no explanation.
   final String? declineReason;
+  // Pre-call info the customer gave when requesting this consultation (see
+  // ConsultationService.requestConsultation): an optional one-line problem
+  // description, an optional short area/city (not a full address — the call
+  // is remote), and aiDiagnosisSessionId linking back to an AI Diagnosis chat
+  // the customer already ran for this issue (nil if they skipped it).
+  // aiAssessment is the AI's own last message from that session, resolved by
+  // the backend — nil whenever aiDiagnosisSessionId is nil. Shown to the
+  // technician on the incoming-request card before they accept/decline.
+  final String? note;
+  final String? area;
+  final String? aiDiagnosisSessionId;
+  final String? aiAssessment;
   // Post-call recommendation — see ConsultationService.RecommendOnsite on the
   // backend. Null status = no recommendation sent for this call yet.
   final String? recommendationSummary;
@@ -91,6 +103,10 @@ class Consultation {
     this.amount,
     this.paymentStatus,
     this.declineReason,
+    this.note,
+    this.area,
+    this.aiDiagnosisSessionId,
+    this.aiAssessment,
     this.recommendationSummary,
     this.recommendationPrice,
     this.recommendationStatus,
@@ -126,6 +142,10 @@ class Consultation {
       amount: (json['amount'] as num?)?.toDouble(),
       paymentStatus: json['payment_status'] as String?,
       declineReason: json['decline_reason'] as String?,
+      note: json['note'] as String?,
+      area: json['area'] as String?,
+      aiDiagnosisSessionId: json['ai_diagnosis_session_id'] as String?,
+      aiAssessment: json['ai_assessment'] as String?,
       recommendationSummary: json['recommendation_summary'] as String?,
       recommendationPrice: (json['recommendation_price'] as num?)?.toDouble(),
       recommendationStatus: json['recommendation_status'] as String?,
@@ -148,6 +168,10 @@ class Consultation {
     double? amount,
     String? paymentStatus,
     String? declineReason,
+    String? note,
+    String? area,
+    String? aiDiagnosisSessionId,
+    String? aiAssessment,
     String? recommendationSummary,
     double? recommendationPrice,
     String? recommendationStatus,
@@ -172,6 +196,10 @@ class Consultation {
       amount: amount ?? this.amount,
       paymentStatus: paymentStatus ?? this.paymentStatus,
       declineReason: declineReason ?? this.declineReason,
+      note: note ?? this.note,
+      area: area ?? this.area,
+      aiDiagnosisSessionId: aiDiagnosisSessionId ?? this.aiDiagnosisSessionId,
+      aiAssessment: aiAssessment ?? this.aiAssessment,
       recommendationSummary: recommendationSummary ?? this.recommendationSummary,
       recommendationPrice: recommendationPrice ?? this.recommendationPrice,
       recommendationStatus: recommendationStatus ?? this.recommendationStatus,
@@ -188,6 +216,12 @@ class ConsultationRequest {
   final int estimatedDurationMinutes;
   final double consultationFee;
   final String? customerNote;
+  // Short area/city the customer gave (not a full address — the call is
+  // remote) and, if they already ran AI Diagnosis for this issue, the AI's
+  // assessment carried over. Both optional — shown on the incoming-request
+  // card alongside customerNote.
+  final String? customerArea;
+  final String? aiAssessment;
 
   ConsultationRequest({
     required this.consultationId,
@@ -196,6 +230,8 @@ class ConsultationRequest {
     required this.estimatedDurationMinutes,
     required this.consultationFee,
     this.customerNote,
+    this.customerArea,
+    this.aiAssessment,
   });
 
   factory ConsultationRequest.fromJson(Map<String, dynamic> json) {
@@ -205,7 +241,9 @@ class ConsultationRequest {
       categoryName: json['category_name'] as String? ?? '',
       estimatedDurationMinutes: json['estimated_duration_minutes'] as int? ?? 15,
       consultationFee: (json['consultation_fee'] as num?)?.toDouble() ?? 199,
-      customerNote: json['customer_note'] as String?,
+      customerNote: json['customer_note'] as String? ?? json['note'] as String?,
+      customerArea: json['customer_area'] as String? ?? json['area'] as String?,
+      aiAssessment: json['ai_assessment'] as String?,
     );
   }
 }

@@ -45,6 +45,27 @@ type Consultation struct {
 	EndedAt     *time.Time `json:"ended_at,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
+
+	// Request-time details — collected once, up front, when the customer
+	// requests the call (see migrations/027_consultation_request_details.sql),
+	// so the technician has real context before answering instead of finding
+	// out what the problem even is only after picking up.
+	//
+	// Note is the customer's one-line description of the issue — kept
+	// separate from RecommendationSummary (the technician's own post-call
+	// note) so the two directions never overwrite each other.
+	Note *string `json:"note,omitempty"`
+	// Area is a short, privacy-friendly location hint (e.g. "Andheri West,
+	// Mumbai") — NOT a full address. A video consultation is remote by
+	// definition; this exists purely so the technician knows roughly where
+	// the customer is, in case the call later escalates to an on-site visit
+	// (see RecommendOnsite/Escalate) and service-area coverage matters.
+	Area *string `json:"area,omitempty"`
+	// AIDiagnosisSessionID links back to an AI diagnosis chat the customer
+	// already ran (see ai_diagnosis_sessions/ai_diagnosis_messages) before
+	// requesting this call — optional; nil if they skipped straight to a
+	// video call without using AI diagnosis first.
+	AIDiagnosisSessionID *string `json:"ai_diagnosis_session_id,omitempty"`
 }
 
 // ConsultationWithDetails adds the display info the app actually renders: which
@@ -58,4 +79,11 @@ type ConsultationWithDetails struct {
 	CustomerPhone   string `json:"customer_phone,omitempty"`
 	TechnicianName  string `json:"technician_name,omitempty"`
 	TechnicianPhone string `json:"technician_phone,omitempty"`
+	// AIAssessment is NOT a database column — it's the last AI-authored
+	// message from the linked ai_diagnosis_sessions chat (see
+	// AIDiagnosisSessionID above), resolved and attached by
+	// ConsultationService.attachAIAssessment right before returning to the
+	// technician. Nil whenever AIDiagnosisSessionID is nil, or the linked
+	// session turns out to have no AI messages yet.
+	AIAssessment *string `json:"ai_assessment,omitempty"`
 }

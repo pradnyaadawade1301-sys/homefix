@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../models/booking_model.dart';
 import '../../services/service_locator.dart';
+import '../../widgets/video_call_precheck_sheet.dart';
 import '../booking/book_technician_screen.dart';
 import '../consultation/searching_technician_screen.dart';
 
@@ -36,9 +37,12 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
     _controller.forward();
     _loadReviews();
   }
-  Future<void> _pickScheduleTime(BuildContext context) async {
+   Future<void> _pickScheduleTime(BuildContext context) async {
   final t = widget.technician;
   final now = DateTime.now();
+
+  final preCheck = await showVideoCallPreCheckSheet(context, initialDescription: widget.problemDescription);
+  if (preCheck == null || !context.mounted) return;
 
   final date = await showDatePicker(
     context: context,
@@ -68,7 +72,9 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
     builder: (_) => SearchingTechnicianScreen(
       categoryId: t.categoryId,
       categoryName: t.categoryName,
-      note: widget.problemDescription,
+      note: preCheck.note,
+      area: preCheck.area,
+      aiDiagnosisSessionId: preCheck.aiDiagnosisSessionId,
       preferredTechnicianId: t.id,
       preferredTechnicianName: t.name,
       scheduledAt: scheduledAt,
@@ -366,15 +372,22 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                       SizedBox(
                         width: double.infinity,
                         height: 54,
-                        child: OutlinedButton.icon(
+                                           child: OutlinedButton.icon(
                           onPressed: t.isAvailable
-                              ? () {
+                              ? () async {
+                                  final preCheck = await showVideoCallPreCheckSheet(
+                                    context,
+                                    initialDescription: widget.problemDescription,
+                                  );
+                                  if (preCheck == null || !context.mounted) return;
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (_) => SearchingTechnicianScreen(
                                         categoryId: t.categoryId,
                                         categoryName: t.categoryName,
-                                        note: widget.problemDescription,
+                                        note: preCheck.note,
+                                        area: preCheck.area,
+                                        aiDiagnosisSessionId: preCheck.aiDiagnosisSessionId,
                                         preferredTechnicianId: t.id,
                                         preferredTechnicianName: t.name,
                                       ),

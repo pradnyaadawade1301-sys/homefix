@@ -8,22 +8,13 @@ import '../../providers/consultation_provider.dart';
 import '../../services/signaling_service.dart';
 import '../video_call_screen.dart';
 
-/// Customer side of the Live Video Consultation flow. Requests a consultation,
-/// shows a "searching for technician" state while [ConsultationProvider] polls
-/// status, then — once a technician accepts — fetches the call's room_id +
-/// ICE servers and opens the real WebRTC [VideoCallScreen].
-///
-/// IMPORTANT: every "is this scheduled?" check in this file is gated on
-/// [scheduledAt] (a value we already know on the client, right from the
-/// moment the widget is built) — NOT on the backend's status string. This is
-/// intentional: relying on the backend status alone means if the server is
-/// ever mid-rollout, stale, or briefly wrong, a scheduled request could look
-/// "accepted" and this screen would wrongly jump straight into a live video
-/// call. Gating on scheduledAt makes that impossible by construction.
+
 class SearchingTechnicianScreen extends StatefulWidget {
   final String categoryId;
   final String categoryName;
   final String? note;
+  final String? area;
+  final String? aiDiagnosisSessionId;
   final String? preferredTechnicianId;
   final String? preferredTechnicianName;
   // Non-null = "Schedule for Later". When set, this screen must NEVER
@@ -35,6 +26,8 @@ class SearchingTechnicianScreen extends StatefulWidget {
     required this.categoryId,
     required this.categoryName,
     this.note,
+    this.area,
+    this.aiDiagnosisSessionId,
     this.preferredTechnicianId,
     this.preferredTechnicianName,
     this.scheduledAt,
@@ -65,10 +58,12 @@ class _SearchingTechnicianScreenState extends State<SearchingTechnicianScreen> {
   Future<void> _start() async {
     try {
       final provider = context.read<ConsultationProvider>();
-      final consultation = await provider.requestConsultation(
+          final consultation = await provider.requestConsultation(
         categoryId: widget.categoryId,
         categoryName: widget.categoryName,
         note: widget.note,
+        area: widget.area,
+        aiDiagnosisSessionId: widget.aiDiagnosisSessionId,
         preferredTechnicianId: widget.preferredTechnicianId,
         scheduledAt: widget.scheduledAt,
       );

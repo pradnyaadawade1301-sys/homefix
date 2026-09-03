@@ -14,6 +14,7 @@ type ConsultationService struct {
 	techRepo    *repository.TechnicianRepository
 	bookingSvc  *BookingService
 	reviewRepo  *repository.ReviewRepository
+	aiRepo      *repository.AIRepository
 	fcm         *FirebaseService
 }
 
@@ -22,9 +23,10 @@ func NewConsultationService(
 	techRepo *repository.TechnicianRepository,
 	bookingSvc *BookingService,
 	reviewRepo *repository.ReviewRepository,
+	aiRepo *repository.AIRepository,
 	fcm *FirebaseService,
 ) *ConsultationService {
-	return &ConsultationService{consultRepo: consultRepo, techRepo: techRepo, bookingSvc: bookingSvc, reviewRepo: reviewRepo, fcm: fcm}
+	return &ConsultationService{consultRepo: consultRepo, techRepo: techRepo, bookingSvc: bookingSvc, reviewRepo: reviewRepo, aiRepo: aiRepo, fcm: fcm}
 }
 
 const defaultConsultationFee = 0.0 // Live Consultation is free, no charge
@@ -32,6 +34,36 @@ const defaultConsultationFee = 0.0 // Live Consultation is free, no charge
 // minScheduleLeadTime stops someone from "scheduling" a slot that's basically
 // right now (which should just be Consult Now instead) or in the past.
 const minScheduleLeadTime = 10 * time.Minute
+
+// getDetails wraps ConsultationRepository.GetWithDetails, additionally
+// resolving AIAssessment from the linked AI diagnosis session (see
+// AIDiagnosisSessionID on the model / migrations/027_consultation_request_details.sql)
+// so every call site below gets it "for free" instead of each one needing to
+// know about AIRepository. Kept at the service layer (not inside the repo)
+// since it has to reach across into a different repository.
+//
+// Failure to resolve the AI assessment is deliberately non-fatal — a
+// broken/missing AI session shouldn't ever block a customer or technician
+// from seeing the consultation itself; AIAssessment is just left nil.
+func (s *ConsultationService) getDetails(ctx context.Context, id string) (*models.ConsultationWithDetails, error) {
+	d, err := s.consultRepo.GetWithDetails(ctx, id)
+	if err != nil || d == nil {
+		return d, err
+	}
+	if d.AIDiagnosisSessionID != nil && s.aiRepo != nil {
+		messages, msgErr := s.aiRepo.ListMessages(ctx, *d.AIDiagnosisSessionID)
+		if msgErr == nil {
+			for i := len(messages) - 1; i >= 0; i-- {
+				if messages[i].Role == "assistant" {
+					content := messages[i].Content
+					d.AIAssessment = &content
+					break
+				}
+			}
+		}
+	}
+	return d, nil
+}
 
 // Request is "Start Live Consultation". Two modes based on scheduledAt:
 //
@@ -43,12 +75,33 @@ const minScheduleLeadTime = 10 * time.Minute
 //     but is NOT rung immediately — they're asked to confirm holding that slot
 //     (status 'scheduled' -> 'confirmed'). The actual ring happens later, when
 //     the slot time arrives, via PromoteDueScheduled.
-func (s *ConsultationService) Request(ctx context.Context, customerID, categoryID, preferredTechnicianID string, lat, lng *float64, scheduledAt *time.Time) (*models.ConsultationWithDetails, error) {
+//
+// note/area are the customer's one-line problem description and rough
+// location, collected up front so the technician has real context before
+// picking up (see migrations/027_consultation_request_details.sql) — either
+// may be "" if the customer skipped that field. aiDiagnosisSessionID
+// optionally links back to an AI diagnosis chat the customer already ran;
+// if provided, it's verified to actually belong to this customer before
+// being stored, so a customer can't link (and thereby leak) another
+// customer's AI conversation onto their own request.
+func (s *ConsultationService) Request(ctx context.Context, customerID, categoryID, preferredTechnicianID string, lat, lng *float64, scheduledAt *time.Time, note, area string, aiDiagnosisSessionID *string) (*models.ConsultationWithDetails, error) {
 	if scheduledAt != nil && scheduledAt.Before(time.Now().Add(minScheduleLeadTime)) {
 		return nil, errors.New("please pick a time at least 10 minutes from now")
 	}
 
-	c, err := s.consultRepo.Create(ctx, customerID, categoryID, defaultConsultationFee, scheduledAt)
+	if aiDiagnosisSessionID != nil && *aiDiagnosisSessionID != "" {
+		session, err := s.aiRepo.GetSession(ctx, *aiDiagnosisSessionID)
+		if err != nil {
+			return nil, err
+		}
+		if session == nil || session.UserID != customerID {
+			return nil, errors.New("this AI diagnosis session does not belong to you")
+		}
+	} else {
+		aiDiagnosisSessionID = nil
+	}
+
+	c, err := s.consultRepo.Create(ctx, customerID, categoryID, defaultConsultationFee, scheduledAt, note, area, aiDiagnosisSessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -85,13 +138,13 @@ func (s *ConsultationService) Request(ctx context.Context, customerID, categoryI
 			if err := s.consultRepo.UpdateStatus(ctx, c.ID, "no_technician"); err != nil {
 				return nil, err
 			}
-			return s.consultRepo.GetWithDetails(ctx, c.ID)
+			return s.getDetails(ctx, c.ID)
 		}
 		if err := assign(tech.ID); err != nil {
 			return nil, err
 		}
 		notify(tech.UserID)
-		return s.consultRepo.GetWithDetails(ctx, c.ID)
+		return s.getDetails(ctx, c.ID)
 	}
 
 	// Fallback: nearest-available-by-category matching. For the scheduled flow
@@ -117,7 +170,7 @@ func (s *ConsultationService) Request(ctx context.Context, customerID, categoryI
 		}
 	}
 
-	return s.consultRepo.GetWithDetails(ctx, c.ID)
+	return s.getDetails(ctx, c.ID)
 }
 
 // ConfirmScheduled is the technician confirming they can take a scheduled slot
@@ -146,7 +199,7 @@ func (s *ConsultationService) ConfirmScheduled(ctx context.Context, consultation
 			"Your technician has confirmed your scheduled consultation.",
 			map[string]string{"consultation_id": consultationID, "type": "consultation_confirmed"})
 	}
-	return s.consultRepo.GetWithDetails(ctx, consultationID)
+	return s.getDetails(ctx, consultationID)
 }
 
 // ConfirmScheduledByUser is the ConfirmScheduled counterpart for the Flutter app's
@@ -274,7 +327,7 @@ func (s *ConsultationService) Accept(ctx context.Context, consultationID, techni
 			"A technician has accepted your live video consultation. Connecting now...",
 			map[string]string{"consultation_id": consultationID, "type": "consultation_accepted"})
 	}
-	return s.consultRepo.GetWithDetails(ctx, consultationID)
+	return s.getDetails(ctx, consultationID)
 }
 
 // Reject is the technician tapping [Reject] on an instant/ringing request. reason is
@@ -337,7 +390,7 @@ func (s *ConsultationService) RejectByUser(ctx context.Context, consultationID, 
 }
 
 func (s *ConsultationService) Get(ctx context.Context, consultationID string) (*models.ConsultationWithDetails, error) {
-	return s.consultRepo.GetWithDetails(ctx, consultationID)
+	return s.getDetails(ctx, consultationID)
 }
 
 // MarkStarted flips status to "in_call" the moment both sides have actually joined
@@ -365,7 +418,7 @@ func (s *ConsultationService) End(ctx context.Context, consultationID string) (*
 	if err := s.consultRepo.MarkEnded(ctx, consultationID, duration); err != nil {
 		return nil, err
 	}
-	return s.consultRepo.GetWithDetails(ctx, consultationID)
+	return s.getDetails(ctx, consultationID)
 }
 
 func (s *ConsultationService) MarkPaid(ctx context.Context, consultationID string) error {
@@ -389,7 +442,7 @@ func (s *ConsultationService) EndWithStats(ctx context.Context, consultationID s
 	if err := s.consultRepo.MarkEndedWithStats(ctx, consultationID, duration, reconnectCount, connectionQuality); err != nil {
 		return nil, err
 	}
-	return s.consultRepo.GetWithDetails(ctx, consultationID)
+	return s.getDetails(ctx, consultationID)
 }
 
 // Cancel is the customer giving up while still searching/ringing/scheduled/confirmed.
@@ -411,9 +464,8 @@ func (s *ConsultationService) PendingForUser(ctx context.Context, userID string)
 	return s.consultRepo.ListPendingForTechnician(ctx, tech.ID)
 }
 
-// MyConsultations is GET /consultations/mine — works for both roles: a
-// technician's own call history if they have a technician profile,
-// otherwise the customer's own consultation history, most recent first.
+// MyConsultations is the customer-facing call history (GET /consultations/mine) —
+// every consultation they've ever requested, most recent first.
 func (s *ConsultationService) MyConsultations(ctx context.Context, userID string) ([]models.ConsultationWithDetails, error) {
 	tech, err := s.techRepo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -479,7 +531,7 @@ func (s *ConsultationService) RecommendOnsite(ctx context.Context, consultationI
 			"Your technician sent a recommendation after the call. Review it to book a visit.",
 			map[string]string{"consultation_id": consultationID, "type": "consultation_recommendation"})
 	}
-	return s.consultRepo.GetWithDetails(ctx, consultationID)
+	return s.getDetails(ctx, consultationID)
 }
 
 // RecommendOnsiteByUser is the Send-button counterpart of RecommendOnsite,

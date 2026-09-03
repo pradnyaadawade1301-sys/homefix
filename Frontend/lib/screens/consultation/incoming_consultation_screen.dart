@@ -172,12 +172,47 @@ class _IncomingConsultationScreenState extends State<IncomingConsultationScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(req.customerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                             Text(req.customerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         const SizedBox(height: 4),
                         Text(req.categoryName, style: TextStyle(color: Colors.grey[600])),
                         if (req.customerNote != null && req.customerNote!.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Text(req.customerNote!, style: const TextStyle(fontSize: 13)),
+                        ],
+                        if (req.customerArea != null && req.customerArea!.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(Icons.location_on_outlined, size: 14, color: Colors.grey[500]),
+                              const SizedBox(width: 4),
+                              Text(req.customerArea!, style: TextStyle(fontSize: 12.5, color: Colors.grey[600])),
+                            ],
+                          ),
+                        ],
+                        if (req.aiAssessment != null && req.aiAssessment!.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryColor.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.auto_awesome_outlined, size: 15, color: AppTheme.primaryColor),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    req.aiAssessment!,
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12, color: AppTheme.primaryColor, height: 1.3),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                         const SizedBox(height: 12),
                         Row(

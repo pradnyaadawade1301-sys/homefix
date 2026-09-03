@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../models/booking_model.dart';
-import '../../models/consultation_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/consultation_provider.dart';
 import '../chat/booking_chat_screen.dart';
@@ -93,57 +92,45 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
       itemBuilder: (context, i) {
         final b = bookings[i];
         final customerName = b.customer?.name.isNotEmpty == true ? b.customer!.name : 'Customer';
-<<<<<<< Updated upstream
-        return InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => BookingChatScreen(bookingId: b.id, peerName: customerName),
-          )),
-=======
         void openChat() => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => BookingChatScreen(bookingId: b.id, peerName: customerName),
             ));
         return InkWell(
           borderRadius: BorderRadius.circular(14),
           onTap: openChat,
->>>>>>> Stashed changes
           child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.grey[200]!),
-          ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.12),
-                child: Text(customerName.isNotEmpty ? customerName[0].toUpperCase() : '?',
-                    style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w700)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(customerName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
-                    const SizedBox(height: 2),
-                    Text(b.status.replaceAll('_', ' '),
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-                  ],
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.grey[200]!),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.12),
+                  child: Text(customerName.isNotEmpty ? customerName[0].toUpperCase() : '?',
+                      style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w700)),
                 ),
-              ),
-<<<<<<< Updated upstream
-              const Icon(Icons.forum_outlined, color: AppTheme.primaryColor),
-=======
-              IconButton(
-                icon: const Icon(Icons.forum_outlined, color: AppTheme.primaryColor),
-                tooltip: 'Open chat',
-                onPressed: openChat,
-              ),
->>>>>>> Stashed changes
-            ],
-          ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(customerName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                      const SizedBox(height: 2),
+                      Text(b.status.replaceAll('_', ' '),
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.forum_outlined, color: AppTheme.primaryColor),
+                  tooltip: 'Open chat',
+                  onPressed: openChat,
+                ),
+              ],
+            ),
           ),
         );
       },

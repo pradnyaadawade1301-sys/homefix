@@ -34,6 +34,10 @@ func NewConsultationHandler(consultSvc *service.ConsultationService, stunURLs []
 // the technician is asked to confirm holding that slot instead of being rung
 // right away; the backend automatically rings both sides when the slot arrives
 // (see ConsultationService.PromoteDueScheduled, polled from main.go).
+// note/area are the customer's optional one-line problem description and
+// rough location; ai_diagnosis_session_id optionally links back to an AI
+// diagnosis chat the customer already ran (verified server-side to belong to
+// them — see ConsultationService.Request).
 func (h *ConsultationHandler) Request(c *gin.Context) {
 	userID := c.GetString("user_id")
 
@@ -43,13 +47,16 @@ func (h *ConsultationHandler) Request(c *gin.Context) {
 		Latitude              *float64   `json:"latitude"`
 		Longitude             *float64   `json:"longitude"`
 		ScheduledAt           *time.Time `json:"scheduled_at"`
+		Note                  string     `json:"note"`
+		Area                  string     `json:"area"`
+		AIDiagnosisSessionID  *string    `json:"ai_diagnosis_session_id"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	result, err := h.consultSvc.Request(c.Request.Context(), userID, body.CategoryID, body.PreferredTechnicianID, body.Latitude, body.Longitude, body.ScheduledAt)
+	result, err := h.consultSvc.Request(c.Request.Context(), userID, body.CategoryID, body.PreferredTechnicianID, body.Latitude, body.Longitude, body.ScheduledAt, body.Note, body.Area, body.AIDiagnosisSessionID)
 	if err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return

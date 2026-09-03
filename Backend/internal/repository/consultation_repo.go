@@ -20,20 +20,22 @@ func NewConsultationRepository(database *pgxpool.Pool) *ConsultationRepository {
 
 // Create makes a new consultation. If scheduledAt is nil, it's the existing
 // instant flow (status 'searching', ready to be rung right away). If scheduledAt
-// is set, it starts life as 'scheduled' — nobody is rung yet.
-func (r *ConsultationRepository) Create(ctx context.Context, customerID, categoryID string, fee float64, scheduledAt *time.Time) (*models.Consultation, error) {
+// is set, it starts life as 'scheduled' — nobody is rung yet. note/area are the
+// customer's one-line problem description and rough location collected up
+// front (see migrations/027_consultation_request_details.sql); aiDiagnosisSessionID
+// optionally links back to an AI diagnosis chat the customer already ran. Any of
+// the three may be "" / nil.
+func (r *ConsultationRepository) Create(ctx context.Context, customerID, categoryID string, fee float64, scheduledAt *time.Time, note, area string, aiDiagnosisSessionID *string) (*models.Consultation, error) {
 	status := "searching"
 	if scheduledAt != nil {
 		status = "scheduled"
 	}
 	row := r.db.QueryRow(ctx, `
-		INSERT INTO consultations (customer_id, category_id, fee, status, scheduled_at)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO consultations (customer_id, category_id, fee, status, scheduled_at, note, area, ai_diagnosis_session_id)
+		VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''), NULLIF($7, ''), $8)
 		RETURNING id, customer_id, technician_id, category_id, status, fee, duration_seconds,
-		          payment_status, escalated_booking_id, decline_reason,
-		          recommendation_summary, recommendation_price, recommendation_status, recommendation_sent_at,
-		          scheduled_at, started_at, ended_at, created_at, updated_at
-	`, customerID, categoryID, fee, status, scheduledAt)
+		          payment_status, escalated_booking_id, decline_reason, scheduled_at, started_at, ended_at, created_at, updated_at
+	`, customerID, categoryID, fee, status, scheduledAt, note, area, aiDiagnosisSessionID)
 	return scanConsultation(row)
 }
 
@@ -234,6 +236,32 @@ func (r *ConsultationRepository) ListUpcomingForTechnician(ctx context.Context, 
 	return scanConsultationRows(rows)
 }
 
+// ListForTechnician returns every consultation ever assigned to this technician,
+// most recent first — the technician-side counterpart of ListForCustomer, used by
+// ConsultationService.MyConsultations so the technician's "History" tab (Video
+// Call) can show past calls via the same GET /consultations/mine endpoint the
+// customer app uses. Unlike ListPendingForTechnician / ListUpcomingForTechnician,
+// this is NOT filtered by status.
+func (r *ConsultationRepository) ListForTechnician(ctx context.Context, technicianID string) ([]models.ConsultationWithDetails, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason,
+		       co.recommendation_summary, co.recommendation_price, co.recommendation_status, co.recommendation_sent_at,
+		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
+		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''), '', ''
+		FROM consultations co
+		LEFT JOIN categories cat ON cat.id = co.category_id
+		LEFT JOIN users cu ON cu.id = co.customer_id
+		WHERE co.technician_id = $1
+		ORDER BY co.created_at DESC
+	`, technicianID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanConsultationRows(rows)
+}
+
 // DueForRinging finds every 'confirmed' scheduled consultation whose slot time has
 // arrived (scheduled_at <= now) — polled periodically (see
 // ConsultationService.PromoteDueScheduled) to flip them into 'ringing' and notify
@@ -297,34 +325,6 @@ func (r *ConsultationRepository) ListForCustomer(ctx context.Context, customerID
 		WHERE co.customer_id = $1
 		ORDER BY co.created_at DESC
 	`, customerID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanConsultationRows(rows)
-}
-
-// ListForTechnician returns every consultation ever assigned to this technician,
-// most recent first — the technician-side counterpart of ListForCustomer, powering
-// GET /consultations/mine when called by a technician account (see
-// ConsultationService.MyConsultations). Not filtered by status, same as
-// ListForCustomer.
-func (r *ConsultationRepository) ListForTechnician(ctx context.Context, technicianID string) ([]models.ConsultationWithDetails, error) {
-	rows, err := r.db.Query(ctx, `
-		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
-		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason,
-		       co.recommendation_summary, co.recommendation_price, co.recommendation_status, co.recommendation_sent_at,
-		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
-		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''),
-		       COALESCE(tu.name, ''), COALESCE(tu.phone, '')
-		FROM consultations co
-		LEFT JOIN categories cat ON cat.id = co.category_id
-		LEFT JOIN users cu ON cu.id = co.customer_id
-		LEFT JOIN technicians t ON t.id = co.technician_id
-		LEFT JOIN users tu ON tu.id = t.user_id
-		WHERE co.technician_id = $1
-		ORDER BY co.created_at DESC
-	`, technicianID)
 	if err != nil {
 		return nil, err
 	}

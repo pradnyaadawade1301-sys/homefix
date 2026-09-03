@@ -111,10 +111,14 @@ class ConsultationProvider extends ChangeNotifier {
 
   /// Customer: kick off a new consultation request. Backend starts matching
   /// a technician; resulting status is typically "searching".
+   /// Customer: kick off a new consultation request. Backend starts matching
+  /// a technician; resulting status is typically "searching".
   Future<Consultation> requestConsultation({
     required String categoryId,
     required String categoryName,
     String? note,
+    String? area,
+    String? aiDiagnosisSessionId,
     String? preferredTechnicianId,
     DateTime? scheduledAt,
   }) async {
@@ -126,6 +130,8 @@ class ConsultationProvider extends ChangeNotifier {
         categoryId: categoryId,
         categoryName: categoryName,
         note: note,
+        area: area,
+        aiDiagnosisSessionId: aiDiagnosisSessionId,
         preferredTechnicianId: preferredTechnicianId,
         scheduledAt: scheduledAt,
       );
