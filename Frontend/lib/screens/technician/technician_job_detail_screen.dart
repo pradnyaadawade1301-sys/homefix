@@ -214,24 +214,6 @@ class TechnicianJobDetailScreen extends StatelessWidget {
                         const SizedBox(height: 16),
                         Row(
                           children: [
-                            if (customer.phone.isNotEmpty) ...[
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  icon: const Icon(Icons.call_outlined, size: 16),
-                                  label: const Text('Call'),
-                                  onPressed: () => callContact(context, customer.phone),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  icon: const Icon(Icons.chat_outlined, size: 16),
-                                  label: const Text('WhatsApp'),
-                                  onPressed: () => openWhatsApp(context, customer.phone),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                            ],
                             Expanded(
                               child: ElevatedButton.icon(
                                 icon: const Icon(Icons.forum_outlined, size: 16),

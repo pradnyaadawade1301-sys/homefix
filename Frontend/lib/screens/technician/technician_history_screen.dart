@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../models/booking_model.dart';
+import '../../models/consultation_model.dart';
 import '../../providers/booking_provider.dart';
+import '../../providers/consultation_provider.dart';
 import '../chat/booking_chat_screen.dart';
 
 /// Technician-facing History tab — one place to see every job's chat thread
-/// and how much the customer paid for it. Reuses the same booking list
-/// already loaded by TechnicianJobsScreen (BookingProvider.bookings), so it
-/// needs no new backend endpoint.
-///
-/// Note: there's no video-call log here — video calling isn't wired up for
-/// regular jobs yet (only for the separate paid "Live Consultation" flow),
-/// so there's no call history data to show for jobs.
+/// and past video consultations. Chats reuses the booking list already
+/// loaded by TechnicianJobsScreen (BookingProvider.bookings); Video Call
+/// reuses ConsultationProvider.loadHistory() (same "/consultations/mine"
+/// endpoint the customer-side history screen uses — scoped to whoever is
+/// authenticated, technician or customer).
 class TechnicianHistoryScreen extends StatefulWidget {
   const TechnicianHistoryScreen({super.key});
 
@@ -21,11 +21,18 @@ class TechnicianHistoryScreen extends StatefulWidget {
 }
 
 class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
-  int _tab = 0; // 0 = Chats, 1 = Payments
+  int _tab = 0; // 0 = Chats, 1 = Video Call
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => context.read<ConsultationProvider>().loadHistory());
+  }
 
   @override
   Widget build(BuildContext context) {
     final bookings = context.watch<BookingProvider>().bookings;
+    final consultationProvider = context.watch<ConsultationProvider>();
 
     return Column(
       children: [
@@ -38,13 +45,15 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _tabChip('Payments', 1),
+                child: _tabChip('Video Call', 1),
               ),
             ],
           ),
         ),
         Expanded(
-          child: _tab == 0 ? _chatsList(bookings) : _paymentsList(bookings),
+          child: _tab == 0
+              ? _chatsList(bookings)
+              : _videoCallList(consultationProvider),
         ),
       ],
     );
@@ -84,7 +93,12 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
       itemBuilder: (context, i) {
         final b = bookings[i];
         final customerName = b.customer?.name.isNotEmpty == true ? b.customer!.name : 'Customer';
-        return Container(
+        return InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => BookingChatScreen(bookingId: b.id, peerName: customerName),
+          )),
+          child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -110,32 +124,29 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
                   ],
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.forum_outlined, color: AppTheme.primaryColor),
-                tooltip: 'Open chat',
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => BookingChatScreen(bookingId: b.id, peerName: customerName),
-                )),
-              ),
+              const Icon(Icons.forum_outlined, color: AppTheme.primaryColor),
             ],
+          ),
           ),
         );
       },
     );
   }
 
-  Widget _paymentsList(List<Booking> bookings) {
-    final paid = bookings.where((b) => b.isPaid && b.displayPrice != null).toList();
-    if (paid.isEmpty) {
-      return const Center(child: Text('No payments yet'));
+  Widget _videoCallList(ConsultationProvider provider) {
+    if (provider.isLoadingHistory && provider.history.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (provider.history.isEmpty) {
+      return const Center(child: Text('No video calls yet'));
     }
     return ListView.separated(
       padding: const EdgeInsets.all(16),
-      itemCount: paid.length,
+      itemCount: provider.history.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, i) {
-        final b = paid[i];
-        final customerName = b.customer?.name.isNotEmpty == true ? b.customer!.name : 'Customer';
+        final c = provider.history[i];
+        final customerName = c.customerName?.isNotEmpty == true ? c.customerName! : 'Customer';
         return Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -145,19 +156,35 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
           ),
           child: Row(
             children: [
+              CircleAvatar(
+                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.12),
+                child: const Icon(Icons.videocam_outlined, color: AppTheme.primaryColor, size: 20),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(customerName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
                     const SizedBox(height: 2),
-                    Text('Paid on ${_formatDate(b.updatedAt)}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                    Text(
+                      c.scheduledAt != null ? 'Scheduled on ${_formatDate(c.scheduledAt!)}' : _formatDate(c.createdAt),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
                   ],
                 ),
               ),
-              Text('\u20b9${b.displayPrice!.toStringAsFixed(0)}',
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppTheme.primaryColor)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  c.status.replaceAll('_', ' '),
+                  style: const TextStyle(fontSize: 11, color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
+                ),
+              ),
             ],
           ),
         );

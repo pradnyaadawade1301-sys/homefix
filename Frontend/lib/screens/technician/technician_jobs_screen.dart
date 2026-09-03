@@ -306,13 +306,22 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
         if (_upcomingConsultations.isNotEmpty) _buildUpcomingBanner(),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
-          child: Row(
-            key: _filterKey,
-            children: [
-              _FilterChip(label: 'Active', selected: _tabIndex == 0, onTap: () => setState(() => _tabIndex = 0)),
-              const SizedBox(width: 8),
-              _FilterChip(label: 'All', selected: _tabIndex == 1, onTap: () => setState(() => _tabIndex = 1)),
-            ],
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              key: _filterKey,
+              children: [
+                _FilterChip(label: 'Active', selected: _tabIndex == 0, onTap: () => setState(() => _tabIndex = 0)),
+                const SizedBox(width: 8),
+                _FilterChip(label: 'Book Now', selected: _tabIndex == 1, onTap: () => setState(() => _tabIndex = 1)),
+                const SizedBox(width: 8),
+                _FilterChip(label: 'Video Call', selected: _tabIndex == 2, onTap: () => setState(() => _tabIndex = 2)),
+                const SizedBox(width: 8),
+                _FilterChip(label: 'Schedule for later', selected: _tabIndex == 3, onTap: () => setState(() => _tabIndex = 3)),
+                const SizedBox(width: 8),
+                _FilterChip(label: 'All', selected: _tabIndex == 4, onTap: () => setState(() => _tabIndex = 4)),
+              ],
+            ),
           ),
         ),
         Expanded(
@@ -351,13 +360,28 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
                   );
                 }
 
-                final jobs = _tabIndex == 0
-                    ? provider.bookings
-                        .where((b) => b.status == 'accepted' || b.status == 'on_the_way' || b.status == 'arrived' || b.status == 'inspecting' || b.status == 'in_progress' || b.status == 'awaiting_estimate_approval')
-                        .toList()
-                    : provider.bookings;
+                // Book Now = an immediate request (no future schedule, no
+                // video consultation beforehand). Video Call = a booking
+                // that had a video consultation first (jobBrief.hasVideo).
+                // Schedule for later = customer picked a future date/time.
+                final jobs = switch (_tabIndex) {
+                  0 => provider.bookings
+                      .where((b) => b.status == 'accepted' || b.status == 'on_the_way' || b.status == 'arrived' || b.status == 'inspecting' || b.status == 'in_progress' || b.status == 'awaiting_estimate_approval')
+                      .toList(),
+                  1 => provider.bookings.where((b) => b.jobBrief?.hasVideo != true && b.scheduledAt == null).toList(),
+                  2 => provider.bookings.where((b) => b.jobBrief?.hasVideo == true).toList(),
+                  3 => provider.bookings.where((b) => b.scheduledAt != null).toList(),
+                  _ => provider.bookings,
+                };
 
                 if (jobs.isEmpty) {
+                  final emptyTitle = switch (_tabIndex) {
+                    0 => 'No active jobs right now',
+                    1 => 'No Book Now requests',
+                    2 => 'No Video Call jobs',
+                    3 => 'No jobs scheduled for later',
+                    _ => 'No jobs yet',
+                  };
                   return ListView(
                     children: [
                       SizedBox(height: MediaQuery.of(context).size.height * 0.22),
@@ -365,7 +389,7 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
                       const SizedBox(height: 16),
                       Center(
                         child: Text(
-                          _tabIndex == 0 ? 'No active jobs right now' : 'No jobs yet',
+                          emptyTitle,
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey[600]),
                         ),
                       ),

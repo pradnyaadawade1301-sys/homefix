@@ -205,9 +205,14 @@ class _HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin {
   final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
   late final AnimationController _bannerAnimController;
   late final Animation<double> _floatAnim;
   late final Animation<double> _sparkleAnim;
+
+  // Live list of suggestions shown below the search bar as the user types,
+  // similar to how most apps offer suggestions after every keystroke.
+  List<String> _suggestions = [];
 
   @override
   void initState() {
@@ -223,6 +228,32 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
     _sparkleAnim = Tween<double>(begin: 0.6, end: 1.0).animate(
       CurvedAnimation(parent: _bannerAnimController, curve: Curves.easeInOut),
     );
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      setState(() => _suggestions = []);
+      return;
+    }
+    final categories = context.read<CategoryProvider>().categories;
+    final matches = categories
+        .map((c) => c.name)
+        .where((name) => name.toLowerCase().contains(query))
+        .toSet()
+        .toList();
+    setState(() => _suggestions = matches);
+  }
+
+  void _selectSuggestion(String suggestion) {
+    _searchController.text = suggestion;
+    _searchController.selection = TextSelection.fromPosition(
+      TextPosition(offset: suggestion.length),
+    );
+    setState(() => _suggestions = []);
+    _searchFocusNode.unfocus();
+    _openTechnicianList(initialQuery: suggestion);
   }
 
   void _loadData() {
@@ -257,7 +288,9 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
 
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _bannerAnimController.dispose();
     super.dispose();
   }
@@ -273,6 +306,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
             _buildHeader(context),
             const SizedBox(height: 20),
             KeyedSubtree(key: widget.searchKey, child: _buildSearchBar()),
+            if (_suggestions.isNotEmpty) _buildSuggestionsList(),
             const SizedBox(height: 20),
             KeyedSubtree(key: widget.promoKey, child: _buildPromoBanner(context)),
             const SizedBox(height: 24),
@@ -503,8 +537,12 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
       ),
       child: TextField(
         controller: _searchController,
+        focusNode: _searchFocusNode,
         textInputAction: TextInputAction.search,
-        onSubmitted: _submitSearch,
+        onSubmitted: (value) {
+          setState(() => _suggestions = []);
+          _submitSearch(value);
+        },
         decoration: InputDecoration(
           hintText: 'Search service...',
           hintStyle: TextStyle(color: Colors.grey[500]),
@@ -524,6 +562,36 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
           focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
         ),
+      ),
+    );
+  }
+
+  // Dropdown-style suggestion list shown right below the search bar as the
+  // user types, matching against known service/category names.
+  Widget _buildSuggestionsList() {
+    return Container(
+      margin: const EdgeInsets.only(top: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      constraints: const BoxConstraints(maxHeight: 220),
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        shrinkWrap: true,
+        itemCount: _suggestions.length,
+        separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.withValues(alpha: 0.15)),
+        itemBuilder: (context, index) {
+          final suggestion = _suggestions[index];
+          return ListTile(
+            dense: true,
+            leading: Icon(Icons.search_rounded, color: Colors.grey[500], size: 20),
+            title: Text(suggestion, style: const TextStyle(fontSize: 14)),
+            onTap: () => _selectSuggestion(suggestion),
+          );
+        },
       ),
     );
   }
@@ -577,25 +645,6 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // "Get 30% Off Today!" pill badge.
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF241C15),
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: RichText(
-                      text: const TextSpan(
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-                        children: [
-                          TextSpan(text: '🏷️ Get '),
-                          TextSpan(text: '30%', style: TextStyle(color: Color(0xFFFFC94A))),
-                          TextSpan(text: ' Off Today!'),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
                   // Heading — last line in white, rest in dark ink.
                   const Text.rich(
                     TextSpan(

@@ -304,6 +304,34 @@ func (r *ConsultationRepository) ListForCustomer(ctx context.Context, customerID
 	return scanConsultationRows(rows)
 }
 
+// ListForTechnician returns every consultation ever assigned to this technician,
+// most recent first — the technician-side counterpart of ListForCustomer, powering
+// GET /consultations/mine when called by a technician account (see
+// ConsultationService.MyConsultations). Not filtered by status, same as
+// ListForCustomer.
+func (r *ConsultationRepository) ListForTechnician(ctx context.Context, technicianID string) ([]models.ConsultationWithDetails, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason,
+		       co.recommendation_summary, co.recommendation_price, co.recommendation_status, co.recommendation_sent_at,
+		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
+		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''),
+		       COALESCE(tu.name, ''), COALESCE(tu.phone, '')
+		FROM consultations co
+		LEFT JOIN categories cat ON cat.id = co.category_id
+		LEFT JOIN users cu ON cu.id = co.customer_id
+		LEFT JOIN technicians t ON t.id = co.technician_id
+		LEFT JOIN users tu ON tu.id = t.user_id
+		WHERE co.technician_id = $1
+		ORDER BY co.created_at DESC
+	`, technicianID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanConsultationRows(rows)
+}
+
 // MarkEndedWithStats is MarkEnded plus the client-reported session-analytics fields
 // gathered during the call (see RtcService in the app: reconnect attempts and a
 // coarse connection-quality sample from getStats()).

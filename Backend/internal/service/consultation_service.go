@@ -419,28 +419,15 @@ func (s *ConsultationService) MyConsultations(ctx context.Context, customerID st
 
 // Rate records the customer's rating for a consultation that resolved remotely (no
 // escalated booking). Only allowed once the call has actually ended.
-func (s *ConsultationService) Rate(ctx context.Context, consultationID, customerID string, rating int, comment string) error {
-	c, err := s.consultRepo.GetByID(ctx, consultationID)
+func (s *ConsultationService) MyConsultations(ctx context.Context, userID string) ([]models.ConsultationWithDetails, error) {
+	tech, err := s.techRepo.GetByUserID(ctx, userID)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if c == nil {
-		return errors.New("consultation not found")
+	if tech != nil {
+		return s.consultRepo.ListForTechnician(ctx, tech.ID)
 	}
-	if c.CustomerID != customerID {
-		return errors.New("not your consultation")
-	}
-	if c.Status != "ended" {
-		return errors.New("consultation hasn't ended yet")
-	}
-	if c.TechnicianID == nil {
-		return errors.New("no technician was assigned to this consultation")
-	}
-	if err := s.consultRepo.SetRating(ctx, consultationID, rating, comment); err != nil {
-		return err
-	}
-	_, err = s.reviewRepo.CreateForConsultation(ctx, consultationID, customerID, *c.TechnicianID, rating, comment)
-	return err
+	return s.consultRepo.ListForCustomer(ctx, userID)
 }
 
 // Escalate is "Recommend On-site Visit" -> customer taps Yes: turns the consultation
