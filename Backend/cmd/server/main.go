@@ -31,7 +31,11 @@ func main() {
 	if _, err := pool.Exec(context.Background(),
 		`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS otp_code VARCHAR(6);
 		 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS otp_verified_at TIMESTAMP NULL;
-		 ALTER TABLE consultations ADD COLUMN IF NOT EXISTS decline_reason TEXT;`); err != nil {
+		 ALTER TABLE consultations ADD COLUMN IF NOT EXISTS decline_reason TEXT;
+		 ALTER TABLE consultations ADD COLUMN IF NOT EXISTS note TEXT;
+		 ALTER TABLE consultations ADD COLUMN IF NOT EXISTS area VARCHAR(120);
+		 ALTER TABLE consultations ADD COLUMN IF NOT EXISTS ai_diagnosis_session_id UUID REFERENCES ai_diagnosis_sessions(id);
+		 CREATE INDEX IF NOT EXISTS idx_consultations_ai_diagnosis ON consultations(ai_diagnosis_session_id);`); err != nil {
 		log.Fatalf("startup: failed to ensure otp columns exist: %v", err)
 	}
 
