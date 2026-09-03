@@ -195,6 +195,22 @@ func (h *BookingHandler) Accept(c *gin.Context) {
 	utils.Success(c, http.StatusOK, gin.H{"message": "booking accepted"})
 }
 
+// Decline lets a technician turn down a booking that's been routed to them
+// while it's still 'requested'. Mirrors Accept's request shape.
+func (h *BookingHandler) Decline(c *gin.Context) {
+	bookingID := c.Param("id")
+	var body acceptBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.bookingService.Decline(c.Request.Context(), bookingID, body.TechnicianID); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"message": "booking declined"})
+}
+
 type statusBody struct {
 	Status string `json:"status" binding:"required"`
 	Note   string `json:"note"`

@@ -93,11 +93,20 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
       itemBuilder: (context, i) {
         final b = bookings[i];
         final customerName = b.customer?.name.isNotEmpty == true ? b.customer!.name : 'Customer';
+<<<<<<< Updated upstream
         return InkWell(
           borderRadius: BorderRadius.circular(14),
           onTap: () => Navigator.of(context).push(MaterialPageRoute(
             builder: (_) => BookingChatScreen(bookingId: b.id, peerName: customerName),
           )),
+=======
+        void openChat() => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => BookingChatScreen(bookingId: b.id, peerName: customerName),
+            ));
+        return InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: openChat,
+>>>>>>> Stashed changes
           child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -124,7 +133,15 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
                   ],
                 ),
               ),
+<<<<<<< Updated upstream
               const Icon(Icons.forum_outlined, color: AppTheme.primaryColor),
+=======
+              IconButton(
+                icon: const Icon(Icons.forum_outlined, color: AppTheme.primaryColor),
+                tooltip: 'Open chat',
+                onPressed: openChat,
+              ),
+>>>>>>> Stashed changes
             ],
           ),
           ),

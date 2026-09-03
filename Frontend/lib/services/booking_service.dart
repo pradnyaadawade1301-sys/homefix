@@ -189,6 +189,20 @@ class BookingService {
     }
   }
 
+  /// Technician declines a requested booking that was routed to them —
+  /// POST /bookings/:id/decline. The booking goes back into the pool
+  /// (unassigned, still 'requested') so another technician can be found.
+  Future<void> declineBooking(String bookingId, String technicianId) async {
+    try {
+      await _httpClient.post(
+        '${ApiConfig.bookingDetail}/$bookingId/decline',
+        data: {'technician_id': technicianId},
+      );
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
   /// Technician marks themselves as having reached the customer's location —
   /// POST /bookings/:id/arrived. Backend generates a fresh OTP and pushes it
   /// to the customer only; this call doesn't return the code itself.

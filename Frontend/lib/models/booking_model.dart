@@ -269,6 +269,7 @@ class JobBrief {
   final bool hasVideo;
   final String? aiDiagnosis;
   final String? consultationNotes;
+  final Map<String, String>? categoryAnswers;
 
   const JobBrief({
     this.startedWhen,
@@ -279,6 +280,7 @@ class JobBrief {
     this.hasVideo = false,
     this.aiDiagnosis,
     this.consultationNotes,
+    this.categoryAnswers,
   });
 
   /// True if the customer actually answered any of the guided questions —
@@ -288,7 +290,8 @@ class JobBrief {
   /// section vs. its empty-state message.
   bool get hasGuidedAnswers =>
       startedWhen != null || isContinuous != null || previousRepair != null || isEmergency != null ||
-      (unusualSigns != null && unusualSigns!.isNotEmpty);
+      (unusualSigns != null && unusualSigns!.isNotEmpty) ||
+      (categoryAnswers != null && categoryAnswers!.isNotEmpty);
 
   JobBrief copyWith({
     String? startedWhen,
@@ -299,6 +302,7 @@ class JobBrief {
     bool? hasVideo,
     String? aiDiagnosis,
     String? consultationNotes,
+    Map<String, String>? categoryAnswers,
   }) {
     return JobBrief(
       startedWhen: startedWhen ?? this.startedWhen,
@@ -309,6 +313,7 @@ class JobBrief {
       hasVideo: hasVideo ?? this.hasVideo,
       aiDiagnosis: aiDiagnosis ?? this.aiDiagnosis,
       consultationNotes: consultationNotes ?? this.consultationNotes,
+      categoryAnswers: categoryAnswers ?? this.categoryAnswers,
     );
   }
 
@@ -330,6 +335,7 @@ class JobBrief {
       if (hasVideo) 'hasVideo': hasVideo,
       if (aiDiagnosis != null && aiDiagnosis!.isNotEmpty) 'aiDiagnosis': aiDiagnosis,
       if (consultationNotes != null && consultationNotes!.isNotEmpty) 'consultationNotes': consultationNotes,
+      if (categoryAnswers != null && categoryAnswers!.isNotEmpty) 'categoryAnswers': categoryAnswers,
     };
     return '$_marker${jsonEncode(map)}';
   }
@@ -351,6 +357,8 @@ class JobBrief {
         hasVideo: map['hasVideo'] as bool? ?? false,
         aiDiagnosis: map['aiDiagnosis'] as String?,
         consultationNotes: map['consultationNotes'] as String?,
+        categoryAnswers: (map['categoryAnswers'] as Map<String, dynamic>?)
+            ?.map((k, v) => MapEntry(k, v as String)),
       );
     } catch (_) {
       return null;

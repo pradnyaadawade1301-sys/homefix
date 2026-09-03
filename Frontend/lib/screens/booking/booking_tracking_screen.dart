@@ -111,7 +111,7 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
               return ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
-                  _buildStepper(currentIndex),
+                  _buildStepper(currentIndex, provider.history),
                   const SizedBox(height: 24),
                   if (booking.isAwaitingEstimateApproval) ...[
                     _estimateApprovalCard(context, provider, booking),
@@ -548,7 +548,24 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
     );
   }
 
-  Widget _buildStepper(int currentIndex) {
+  /// Formats a timestamp the same compact way Meesho/Shiprocket-style order
+  /// tracking does: "3 Sep, 6:42 PM".
+  String _formatStamp(DateTime dt) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final period = dt.hour >= 12 ? 'PM' : 'AM';
+    final minute = dt.minute.toString().padLeft(2, '0');
+    return '${dt.day} ${months[dt.month - 1]}, $hour12:$minute $period';
+  }
+
+  Widget _buildStepper(int currentIndex, List<BookingStatusHistory> history) {
+    // Latest history row for each stage — reused so every completed step
+    // shows exactly when it happened, like a courier tracking timeline.
+    final Map<String, DateTime> stageTimestamps = {};
+    for (final h in history) {
+      stageTimestamps[h.status] = h.createdAt;
+    }
+
     // A vertical timeline instead of the old horizontal icon row — it never
     // overflows on narrow screens (labels wrap naturally) and reads more
     // like a premium delivery-tracking screen.
@@ -566,6 +583,7 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
           final isCurrent = i == currentIndex;
           final isDone = i < currentIndex;
           final reached = i <= currentIndex;
+          final stamp = stageTimestamps[stage];
           return IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -615,19 +633,36 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          _stageLabels[stage] ?? stage,
-                          style: TextStyle(
-                            fontSize: isCurrent ? 15.5 : 13.5,
-                            fontWeight: reached ? FontWeight.w700 : FontWeight.w500,
-                            color: reached ? const Color(0xFF1A1F36) : Colors.grey[400],
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _stageLabels[stage] ?? stage,
+                              style: TextStyle(
+                                fontSize: isCurrent ? 15.5 : 13.5,
+                                fontWeight: reached ? FontWeight.w700 : FontWeight.w500,
+                                color: reached ? const Color(0xFF1A1F36) : Colors.grey[400],
+                              ),
+                            ),
+                            // Timestamp on the right of the label, same as
+                            // Meesho's order-tracking rows — only shown once
+                            // this step has actually happened.
+                            if (stamp != null)
+                              Text(
+                                _formatStamp(stamp),
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: reached ? AppTheme.primaryColor : Colors.grey[400],
+                                ),
+                              ),
+                          ],
                         ),
                         if (isCurrent) ...[
                           const SizedBox(height: 3),
-                          const Text(
-                            'In progress...',
-                            style: TextStyle(fontSize: 12, color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
+                          Text(
+                            stamp != null ? 'Updated ${_formatStamp(stamp)}' : 'In progress...',
+                            style: const TextStyle(fontSize: 12, color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
                           ),
                         ],
                       ],

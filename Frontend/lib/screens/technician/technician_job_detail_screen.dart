@@ -24,6 +24,7 @@ class TechnicianJobDetailScreen extends StatelessWidget {
       case 'cancelled':
         return AppTheme.errorColor;
       case 'in_progress':
+      case 'repair_in_progress':
       case 'accepted':
       case 'on_the_way':
       case 'arrived':
@@ -46,6 +47,8 @@ class TechnicianJobDetailScreen extends StatelessWidget {
         return 'Arrived';
       case 'in_progress':
         return 'In progress';
+      case 'repair_in_progress':
+        return 'Repair in progress';
       case 'awaiting_estimate_approval':
         return 'Awaiting customer approval';
       case 'completed':

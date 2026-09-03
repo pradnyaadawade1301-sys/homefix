@@ -139,6 +139,33 @@ func (r *BookingRepository) AssignTechnician(ctx context.Context, bookingID, tec
 	return tx.Commit(ctx)
 }
 
+// Decline reverses AssignTechnician for a technician who was handed a
+// 'requested' booking but doesn't want to take it: it clears technician_id
+// and leaves status at 'requested' so the booking goes back into the pool
+// for another technician to be found, instead of silently getting stuck.
+func (r *BookingRepository) Decline(ctx context.Context, bookingID, technicianID string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(ctx, `UPDATE bookings SET technician_id = NULL, status = 'requested', updated_at = now()
+		WHERE id = $1 AND technician_id = $2 AND status = 'requested'`, bookingID, technicianID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrBookingAlreadyAssigned
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO booking_status_history (booking_id, status, note) VALUES ($1,'requested','Technician declined — searching for another technician')`,
+		bookingID)
+	if err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 func (r *BookingRepository) UpdateStatus(ctx context.Context, bookingID, status, note string) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {

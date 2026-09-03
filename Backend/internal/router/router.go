@@ -116,6 +116,7 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.GET("/bookings/:id", h.Booking.Get)
 		authed.GET("/bookings/:id/history", h.Booking.History)
 		authed.POST("/bookings/:id/accept", middleware.RequireRole("technician"), h.Booking.Accept)
+		authed.POST("/bookings/:id/decline", middleware.RequireRole("technician"), h.Booking.Decline)
 		authed.PATCH("/bookings/:id/status", middleware.RequireRole("technician", "admin"), h.Booking.UpdateStatus)
 		authed.POST("/bookings/:id/complete", middleware.RequireRole("technician", "admin"), h.Booking.Complete)
 		authed.POST("/bookings/:id/warranty-claim", h.Booking.RaiseWarrantyClaim)

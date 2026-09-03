@@ -35,9 +35,49 @@ class BookTechnicianScreen extends StatefulWidget {
   State<BookTechnicianScreen> createState() => _BookTechnicianScreenState();
 }
 
-/// Step 4 of the spec ("Select Date & Time"): ASAP, or a scheduled Today /
-/// Tomorrow / custom date with one of four fixed 2-hour slots.
-enum _WhenChoice { asap, today, tomorrow, customDate }
+/// Step 4 of the spec ("Select Date & Time"): a scheduled Today / Tomorrow /
+/// custom date with one of four fixed 2-hour slots. ASAP was removed —
+/// every booking now goes through a technician Accept/Decline step, so a
+/// firm slot is always required rather than "as soon as possible".
+enum _WhenChoice { today, tomorrow, customDate }
+
+/// Fixed, category-specific quick questions shown on the booking confirm
+/// screen (before "Confirm Booking") — e.g. AC Repair asks about cooling /
+/// gas leak / noise, Plumber asks about leak / blockage / installation.
+/// Keyed by the exact category name seeded in `002_seed_categories.sql`.
+const Map<String, List<_CategoryQuestion>> _categoryQuestions = {
+  'AC Repair': [
+    _CategoryQuestion('What\'s the issue?', ['Not cooling', 'Gas leak', 'Water leakage', 'Unusual noise', 'Not turning on']),
+    _CategoryQuestion('AC type', ['Split AC', 'Window AC', 'Central AC']),
+  ],
+  'Plumber': [
+    _CategoryQuestion('What\'s the issue?', ['Leakage', 'Blockage / clogging', 'New fitting/installation', 'Low water pressure', 'Tap/valve repair']),
+    _CategoryQuestion('Where is the problem?', ['Kitchen', 'Bathroom', 'Overhead tank', 'Main pipeline']),
+  ],
+  'Electrician': [
+    _CategoryQuestion('What\'s the issue?', ['Switch/socket not working', 'Wiring problem', 'Frequent tripping', 'New installation', 'Fan/light repair']),
+    _CategoryQuestion('Is it urgent?', ['Yes, safety risk', 'No, can wait']),
+  ],
+  'Appliance Repair': [
+    _CategoryQuestion('Which appliance?', ['Washing machine', 'Refrigerator', 'Microwave', 'Water purifier', 'Other']),
+    _CategoryQuestion('What\'s the issue?', ['Not turning on', 'Making noise', 'Not working properly', 'Needs servicing']),
+  ],
+  'Roofer': [
+    _CategoryQuestion('What\'s the issue?', ['Leakage/seepage', 'Waterproofing needed', 'Cracks', 'General maintenance']),
+  ],
+  'Carpenter': [
+    _CategoryQuestion('What\'s the issue?', ['Furniture repair', 'New fitting', 'Door/window issue', 'Lock/hinge repair']),
+  ],
+  'Painter': [
+    _CategoryQuestion('Type of work', ['Interior painting', 'Exterior painting', 'Touch-up/patch work', 'Waterproofing + painting']),
+  ],
+};
+
+class _CategoryQuestion {
+  final String question;
+  final List<String> options;
+  const _CategoryQuestion(this.question, this.options);
+}
 
 const List<_TimeSlot> _timeSlots = [
   _TimeSlot('9 AM – 11 AM', 9),
@@ -54,10 +94,11 @@ class _TimeSlot {
 class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
   final _notesController = TextEditingController();
   String? _selectedAddressId;
-  _WhenChoice _whenChoice = _WhenChoice.asap;
+  _WhenChoice _whenChoice = _WhenChoice.today;
   DateTime? _customDate;
   _TimeSlot? _selectedSlot;
   bool _isSubmitting = false;
+  final Map<String, String> _categoryAnswers = {};
 
   @override
   void initState() {
@@ -82,10 +123,8 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
   }
 
   /// Resolves the current "when" selection into an actual DateTime for the
-  /// booking. Returns null for ASAP (no scheduledAt sent — backend treats an
-  /// absent scheduledAt as "as soon as possible").
+  /// booking.
   DateTime? get _resolvedScheduledAt {
-    if (_whenChoice == _WhenChoice.asap) return null;
     final hour = _selectedSlot?.startHour ?? TimeOfDay.now().hour;
     DateTime day;
     switch (_whenChoice) {
@@ -97,9 +136,6 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
         break;
       case _WhenChoice.customDate:
         day = _customDate ?? DateTime.now();
-        break;
-      case _WhenChoice.asap:
-        day = DateTime.now();
         break;
     }
     return DateTime(day.year, day.month, day.day, hour, 0);
@@ -126,7 +162,7 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select an address')));
       return;
     }
-    if (_whenChoice != _WhenChoice.asap && _selectedSlot == null) {
+    if (_selectedSlot == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please choose a time slot')));
       return;
     }
@@ -145,6 +181,9 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
       // along as the Job Brief the technician sees before Accept.
       final pendingBrief = bookingProvider.pendingJobBrief;
       final pendingImages = bookingProvider.pendingJobBriefImages;
+      final brief = (_categoryAnswers.isNotEmpty)
+          ? (pendingBrief ?? const JobBrief()).copyWith(categoryAnswers: _categoryAnswers)
+          : pendingBrief;
       final booking = await bookingProvider.createBooking(
             categoryId: widget.categoryId,
             addressId: _selectedAddressId!,
@@ -152,8 +191,8 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
               if (widget.problemDescription != null && widget.problemDescription!.isNotEmpty) widget.problemDescription,
               if (_notesController.text.trim().isNotEmpty) _notesController.text.trim(),
             ].join('\n\n'),
-            notes: (pendingBrief != null && (pendingBrief.hasGuidedAnswers || (pendingBrief.aiDiagnosis?.isNotEmpty ?? false)))
-                ? pendingBrief.encode()
+            notes: (brief != null && (brief.hasGuidedAnswers || (brief.aiDiagnosis?.isNotEmpty ?? false)))
+                ? brief.encode()
                 : null,
             images: pendingImages,
             scheduledAt: scheduledAt,
@@ -352,79 +391,84 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
             ),
             const SizedBox(height: 22),
             const Text('When do you need the technician?', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-            const SizedBox(height: 10),
-            // ASAP card.
-            _WhenOptionCard(
-              icon: Icons.rocket_launch_rounded,
-              iconColor: Colors.deepOrange,
-              title: 'ASAP',
-              subtitle: 'Technician comes as soon as possible',
-              selected: _whenChoice == _WhenChoice.asap,
-              onTap: () => setState(() {
-                _whenChoice = _WhenChoice.asap;
-                _selectedSlot = null;
-              }),
+            const SizedBox(height: 4),
+            Text(
+              'Every booking is reviewed by a technician before it\'s confirmed, so pick a day and time that works for you.',
+              style: TextStyle(fontSize: 11.5, color: Colors.grey[600]),
             ),
-            const SizedBox(height: 10),
-            // Schedule card — expands to show Today/Tomorrow/Select Date once
-            // any of the scheduled options is active.
-            _WhenOptionCard(
-              icon: Icons.calendar_month_rounded,
-              iconColor: AppTheme.primaryColor,
-              title: 'Schedule',
-              subtitle: 'Pick a day and time that works for you',
-              selected: _whenChoice != _WhenChoice.asap,
-              onTap: () => setState(() {
-                if (_whenChoice == _WhenChoice.asap) _whenChoice = _WhenChoice.today;
-              }),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _ChoiceChipButton(
+                    label: 'Today',
+                    selected: _whenChoice == _WhenChoice.today,
+                    onTap: () => setState(() => _whenChoice = _WhenChoice.today),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _ChoiceChipButton(
+                    label: 'Tomorrow',
+                    selected: _whenChoice == _WhenChoice.tomorrow,
+                    onTap: () => setState(() => _whenChoice = _WhenChoice.tomorrow),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _ChoiceChipButton(
+                    label: _whenChoice == _WhenChoice.customDate && _customDate != null
+                        ? '${_customDate!.day}/${_customDate!.month}'
+                        : 'Select Date',
+                    selected: _whenChoice == _WhenChoice.customDate,
+                    onTap: _pickCustomDate,
+                  ),
+                ),
+              ],
             ),
-            if (_whenChoice != _WhenChoice.asap) ...[
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: _ChoiceChipButton(
-                      label: 'Today',
-                      selected: _whenChoice == _WhenChoice.today,
-                      onTap: () => setState(() => _whenChoice = _WhenChoice.today),
+            const SizedBox(height: 16),
+            const Text('Time slot', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: _timeSlots
+                  .map((slot) => _ChoiceChipButton(
+                        label: slot.label,
+                        selected: _selectedSlot?.label == slot.label,
+                        onTap: () => setState(() => _selectedSlot = slot),
+                      ))
+                  .toList(),
+            ),
+            if ((_categoryQuestions[widget.categoryName] ?? const []).isNotEmpty) ...[
+              const SizedBox(height: 22),
+              Text('About your ${widget.categoryName} issue', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              const SizedBox(height: 4),
+              Text('Helps the technician come prepared', style: TextStyle(fontSize: 11.5, color: Colors.grey[600])),
+              const SizedBox(height: 10),
+              ...(_categoryQuestions[widget.categoryName] ?? const []).map((q) => Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(q.question, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: q.options
+                              .map((opt) => _ChoiceChipButton(
+                                    label: opt,
+                                    selected: _categoryAnswers[q.question] == opt,
+                                    onTap: () => setState(() => _categoryAnswers[q.question] = opt),
+                                  ))
+                              .toList(),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _ChoiceChipButton(
-                      label: 'Tomorrow',
-                      selected: _whenChoice == _WhenChoice.tomorrow,
-                      onTap: () => setState(() => _whenChoice = _WhenChoice.tomorrow),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _ChoiceChipButton(
-                      label: _whenChoice == _WhenChoice.customDate && _customDate != null
-                          ? '${_customDate!.day}/${_customDate!.month}'
-                          : 'Select Date',
-                      selected: _whenChoice == _WhenChoice.customDate,
-                      onTap: _pickCustomDate,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Text('Time slot', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: _timeSlots
-                    .map((slot) => _ChoiceChipButton(
-                          label: slot.label,
-                          selected: _selectedSlot?.label == slot.label,
-                          onTap: () => setState(() => _selectedSlot = slot),
-                        ))
-                    .toList(),
-              ),
+                  )),
             ],
-            const SizedBox(height: 22),
+            const SizedBox(height: 8),
             const Text('Additional notes (optional)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
             const SizedBox(height: 8),
             TextField(
@@ -441,65 +485,6 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
                     ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Text('Confirm Booking'),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Big tappable "ASAP" / "Schedule" choice card at the top of Step 4.
-class _WhenOptionCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String title;
-  final String subtitle;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _WhenOptionCard({
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    required this.subtitle,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: selected ? AppTheme.primaryColor.withValues(alpha: 0.06) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: selected ? AppTheme.primaryColor : Colors.grey[200]!, width: selected ? 1.6 : 1),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.12), shape: BoxShape.circle),
-              child: Icon(icon, color: iconColor, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                  const SizedBox(height: 2),
-                  Text(subtitle, style: TextStyle(fontSize: 11.5, color: Colors.grey[600])),
-                ],
-              ),
-            ),
-            Icon(
-              selected ? Icons.radio_button_checked : Icons.radio_button_off,
-              color: selected ? AppTheme.primaryColor : Colors.grey[400],
             ),
           ],
         ),

@@ -273,6 +273,25 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
+  /// Technician declines a "requested" job — it goes back into the pool so
+  /// another technician can be found for it, instead of getting stuck.
+  Future<void> declineBooking(String bookingId, String technicianId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _bookingService.declineBooking(bookingId, technicianId);
+      _error = null;
+      await fetchTechnicianBookings(technicianId);
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   /// Technician moves a job forward: in_progress, etc.
   Future<void> updateBookingStatus(String bookingId, String status, {String? note}) async {
   _isLoading = true;

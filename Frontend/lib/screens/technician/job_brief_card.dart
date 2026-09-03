@@ -107,6 +107,8 @@ class _JobBriefCardState extends State<JobBriefCard> {
                   _factChip(Icons.repeat, brief.isContinuous! ? 'Continuous' : 'Occasional'),
                 if (brief.previousRepair != null)
                   _factChip(Icons.build_outlined, 'Previous repair: ${brief.previousRepair! ? "Yes" : "No"}'),
+                if (brief.categoryAnswers != null)
+                  ...brief.categoryAnswers!.values.map((v) => _factChip(Icons.checklist_rtl_rounded, v)),
               ],
             ),
             if (brief.unusualSigns != null && brief.unusualSigns!.isNotEmpty) ...[

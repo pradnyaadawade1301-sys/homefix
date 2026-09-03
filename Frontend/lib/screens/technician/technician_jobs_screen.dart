@@ -706,14 +706,30 @@ class JobActionRow extends StatelessWidget {
 
     switch (booking.status) {
       case 'requested':
-        return SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: kycProfile == null
-                ? null
-                : () => _runAction(context, () => provider.acceptBooking(booking.id, kycProfile.id)),
-            child: const Text('Accept job'),
-          ),
+        return Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.errorColor,
+                  side: BorderSide(color: AppTheme.errorColor.withValues(alpha: 0.4)),
+                ),
+                onPressed: kycProfile == null
+                    ? null
+                    : () => _confirmDecline(context, provider, booking.id, kycProfile.id),
+                child: const Text('Decline'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: kycProfile == null
+                    ? null
+                    : () => _runAction(context, () => provider.acceptBooking(booking.id, kycProfile.id)),
+                child: const Text('Accept job'),
+              ),
+            ),
+          ],
         );
       case 'accepted':
         return SizedBox(
@@ -754,6 +770,34 @@ class JobActionRow extends StatelessWidget {
     await action();
     if (provider.error != null) {
       messenger.showSnackBar(SnackBar(content: Text(provider.error!)));
+    }
+  }
+
+  /// Confirms before declining — this is a one-way action (the booking goes
+  /// back into the pool for another technician), so it's worth one extra tap
+  /// to avoid accidental taps costing the technician a job.
+  Future<void> _confirmDecline(
+    BuildContext context,
+    BookingProvider provider,
+    String bookingId,
+    String technicianId,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Decline this job?'),
+        content: const Text("We'll find another technician for this booking. This can't be undone."),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Decline', style: TextStyle(color: AppTheme.errorColor)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _runAction(context, () => provider.declineBooking(bookingId, technicianId));
     }
   }
 }

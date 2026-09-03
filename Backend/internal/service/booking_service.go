@@ -146,6 +146,41 @@ func (s *BookingService) Accept(ctx context.Context, bookingID, technicianID str
 	return nil
 }
 
+// Decline lets a technician turn down a booking that was routed to them
+// while it's still 'requested' (i.e. before they've Accepted it). The
+// booking is put back into the pool — unassigned, still 'requested' — so
+// the next technician can be found for it, and the customer is notified
+// their booking is being reassigned rather than left in silence.
+func (s *BookingService) Decline(ctx context.Context, bookingID, technicianID string) error {
+	b, err := s.bookingRepo.GetByID(ctx, bookingID)
+	if err != nil {
+		return err
+	}
+	if b == nil {
+		return errors.New("booking not found")
+	}
+	if b.Status != models.BookingRequested {
+		return errors.New("booking is not in a requested state")
+	}
+	if b.TechnicianID == nil || *b.TechnicianID != technicianID {
+		return errors.New("this booking is not assigned to you")
+	}
+
+	if err := s.bookingRepo.Decline(ctx, bookingID, technicianID); err != nil {
+		if errors.Is(err, repository.ErrBookingAlreadyAssigned) {
+			return errors.New("could not decline this booking")
+		}
+		return err
+	}
+
+	if s.fcm != nil {
+		_ = s.fcm.SendToUser(ctx, b.CustomerID, "Finding another technician",
+			"Your technician declined this job. We're finding another technician for you.",
+			map[string]string{"booking_id": bookingID, "type": "booking_declined"})
+	}
+	return nil
+}
+
 func (s *BookingService) UpdateStatus(ctx context.Context, bookingID, status, note string) error {
 	if !models.ValidBookingStatuses[status] {
 		return errors.New("invalid status: " + status)
@@ -439,11 +474,7 @@ func (s *BookingService) VerifyOTP(ctx context.Context, bookingID, otp string) (
 	if err != nil || !ok {
 		return ok, err
 	}
-	// The estimate is now approved up-front, right after assignment — see
-	// SubmitEstimate/RespondToEstimate below — so once the technician is
-	// on-site and OTP-verified there's nothing left to "inspect" before
-	// billing; go straight to repair.
-	if err := s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingRepairInProgress, "OTP verified, repair started"); err != nil {
+	if err := s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingInspecting, "OTP verified, service started"); err != nil {
 		return true, err
 	}
 	return true, nil
@@ -467,20 +498,16 @@ func (s *BookingService) TechnicianLocation(ctx context.Context, bookingID strin
 	return s.bookingRepo.TechnicianLocationForBooking(ctx, bookingID)
 }
 
-// SubmitEstimate is called by the technician right after being assigned the
-// job (or again to revise, after the customer declined) to raise the
-// labour+parts quote. This moves the booking into
-// BookingAwaitingEstimateApproval so the customer must explicitly approve
-// it before the technician can head over — see RespondToEstimate.
+// SubmitEstimate is called by the technician after inspecting the problem.
+// Calling it again (e.g. after the customer chose "Discuss") simply
+// replaces the items/total and resets status to pending for a fresh
+// decision — see BookingRepository.UpsertEstimate.
 func (s *BookingService) SubmitEstimate(ctx context.Context, bookingID string, items []models.BookingEstimateItem, note string) (*models.BookingEstimate, error) {
 	if len(items) == 0 {
 		return nil, errors.New("estimate must have at least one line item")
 	}
 	est, err := s.bookingRepo.UpsertEstimate(ctx, bookingID, items, note)
 	if err != nil {
-		return nil, err
-	}
-	if err := s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingAwaitingEstimateApproval, "Estimate sent for customer approval"); err != nil {
 		return nil, err
 	}
 	if b, _ := s.bookingRepo.GetByID(ctx, bookingID); b != nil && s.fcm != nil {
@@ -498,10 +525,8 @@ func (s *BookingService) GetEstimate(ctx context.Context, bookingID string) (*mo
 // RespondToEstimate records the customer's Approve/Decline decision.
 // "Discuss" isn't a persisted status here — it's just the customer opening
 // chat with the technician, who then calls SubmitEstimate again with
-// revised numbers. Either way the booking drops back to BookingAccepted:
-// approved means the technician is now cleared to head over ("I'm on my
-// way"); declined means the technician needs to revise and resend the
-// estimate before they can proceed — the booking itself isn't cancelled.
+// revised numbers. Approving moves the booking into "repair_in_progress" so
+// the technician is unambiguously authorised to start paid work.
 func (s *BookingService) RespondToEstimate(ctx context.Context, bookingID, decision string) error {
 	var status string
 	switch decision {
@@ -516,9 +541,9 @@ func (s *BookingService) RespondToEstimate(ctx context.Context, bookingID, decis
 		return err
 	}
 	if status == models.EstimateApproved {
-		return s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingAccepted, "Customer approved estimate")
+		return s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingRepairInProgress, "Customer approved estimate")
 	}
-	return s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingAccepted, "Customer declined estimate, awaiting revised quote")
+	return s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingCancelled, "Customer declined estimate")
 }
 
 func (s *BookingService) AddServicePhoto(ctx context.Context, bookingID, photoURL, photoType string) (*models.BookingServicePhoto, error) {
