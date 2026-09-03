@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: homefix_pass
       POSTGRES_DB: homefix
     ports:
-      - "5434:5432"
+      - "5442:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d

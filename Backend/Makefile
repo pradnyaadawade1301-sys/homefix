@@ -44,3 +44,15 @@ docker-down:
 
 docker-logs:
 	docker compose logs -f app
+
+# Applies every migrations/*.sql file, in order, against the running dev
+# Postgres container (homefix_postgres from docker-compose.yml). Safe to
+# re-run any time — every migration in this repo is written with
+# IF NOT EXISTS / IF EXISTS guards, so already-applied ones are a no-op.
+# Use this instead of a manual `docker exec ... psql` one-liner whenever a
+# new migration file is added.
+migrate:
+	@for f in migrations/*.sql; do \
+		echo "applying $$f"; \
+		docker exec -i homefix_postgres psql -U homefix -d homefix -v ON_ERROR_STOP=1 < $$f; \
+	done

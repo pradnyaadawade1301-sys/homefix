@@ -17,6 +17,13 @@ const (
 	BookingArrived          = "arrived"
 	BookingInspecting       = "inspecting"
 	BookingRepairInProgress = "repair_in_progress"
+
+	// BookingAwaitingEstimateApproval is set the moment a technician submits
+	// an estimate (right after being assigned — see BookingService.SubmitEstimate)
+	// and cleared back to BookingAccepted once the customer approves or
+	// declines it (see BookingService.RespondToEstimate). The technician
+	// can only move to "on the way" once an estimate has been approved.
+	BookingAwaitingEstimateApproval = "awaiting_estimate_approval"
 )
 
 // Visit-fee status values — see migration 022_visit_fee.sql. A booking created
@@ -45,6 +52,7 @@ var ValidBookingStatuses = map[string]bool{
 	BookingInProgress:       true,
 	BookingCompleted:        true,
 	BookingCancelled:        true,
+	BookingAwaitingEstimateApproval: true,
 }
 
 type Booking struct {
