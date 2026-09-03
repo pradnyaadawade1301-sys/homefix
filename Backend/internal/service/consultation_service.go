@@ -411,14 +411,9 @@ func (s *ConsultationService) PendingForUser(ctx context.Context, userID string)
 	return s.consultRepo.ListPendingForTechnician(ctx, tech.ID)
 }
 
-// MyConsultations is the customer-facing call history (GET /consultations/mine) —
-// every consultation they've ever requested, most recent first.
-func (s *ConsultationService) MyConsultations(ctx context.Context, customerID string) ([]models.ConsultationWithDetails, error) {
-	return s.consultRepo.ListForCustomer(ctx, customerID)
-}
-
-// Rate records the customer's rating for a consultation that resolved remotely (no
-// escalated booking). Only allowed once the call has actually ended.
+// MyConsultations is GET /consultations/mine — works for both roles: a
+// technician's own call history if they have a technician profile,
+// otherwise the customer's own consultation history, most recent first.
 func (s *ConsultationService) MyConsultations(ctx context.Context, userID string) ([]models.ConsultationWithDetails, error) {
 	tech, err := s.techRepo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -428,6 +423,22 @@ func (s *ConsultationService) MyConsultations(ctx context.Context, userID string
 		return s.consultRepo.ListForTechnician(ctx, tech.ID)
 	}
 	return s.consultRepo.ListForCustomer(ctx, userID)
+}
+
+// Rate records the customer's rating for a consultation that resolved remotely (no
+// escalated booking). Only allowed once the call has actually ended.
+func (s *ConsultationService) Rate(ctx context.Context, consultationID, customerID string, rating int, comment string) error {
+	c, err := s.consultRepo.GetByID(ctx, consultationID)
+	if err != nil {
+		return err
+	}
+	if c == nil {
+		return errors.New("consultation not found")
+	}
+	if c.CustomerID != customerID {
+		return errors.New("this consultation does not belong to you")
+	}
+	return s.consultRepo.SetRating(ctx, consultationID, rating, comment)
 }
 
 // Escalate is "Recommend On-site Visit" -> customer taps Yes: turns the consultation
