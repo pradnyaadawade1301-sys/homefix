@@ -183,7 +183,7 @@ func (s *BookingService) UpdateStatus(ctx context.Context, bookingID, status, no
 // UpiService.CreateOrder, which validates the payment amount against it). The
 // FCM push here is the only signal the customer gets that a bill is ready;
 // without it they'd only find out by happening to reopen the booking.
-func (s *BookingService) Complete(ctx context.Context, bookingID string, finalPrice float64) error {
+func (s *BookingService) Complete(ctx context.Context, bookingID string, finalPrice float64, warrantyEnabled bool, warrantyDays *int) error {
 	b, err := s.bookingRepo.GetByID(ctx, bookingID)
 	if err != nil {
 		return err
@@ -192,7 +192,36 @@ func (s *BookingService) Complete(ctx context.Context, bookingID string, finalPr
 		return errors.New("booking not found")
 	}
 
+	// Warranty is opt-in; when the technician enables it, the number of days
+	// must be one of the category's configured options — never an arbitrary
+	// typed number (see migration 023_booking_warranty.sql).
+	if warrantyEnabled {
+		if warrantyDays == nil {
+			return errors.New("warranty_days is required when warranty_enabled is true")
+		}
+		cat, err := s.catRepo.GetByID(ctx, b.CategoryID)
+		if err != nil {
+			return err
+		}
+		if cat == nil {
+			return errors.New("category not found")
+		}
+		allowed := false
+		for _, d := range cat.WarrantyOptions {
+			if int(d) == *warrantyDays {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return fmt.Errorf("warranty_days must be one of %v for this category", cat.WarrantyOptions)
+		}
+	}
+
 	if err := s.bookingRepo.SetFinalPrice(ctx, bookingID, finalPrice); err != nil {
+		return err
+	}
+	if err := s.bookingRepo.SetWarranty(ctx, bookingID, warrantyEnabled, warrantyDays); err != nil {
 		return err
 	}
 	if err := s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingCompleted, "Job completed"); err != nil {
@@ -205,6 +234,50 @@ func (s *BookingService) Complete(ctx context.Context, bookingID string, finalPr
 			map[string]string{"booking_id": bookingID, "type": "invoice_ready", "final_price": fmt.Sprintf("%.2f", finalPrice)})
 	}
 	return nil
+}
+
+// RaiseWarrantyClaim lets a customer raise a claim against their own
+// completed, still-under-warranty booking. Per migration
+// 023_booking_warranty.sql, a claim is itself a brand-new booking — it
+// reuses the entire existing booking lifecycle (accept/track/complete/pay)
+// instead of a separate claims table, and is linked back to the original
+// via WarrantyClaimOf.
+func (s *BookingService) RaiseWarrantyClaim(ctx context.Context, userID, originalBookingID, note string) (*models.Booking, error) {
+	original, err := s.bookingRepo.GetByID(ctx, originalBookingID)
+	if err != nil {
+		return nil, err
+	}
+	if original == nil {
+		return nil, errors.New("booking not found")
+	}
+	if original.CustomerID != userID {
+		return nil, errors.New("not your booking")
+	}
+	if original.Status != models.BookingCompleted {
+		return nil, errors.New("only completed bookings can have a warranty claim raised")
+	}
+	if !original.WarrantyEnabled {
+		return nil, errors.New("this booking has no warranty")
+	}
+	if original.WarrantyExpiresAt == nil || time.Now().After(*original.WarrantyExpiresAt) {
+		return nil, errors.New("warranty has expired for this booking")
+	}
+	if original.IsWarrantyClaim {
+		return nil, errors.New("cannot raise a claim against a claim booking")
+	}
+
+	claimOf := original.ID
+	claim := &models.Booking{
+		CustomerID:          original.CustomerID,
+		CategoryID:          original.CategoryID,
+		AddressID:           original.AddressID,
+		Status:               models.BookingRequested,
+		PaymentStatus:        "pending",
+		ProblemDescription:   note,
+		IsWarrantyClaim:      true,
+		WarrantyClaimOf:      &claimOf,
+	}
+	return s.bookingRepo.Create(ctx, claim)
 }
 
 func (s *BookingService) Cancel(ctx context.Context, bookingID, reason string) error {
