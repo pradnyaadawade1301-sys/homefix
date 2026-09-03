@@ -93,7 +93,7 @@ func main() {
 	// BookingService, so passing razorpayService here was a leftover extra
 	// argument that doesn't match NewBookingService's actual signature.
 	bookingService := service.NewBookingService(bookingRepo, catRepo, techRepo, paymentRepo, fcmService)
-	consultService := service.NewConsultationService(consultRepo, techRepo, bookingService, reviewRepo, fcmService)
+	consultService := service.NewConsultationService(consultRepo, techRepo, bookingService, reviewRepo, aiRepo, fcmService)
 	walletService := service.NewWalletService(walletRepo)
 	reviewService := service.NewReviewService(reviewRepo, bookingRepo)
 	disputeService := service.NewDisputeService(disputeRepo, bookingRepo, consultRepo, techRepo, razorpayService, paymentRepo)
