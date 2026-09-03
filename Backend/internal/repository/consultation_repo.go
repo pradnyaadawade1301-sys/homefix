@@ -33,8 +33,10 @@ func (r *ConsultationRepository) Create(ctx context.Context, customerID, categor
 	row := r.db.QueryRow(ctx, `
 		INSERT INTO consultations (customer_id, category_id, fee, status, scheduled_at, note, area, ai_diagnosis_session_id)
 		VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''), NULLIF($7, ''), $8)
-		RETURNING id, customer_id, technician_id, category_id, status, fee, duration_seconds,
-		          payment_status, escalated_booking_id, decline_reason, scheduled_at, started_at, ended_at, created_at, updated_at
+				RETURNING id, customer_id, technician_id, category_id, status, fee, duration_seconds,
+		          payment_status, escalated_booking_id, decline_reason,
+		          recommendation_summary, recommendation_price, recommendation_status, recommendation_sent_at,
+		          scheduled_at, started_at, ended_at, created_at, updated_at
 	`, customerID, categoryID, fee, status, scheduledAt, note, area, aiDiagnosisSessionID)
 	return scanConsultation(row)
 }
@@ -59,7 +61,7 @@ func (r *ConsultationRepository) GetByID(ctx context.Context, id string) (*model
 func (r *ConsultationRepository) GetWithDetails(ctx context.Context, id string) (*models.ConsultationWithDetails, error) {
 	row := r.db.QueryRow(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
-		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason, co.note, co.area, co.ai_diagnosis_session_id, co.note, co.area, co.ai_diagnosis_session_id,
 		       co.recommendation_summary, co.recommendation_price, co.recommendation_status, co.recommendation_sent_at,
 		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''),
@@ -75,7 +77,7 @@ func (r *ConsultationRepository) GetWithDetails(ctx context.Context, id string) 
 	var d models.ConsultationWithDetails
 	err := row.Scan(
 		&d.ID, &d.CustomerID, &d.TechnicianID, &d.CategoryID, &d.Status, &d.Fee,
-		&d.DurationSeconds, &d.PaymentStatus, &d.EscalatedBookingID, &d.DeclineReason,
+		&d.DurationSeconds, &d.PaymentStatus, &d.EscalatedBookingID, &d.DeclineReason, &d.Note, &d.Area, &d.AIDiagnosisSessionID,
 		&d.RecommendationSummary, &d.RecommendationPrice, &d.RecommendationStatus, &d.RecommendationSentAt,
 		&d.ScheduledAt, &d.StartedAt, &d.EndedAt, &d.CreatedAt, &d.UpdatedAt,
 		&d.CategoryName, &d.CustomerName, &d.CustomerPhone, &d.TechnicianName, &d.TechnicianPhone,
@@ -219,7 +221,7 @@ func (r *ConsultationRepository) ListPendingForTechnician(ctx context.Context, t
 func (r *ConsultationRepository) ListUpcomingForTechnician(ctx context.Context, technicianID string) ([]models.ConsultationWithDetails, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
-		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason, co.note, co.area, co.ai_diagnosis_session_id, co.note, co.area, co.ai_diagnosis_session_id,
 		       co.recommendation_summary, co.recommendation_price, co.recommendation_status, co.recommendation_sent_at,
 		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''), '', ''
@@ -245,7 +247,7 @@ func (r *ConsultationRepository) ListUpcomingForTechnician(ctx context.Context, 
 func (r *ConsultationRepository) ListForTechnician(ctx context.Context, technicianID string) ([]models.ConsultationWithDetails, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
-		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason, co.note, co.area, co.ai_diagnosis_session_id, co.note, co.area, co.ai_diagnosis_session_id,
 		       co.recommendation_summary, co.recommendation_price, co.recommendation_status, co.recommendation_sent_at,
 		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''), '', ''
@@ -312,7 +314,7 @@ func (r *ConsultationRepository) PromoteToRinging(ctx context.Context, id string
 func (r *ConsultationRepository) ListForCustomer(ctx context.Context, customerID string) ([]models.ConsultationWithDetails, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
-		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason, co.note, co.area, co.ai_diagnosis_session_id, co.note, co.area, co.ai_diagnosis_session_id,
 		       co.recommendation_summary, co.recommendation_price, co.recommendation_status, co.recommendation_sent_at,
 		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''),
@@ -359,7 +361,7 @@ func (r *ConsultationRepository) SetRating(ctx context.Context, id string, ratin
 func (r *ConsultationRepository) listForTechnicianByStatus(ctx context.Context, technicianID, status string) ([]models.ConsultationWithDetails, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
-		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason, co.note, co.area, co.ai_diagnosis_session_id, co.note, co.area, co.ai_diagnosis_session_id,
 		       co.recommendation_summary, co.recommendation_price, co.recommendation_status, co.recommendation_sent_at,
 		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''), '', ''
@@ -382,7 +384,7 @@ func scanConsultationRows(rows pgx.Rows) ([]models.ConsultationWithDetails, erro
 		var d models.ConsultationWithDetails
 		if err := rows.Scan(
 			&d.ID, &d.CustomerID, &d.TechnicianID, &d.CategoryID, &d.Status, &d.Fee,
-			&d.DurationSeconds, &d.PaymentStatus, &d.EscalatedBookingID, &d.DeclineReason,
+			&d.DurationSeconds, &d.PaymentStatus, &d.EscalatedBookingID, &d.DeclineReason, &d.Note, &d.Area, &d.AIDiagnosisSessionID,
 			&d.RecommendationSummary, &d.RecommendationPrice, &d.RecommendationStatus, &d.RecommendationSentAt,
 			&d.ScheduledAt, &d.StartedAt, &d.EndedAt, &d.CreatedAt, &d.UpdatedAt,
 			&d.CategoryName, &d.CustomerName, &d.CustomerPhone, &d.TechnicianName, &d.TechnicianPhone,
