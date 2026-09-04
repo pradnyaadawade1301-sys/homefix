@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'app.dart';
 import 'services/notification_service.dart';
 
@@ -15,11 +13,17 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
 
-  FirebaseMessaging messaging = FirebaseMessaging.instance;
-  String? token = await messaging.getToken();
-  print("FCM TOKEN: $token");
+  // This sets up everything: Firebase init, creates the Android notification
+  // channels ("homefix_notifications" / "incoming_calls") that the backend's
+  // pushes target, requests the Android 13+ POST_NOTIFICATIONS permission,
+  // fetches the FCM token, and wires up foreground/background/tap listeners.
+  // Previously this file only called Firebase.initializeApp() + getToken()
+  // directly and skipped all of that — so pushes arrived at the device with
+  // a channel ID that was never created, and Android silently dropped them
+  // even though the backend saw a successful send and notification
+  // permission was granted.
+  await fcmNotificationService.initialize();
 
   runApp(const MyApp());
 }

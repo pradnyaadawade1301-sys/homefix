@@ -298,9 +298,11 @@ class _UpcomingCard extends StatelessWidget {
               children: [
                 const Icon(Icons.check_circle_rounded, size: 16, color: AppTheme.successColor),
                 const SizedBox(width: 6),
-                Text(
-                  'Waiting for slot time — you\'ll be notified when it starts',
-                  style: TextStyle(fontSize: 11.5, color: Colors.grey[600]),
+                Expanded(
+                  child: Text(
+                    'Waiting for slot time — you\'ll be notified when it starts',
+                    style: TextStyle(fontSize: 11.5, color: Colors.grey[600]),
+                  ),
                 ),
               ],
             ),
