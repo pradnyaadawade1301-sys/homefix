@@ -14,7 +14,6 @@ import '../chat/booking_chat_screen.dart';
 /// authenticated, technician or customer).
 class TechnicianHistoryScreen extends StatefulWidget {
   const TechnicianHistoryScreen({super.key});
-
   @override
   State<TechnicianHistoryScreen> createState() => _TechnicianHistoryScreenState();
 }
@@ -185,7 +184,7 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  c.status.replaceAll('_', ' '),
+                  c.status.replaceAll('_', ''),
                   style: const TextStyle(fontSize: 11, color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
                 ),
               ),
