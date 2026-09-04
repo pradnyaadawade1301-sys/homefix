@@ -498,10 +498,18 @@ func (s *BookingService) TechnicianLocation(ctx context.Context, bookingID strin
 	return s.bookingRepo.TechnicianLocationForBooking(ctx, bookingID)
 }
 
-// SubmitEstimate is called by the technician after inspecting the problem.
-// Calling it again (e.g. after the customer chose "Discuss") simply
+// SubmitEstimate is called by the technician after inspecting the problem
+// (or right after Accept, in the "accept -> price -> customer decides"
+// flow). Calling it again (e.g. after the customer chose "Discuss") simply
 // replaces the items/total and resets status to pending for a fresh
 // decision — see BookingRepository.UpsertEstimate.
+//
+// The booking itself is moved to "awaiting_estimate_approval" the moment an
+// estimate goes out — that's what makes the customer's tracking screen
+// swap in the Approve / Discuss / Decline card (see
+// BookingTrackingScreen.isAwaitingEstimateApproval on the Flutter side).
+// Without this the estimate would sit there but the customer would never
+// see anything asking them to act on it.
 func (s *BookingService) SubmitEstimate(ctx context.Context, bookingID string, items []models.BookingEstimateItem, note string) (*models.BookingEstimate, error) {
 	if len(items) == 0 {
 		return nil, errors.New("estimate must have at least one line item")
@@ -510,9 +518,18 @@ func (s *BookingService) SubmitEstimate(ctx context.Context, bookingID string, i
 	if err != nil {
 		return nil, err
 	}
-	if b, _ := s.bookingRepo.GetByID(ctx, bookingID); b != nil && s.fcm != nil {
+	b, err := s.bookingRepo.GetByID(ctx, bookingID)
+	if err != nil {
+		return nil, err
+	}
+	if b != nil && b.Status != models.BookingAwaitingEstimateApproval {
+		if err := s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingAwaitingEstimateApproval, "Technician sent an estimate"); err != nil {
+			return nil, err
+		}
+	}
+	if b != nil && s.fcm != nil {
 		_ = s.fcm.SendToUser(ctx, b.CustomerID, "Service estimate ready",
-			fmt.Sprintf("Your technician has sent an estimate of \u20b9%.0f", est.Total),
+			fmt.Sprintf("Your technician has sent an estimate of \u20b9%.0f. Please review and approve.", est.Total),
 			map[string]string{"booking_id": bookingID, "type": "booking_estimate"})
 	}
 	return est, nil
@@ -525,8 +542,16 @@ func (s *BookingService) GetEstimate(ctx context.Context, bookingID string) (*mo
 // RespondToEstimate records the customer's Approve/Decline decision.
 // "Discuss" isn't a persisted status here — it's just the customer opening
 // chat with the technician, who then calls SubmitEstimate again with
-// revised numbers. Approving moves the booking into "repair_in_progress" so
-// the technician is unambiguously authorised to start paid work.
+// revised numbers.
+//
+//   - Approve -> booking moves to "on_the_way": the price is agreed, so the
+//     technician now heads to the customer's location (see the technician
+//     app's "I'm on my way" / "I've arrived" -> OTP -> repair steps that
+//     follow from there).
+//   - Decline -> booking moves straight to "cancelled". There's no
+//     automatic re-quoting; if the technician wants to try a different
+//     price they and the customer sort that out over chat and the
+//     customer books again.
 func (s *BookingService) RespondToEstimate(ctx context.Context, bookingID, decision string) error {
 	var status string
 	switch decision {
@@ -540,10 +565,37 @@ func (s *BookingService) RespondToEstimate(ctx context.Context, bookingID, decis
 	if err := s.bookingRepo.SetEstimateStatus(ctx, bookingID, status); err != nil {
 		return err
 	}
-	if status == models.EstimateApproved {
-		return s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingRepairInProgress, "Customer approved estimate")
+
+	b, err := s.bookingRepo.GetByID(ctx, bookingID)
+	if err != nil {
+		return err
 	}
-	return s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingCancelled, "Customer declined estimate")
+
+	if status == models.EstimateApproved {
+		if err := s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingOnTheWay, "Customer approved the estimate"); err != nil {
+			return err
+		}
+		if b != nil && b.TechnicianID != nil && s.fcm != nil {
+			if tech, _ := s.techRepo.GetByID(ctx, *b.TechnicianID); tech != nil {
+				_ = s.fcm.SendToUser(ctx, tech.UserID, "Estimate approved",
+					"The customer approved your estimate. You're good to head over.",
+					map[string]string{"booking_id": bookingID, "type": "estimate_approved"})
+			}
+		}
+		return nil
+	}
+
+	if err := s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingCancelled, "Customer declined the estimate"); err != nil {
+		return err
+	}
+	if b != nil && b.TechnicianID != nil && s.fcm != nil {
+		if tech, _ := s.techRepo.GetByID(ctx, *b.TechnicianID); tech != nil {
+			_ = s.fcm.SendToUser(ctx, tech.UserID, "Booking cancelled",
+				"The customer declined your estimate and the booking has been cancelled.",
+				map[string]string{"booking_id": bookingID, "type": "estimate_declined"})
+		}
+	}
+	return nil
 }
 
 func (s *BookingService) AddServicePhoto(ctx context.Context, bookingID, photoURL, photoType string) (*models.BookingServicePhoto, error) {
