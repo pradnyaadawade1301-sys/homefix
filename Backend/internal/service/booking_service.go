@@ -28,9 +28,11 @@ const visitFeeAmount = 99.0
 
 // Create makes a new booking. If preferredTechnicianID is non-empty (customer
 // picked a specific technician via "Book Now" on their profile), the booking
-// is created and then immediately assigned to that technician (status jumps
-// straight to "accepted") instead of sitting as "requested" waiting for any
-// technician to accept it.
+// is created and routed to that technician, but it is NOT auto-confirmed —
+// status goes to "pending_technician" and the customer sees "waiting for
+// technician response" until the technician explicitly accepts (Accept) or
+// rejects (Decline) it. A reject sends the booking back to "requested" so
+// another technician can be found, instead of leaving the customer stuck.
 func (s *BookingService) Create(ctx context.Context, b *models.Booking, preferredTechnicianID string) (*models.Booking, error) {
 	cat, err := s.catRepo.GetByID(ctx, b.CategoryID)
 	if err != nil {
@@ -57,19 +59,19 @@ func (s *BookingService) Create(ctx context.Context, b *models.Booking, preferre
 		if tech == nil {
 			return nil, errors.New("selected technician not found")
 		}
-		if err := s.bookingRepo.AssignTechnician(ctx, created.ID, preferredTechnicianID); err != nil {
+		if err := s.bookingRepo.AssignPendingTechnician(ctx, created.ID, preferredTechnicianID); err != nil {
 			if errors.Is(err, repository.ErrBookingAlreadyAssigned) {
 				return nil, errors.New("this booking has already been assigned")
 			}
 			return nil, err
 		}
 		created.TechnicianID = &preferredTechnicianID
-		created.Status = models.BookingAccepted
+		created.Status = models.BookingPendingTechnician
 
 		if s.fcm != nil {
 			_ = s.fcm.SendToUser(ctx, tech.UserID, "New booking request",
-				"You have a new booking request.",
-				map[string]string{"booking_id": created.ID, "type": "booking_assigned"})
+				"You have a new booking request. Please accept or reject it.",
+				map[string]string{"booking_id": created.ID, "type": "booking_pending_response"})
 		}
 	}
 
@@ -118,7 +120,13 @@ func (s *BookingService) ListForTechnicianDetailed(ctx context.Context, technici
 	return s.bookingRepo.ListByTechnicianDetailed(ctx, technicianID)
 }
 
-// Accept assigns a technician to a booking and notifies the customer via real FCM push.
+// Accept covers two cases:
+//  1. A "requested" (open marketplace) booking with no technician yet — the
+//     technician self-assigns and it's confirmed immediately.
+//  2. A "pending_technician" booking that was routed specifically to this
+//     technician (e.g. via "Book Now") — they're just confirming the job
+//     already sitting with them.
+// Either way the customer gets a real FCM push once it's actually accepted.
 func (s *BookingService) Accept(ctx context.Context, bookingID, technicianID string) error {
 	b, err := s.bookingRepo.GetByID(ctx, bookingID)
 	if err != nil {
@@ -127,19 +135,31 @@ func (s *BookingService) Accept(ctx context.Context, bookingID, technicianID str
 	if b == nil {
 		return errors.New("booking not found")
 	}
-	if b.Status != models.BookingRequested {
-		return errors.New("booking is not in a requested state")
-	}
 
-	// AssignTechnician re-checks status='requested' atomically inside its own
-	// UPDATE, so even if two technicians pass the check above at the same
-	// instant, only one of them can actually win here — the other gets
-	// ErrBookingAlreadyAssigned instead of silently overwriting the first.
-	if err := s.bookingRepo.AssignTechnician(ctx, bookingID, technicianID); err != nil {
-		if errors.Is(err, repository.ErrBookingAlreadyAssigned) {
-			return errors.New("this booking has already been accepted by another technician")
+	switch b.Status {
+	case models.BookingRequested:
+		// AssignTechnician re-checks status='requested' atomically inside its own
+		// UPDATE, so even if two technicians pass the check above at the same
+		// instant, only one of them can actually win here — the other gets
+		// ErrBookingAlreadyAssigned instead of silently overwriting the first.
+		if err := s.bookingRepo.AssignTechnician(ctx, bookingID, technicianID); err != nil {
+			if errors.Is(err, repository.ErrBookingAlreadyAssigned) {
+				return errors.New("this booking has already been accepted by another technician")
+			}
+			return err
 		}
-		return err
+	case models.BookingPendingTechnician:
+		if b.TechnicianID == nil || *b.TechnicianID != technicianID {
+			return errors.New("this booking is not assigned to you")
+		}
+		if err := s.bookingRepo.ConfirmAssignment(ctx, bookingID, technicianID); err != nil {
+			if errors.Is(err, repository.ErrBookingAlreadyAssigned) {
+				return errors.New("this booking is no longer assigned to you")
+			}
+			return err
+		}
+	default:
+		return errors.New("booking is not in a state that can be accepted")
 	}
 
 	if s.fcm != nil {
@@ -151,17 +171,30 @@ func (s *BookingService) Accept(ctx context.Context, bookingID, technicianID str
 }
 
 // Decline is the technician-side counterpart of Accept — a technician turning
-// down a booking that was routed to them while it's still 'requested'.
-// bookingRepo.Decline atomically clears technician_id and puts the booking
-// back to 'requested' only if it was still assigned to this exact technician,
-// so a stale/duplicate decline can't clobber a booking someone else already
-// accepted in the meantime.
+// down a booking that was routed to them while it's still 'requested' or
+// 'pending_technician'. bookingRepo.Decline atomically clears technician_id
+// and puts the booking back to 'requested' only if it was still assigned to
+// this exact technician, so a stale/duplicate decline can't clobber a
+// booking someone else already accepted in the meantime. The customer is
+// notified so the app can bounce them back to the technician-selection
+// screen to pick/find another technician instead of sitting on a dead card.
 func (s *BookingService) Decline(ctx context.Context, bookingID, technicianID string) error {
+	b, err := s.bookingRepo.GetByID(ctx, bookingID)
+	if err != nil {
+		return err
+	}
+
 	if err := s.bookingRepo.Decline(ctx, bookingID, technicianID); err != nil {
 		if errors.Is(err, repository.ErrBookingAlreadyAssigned) {
 			return errors.New("this booking is no longer assigned to you")
 		}
 		return err
+	}
+
+	if s.fcm != nil && b != nil {
+		_ = s.fcm.SendToUser(ctx, b.CustomerID, "Technician unavailable",
+			"The technician rejected your booking. We're finding another technician for you.",
+			map[string]string{"booking_id": bookingID, "type": "booking_technician_rejected"})
 	}
 	return nil
 }

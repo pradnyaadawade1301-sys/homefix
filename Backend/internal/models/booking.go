@@ -24,6 +24,13 @@ const (
 	// declines it (see BookingService.RespondToEstimate). The technician
 	// can only move to "on the way" once an estimate has been approved.
 	BookingAwaitingEstimateApproval = "awaiting_estimate_approval"
+
+	// BookingPendingTechnician is set when a specific technician has been
+	// notified about a booking (via "Book Now" preferred-technician flow)
+	// but has not yet accepted or rejected it. Only once the technician
+	// accepts does the booking move to BookingAccepted; if they reject it,
+	// it falls back to BookingRequested so another technician can be found.
+	BookingPendingTechnician = "pending_technician"
 )
 
 // Visit-fee status values — see migration 022_visit_fee.sql. A booking created
@@ -44,6 +51,7 @@ const DefaultVisitFeeAmount = 99.0
 // so a typo'd status string can't get silently stuck in a booking's history.
 var ValidBookingStatuses = map[string]bool{
 	BookingRequested:        true,
+	BookingPendingTechnician: true,
 	BookingAccepted:         true,
 	BookingOnTheWay:         true,
 	BookingArrived:          true,

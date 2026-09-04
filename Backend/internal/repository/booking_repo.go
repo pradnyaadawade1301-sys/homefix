@@ -139,10 +139,65 @@ func (r *BookingRepository) AssignTechnician(ctx context.Context, bookingID, tec
 	return tx.Commit(ctx)
 }
 
-// Decline reverses AssignTechnician for a technician who was handed a
-// 'requested' booking but doesn't want to take it: it clears technician_id
-// and leaves status at 'requested' so the booking goes back into the pool
-// for another technician to be found, instead of silently getting stuck.
+// AssignPendingTechnician is used by the "Book Now" preferred-technician flow:
+// it puts the chosen technician on the booking but does NOT auto-confirm it —
+// status goes to 'pending_technician' so the technician still has to explicitly
+// accept (via ConfirmAssignment) or reject (via Decline) the job.
+func (r *BookingRepository) AssignPendingTechnician(ctx context.Context, bookingID, technicianID string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(ctx, `UPDATE bookings SET technician_id = $1, status = 'pending_technician', updated_at = now() WHERE id = $2 AND status = 'requested'`,
+		technicianID, bookingID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrBookingAlreadyAssigned
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO booking_status_history (booking_id, status, note) VALUES ($1,'pending_technician','Waiting for technician to accept')`,
+		bookingID)
+	if err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// ConfirmAssignment is the technician explicitly accepting a booking that was
+// routed to them and is sitting at 'pending_technician' — it flips the
+// booking to 'accepted' only if it's still pending for this exact technician.
+func (r *BookingRepository) ConfirmAssignment(ctx context.Context, bookingID, technicianID string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(ctx, `UPDATE bookings SET status = 'accepted', updated_at = now()
+		WHERE id = $1 AND technician_id = $2 AND status = 'pending_technician'`, bookingID, technicianID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrBookingAlreadyAssigned
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO booking_status_history (booking_id, status, note) VALUES ($1,'accepted','Technician accepted the booking')`,
+		bookingID)
+	if err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// Decline reverses AssignTechnician/AssignPendingTechnician for a technician
+// who was handed a booking but doesn't want to take it: it clears
+// technician_id and leaves status at 'requested' so the booking goes back
+// into the pool for another technician to be found, instead of silently
+// getting stuck. Covers both the plain 'requested' self-accept flow and the
+// 'pending_technician' preferred-technician flow.
 func (r *BookingRepository) Decline(ctx context.Context, bookingID, technicianID string) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -151,7 +206,7 @@ func (r *BookingRepository) Decline(ctx context.Context, bookingID, technicianID
 	defer tx.Rollback(ctx)
 
 	tag, err := tx.Exec(ctx, `UPDATE bookings SET technician_id = NULL, status = 'requested', updated_at = now()
-		WHERE id = $1 AND technician_id = $2 AND status = 'requested'`, bookingID, technicianID)
+		WHERE id = $1 AND technician_id = $2 AND status IN ('requested', 'pending_technician')`, bookingID, technicianID)
 	if err != nil {
 		return err
 	}
