@@ -306,22 +306,13 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
         if (_upcomingConsultations.isNotEmpty) _buildUpcomingBanner(),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              key: _filterKey,
-              children: [
-                _FilterChip(label: 'Active', selected: _tabIndex == 0, onTap: () => setState(() => _tabIndex = 0)),
-                const SizedBox(width: 8),
-                _FilterChip(label: 'Book Now', selected: _tabIndex == 1, onTap: () => setState(() => _tabIndex = 1)),
-                const SizedBox(width: 8),
-                _FilterChip(label: 'Video Call', selected: _tabIndex == 2, onTap: () => setState(() => _tabIndex = 2)),
-                const SizedBox(width: 8),
-                _FilterChip(label: 'Schedule for later', selected: _tabIndex == 3, onTap: () => setState(() => _tabIndex = 3)),
-                const SizedBox(width: 8),
-                _FilterChip(label: 'All', selected: _tabIndex == 4, onTap: () => setState(() => _tabIndex = 4)),
-              ],
-            ),
+          child: Row(
+            key: _filterKey,
+            children: [
+              _FilterChip(label: 'Active', selected: _tabIndex == 0, onTap: () => setState(() => _tabIndex = 0)),
+              const SizedBox(width: 8),
+              _FilterChip(label: 'All', selected: _tabIndex == 1, onTap: () => setState(() => _tabIndex = 1)),
+            ],
           ),
         ),
         Expanded(
@@ -360,28 +351,13 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
                   );
                 }
 
-                // Book Now = an immediate request (no future schedule, no
-                // video consultation beforehand). Video Call = a booking
-                // that had a video consultation first (jobBrief.hasVideo).
-                // Schedule for later = customer picked a future date/time.
-                final jobs = switch (_tabIndex) {
-                  0 => provider.bookings
-                      .where((b) => b.status == 'accepted' || b.status == 'on_the_way' || b.status == 'arrived' || b.status == 'inspecting' || b.status == 'in_progress' || b.status == 'awaiting_estimate_approval')
-                      .toList(),
-                  1 => provider.bookings.where((b) => b.jobBrief?.hasVideo != true && b.scheduledAt == null).toList(),
-                  2 => provider.bookings.where((b) => b.jobBrief?.hasVideo == true).toList(),
-                  3 => provider.bookings.where((b) => b.scheduledAt != null).toList(),
-                  _ => provider.bookings,
-                };
+                final jobs = _tabIndex == 0
+                    ? provider.bookings
+                        .where((b) => b.status == 'accepted' || b.status == 'on_the_way' || b.status == 'arrived' || b.status == 'inspecting' || b.status == 'in_progress' || b.status == 'awaiting_estimate_approval')
+                        .toList()
+                    : provider.bookings;
 
                 if (jobs.isEmpty) {
-                  final emptyTitle = switch (_tabIndex) {
-                    0 => 'No active jobs right now',
-                    1 => 'No Book Now requests',
-                    2 => 'No Video Call jobs',
-                    3 => 'No jobs scheduled for later',
-                    _ => 'No jobs yet',
-                  };
                   return ListView(
                     children: [
                       SizedBox(height: MediaQuery.of(context).size.height * 0.22),
@@ -389,7 +365,7 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
                       const SizedBox(height: 16),
                       Center(
                         child: Text(
-                          emptyTitle,
+                          _tabIndex == 0 ? 'No active jobs right now' : 'No jobs yet',
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey[600]),
                         ),
                       ),
@@ -407,7 +383,7 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
                 return ListView.builder(
                   padding: const EdgeInsets.all(20),
                   itemCount: jobs.length,
-                  itemBuilder: (context, i) => _JobCard(booking: jobs[i]),
+                  itemBuilder: (context, i) => _JobCard(key: ValueKey(jobs[i].id), booking: jobs[i]),
                 );
               },
             ),
@@ -564,7 +540,7 @@ class _FilterChip extends StatelessWidget {
 
 class _JobCard extends StatelessWidget {
   final Booking booking;
-  const _JobCard({required this.booking});
+  const _JobCard({super.key, required this.booking});
 
   Color _statusColor(String status) {
     switch (status) {
@@ -725,7 +701,7 @@ class JobActionRow extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: kycProfile == null
                     ? null
-                    : () => _runAction(context, () => provider.acceptBooking(booking.id, kycProfile.id)),
+                    : () => _acceptAndGoToEstimate(context, provider, booking, kycProfile.id),
                 child: const Text('Accept job'),
               ),
             ),
@@ -753,7 +729,7 @@ class JobActionRow extends StatelessWidget {
           ),
         );
       case 'arrived':
-        return _OtpVerifyRow(booking: booking, technicianId: kycProfile?.id);
+        return _OtpVerifyRow(key: ValueKey('otp_${booking.id}'), booking: booking, technicianId: kycProfile?.id);
       case 'inspecting':
       case 'in_progress':
         return _EstimateAwareAction(booking: booking, technicianId: kycProfile?.id);
@@ -771,6 +747,39 @@ class JobActionRow extends StatelessWidget {
     if (provider.error != null) {
       messenger.showSnackBar(SnackBar(content: Text(provider.error!)));
     }
+  }
+
+  /// Accepts the job and — as soon as the accept succeeds — takes the
+  /// technician straight to the "Submit estimate" screen, instead of making
+  /// them step through "On the way" / "Arrived" first. This matches the
+  /// requested flow: customer books -> technician gets the request ->
+  /// Accept/Decline -> on Accept, go directly to Submit Estimate; on
+  /// Decline, the booking goes back into the pool and the customer is told
+  /// (in English) that we're finding another technician.
+  Future<void> _acceptAndGoToEstimate(
+    BuildContext context,
+    BookingProvider provider,
+    Booking booking,
+    String technicianId,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
+    await provider.acceptBooking(booking.id, technicianId);
+
+    if (provider.error != null) {
+      messenger.showSnackBar(SnackBar(content: Text(provider.error!)));
+      return;
+    }
+
+    if (!context.mounted) return;
+    await navigator.push(MaterialPageRoute(
+      builder: (_) => TechnicianEstimateScreen(
+        bookingId: booking.id,
+        technicianId: technicianId,
+        customerName: booking.customer?.name ?? 'the customer',
+      ),
+    ));
   }
 
   /// Confirms before declining — this is a one-way action (the booking goes
@@ -1122,7 +1131,7 @@ class _WaitingOnEstimateRow extends StatelessWidget {
 class _OtpVerifyRow extends StatefulWidget {
   final Booking booking;
   final String? technicianId;
-  const _OtpVerifyRow({required this.booking, required this.technicianId});
+  const _OtpVerifyRow({super.key, required this.booking, required this.technicianId});
 
   @override
   State<_OtpVerifyRow> createState() => _OtpVerifyRowState();

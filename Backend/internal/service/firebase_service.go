@@ -79,6 +79,20 @@ func (f *FirebaseService) SendToUser(ctx context.Context, userID, title, body st
 	case u == nil || u.FCMToken == nil || *u.FCMToken == "":
 		log.Printf("[fcm] SendToUser: user %s has no FCM token registered — writing in-app notification only: %q", userID, title)
 	default:
+		// Route to the Android notification channel actually created on the
+		// device (see FcmNotificationService.initialize in the Flutter app).
+		// Without an explicit channel here, Android has nothing to hang a
+		// heads-up/lock-screen alert on once the app is backgrounded or
+		// killed — the push still "arrives" (which is why it shows up fine
+		// in the in-app Notifications list, since that's written below
+		// regardless of push outcome) but the OS silently swallows the
+		// popup instead of showing it. "incoming_calls" is the Importance.max
+		// channel used only for live-consultation ring alerts; everything
+		// else goes to the shared Importance.high "homefix_notifications" channel.
+		channelID := "homefix_notifications"
+		if data["type"] == "consultation_request" {
+			channelID = "incoming_calls"
+		}
 		msg := &messaging.Message{
 			Token: *u.FCMToken,
 			Notification: &messaging.Notification{
@@ -86,12 +100,43 @@ func (f *FirebaseService) SendToUser(ctx context.Context, userID, title, body st
 				Body:  body,
 			},
 			Data: data,
+			Android: &messaging.AndroidConfig{
+				Priority: "high", // ensures delivery even in Doze/background
+				Notification: &messaging.AndroidNotification{
+					ChannelID: channelID,
+					Priority:  messaging.PriorityHigh,
+					Sound:     "default",
+					DefaultVibrateTimings: true,
+				},
+			},
+			APNS: &messaging.APNSConfig{
+				Payload: &messaging.APNSPayload{
+					Aps: &messaging.Aps{
+						Sound: "default",
+					},
+				},
+			},
 		}
 		if _, err := f.client.Send(ctx, msg); err != nil {
 			// Push failed (e.g. stale/invalid token, revoked credentials) - still
 			// record in-app notification below, but log so this isn't invisible.
 			log.Printf("[fcm] SendToUser: push send failed for user %s: %v", userID, err)
 			sentOK = false
+
+			// If FCM says this token is dead (app uninstalled/reinstalled, app
+			// data cleared, or the token was rotated while the app couldn't
+			// reach our backend), every future push to this user will keep
+			// failing the exact same way until they log in again — which is
+			// what shows up as "notifications permanently stopped for this
+			// user". Clear it now so it's obviously empty (visible via
+			// GetByID) instead of silently dead, and so we're not wasting FCM
+			// calls on a token that can never succeed.
+			if messaging.IsUnregistered(err) || messaging.IsInvalidArgument(err) || messaging.IsSenderIDMismatch(err) {
+				log.Printf("[fcm] SendToUser: token for user %s is invalid/unregistered — clearing stored token", userID)
+				if clearErr := f.userRepo.SetFCMToken(ctx, userID, ""); clearErr != nil {
+					log.Printf("[fcm] SendToUser: failed to clear stale token for user %s: %v", userID, clearErr)
+				}
+			}
 		} else {
 			sentOK = true
 		}

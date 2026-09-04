@@ -34,12 +34,13 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
     await provider.fetchJobPhotos(widget.bookingId);
   }
 
-  static const _stages = ['requested', 'accepted', 'on_the_way', 'arrived', 'in_progress', 'completed'];
+  static const _stages = ['requested', 'accepted', 'on_the_way', 'arrived', 'inspecting', 'in_progress', 'completed'];
   static const _stageLabels = {
     'requested': 'Pending Assignment',
     'accepted': 'Technician Assigned',
     'on_the_way': 'On The Way',
     'arrived': 'Technician Arrived',
+    'inspecting': 'Inspecting Issue',
     'in_progress': 'Service In Progress',
     'awaiting_estimate_approval': 'Estimate Awaiting Approval',
     'completed': 'Service Completed',
@@ -49,6 +50,7 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
     'accepted': Icons.person_pin_circle_rounded,
     'on_the_way': Icons.directions_run_rounded,
     'arrived': Icons.home_rounded,
+    'inspecting': Icons.search_rounded,
     'in_progress': Icons.build_rounded,
     'completed': Icons.check_circle_rounded,
   };

@@ -3,7 +3,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'app.dart';
 import 'services/notification_service.dart';
-import 'services/firebase_messaging_handler.dart';
 
 /// Global FCM notification service instance — accessed from app.dart
 /// and any screen that needs to navigate on notification tap.
