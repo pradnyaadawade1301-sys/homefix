@@ -37,7 +37,7 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
     _controller.forward();
     _loadReviews();
   }
-   Future<void> _pickScheduleTime(BuildContext context) async {
+  Future<void> _pickScheduleTime(BuildContext context) async {
   final t = widget.technician;
   final now = DateTime.now();
 
@@ -110,7 +110,7 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 260,
+            expandedHeight: 296,
             pinned: true,
             backgroundColor: _accent,
             iconTheme: const IconThemeData(color: Colors.white),
@@ -123,67 +123,148 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                     end: Alignment.bottomRight,
                   ),
                 ),
-                child: SafeArea(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Container(
-                            width: 88,
-                            height: 88,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white,
-                              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 14, offset: const Offset(0, 6))],
-                            ),
-                            padding: const EdgeInsets.all(3),
-                            child: CircleAvatar(
-                              backgroundColor: _accent.withValues(alpha: 0.12),
-                              child: Text(
-                                t.name.isNotEmpty ? t.name[0].toUpperCase() : '?',
-                                style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: _accent),
-                              ),
-                            ),
-                          ),
-                          if (t.isAvailable)
-                            Positioned(
-                              right: 2,
-                              bottom: 2,
-                              child: Container(
-                                width: 16,
-                                height: 16,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.successColor,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 2.5),
-                                ),
-                              ),
-                            ),
-                        ],
+                child: Stack(
+                  children: [
+                    // Decorative touches so the banner reads as designed
+                    // rather than a flat block of color, matching the
+                    // reference's subtle background shapes.
+                    Positioned(
+                      top: -40,
+                      right: -30,
+                      child: Container(
+                        width: 160,
+                        height: 160,
+                        decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.05)),
                       ),
-                      const SizedBox(height: 12),
-                      Row(
+                    ),
+                    Positioned(
+                      bottom: -60,
+                      left: -40,
+                      child: Container(
+                        width: 180,
+                        height: 180,
+                        decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.04)),
+                      ),
+                    ),
+                    SafeArea(
+                      child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Flexible(
-                            child: Text(
-                              t.name.isNotEmpty ? t.name : 'Technician',
-                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-                              textAlign: TextAlign.center,
+                          Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                width: 76,
+                                height: 76,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white,
+                                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 14, offset: const Offset(0, 6))],
+                                ),
+                                padding: const EdgeInsets.all(3),
+                                child: CircleAvatar(
+                                  backgroundColor: _accent.withValues(alpha: 0.12),
+                                  child: Text(
+                                    t.name.isNotEmpty ? t.name[0].toUpperCase() : '?',
+                                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: _accent),
+                                  ),
+                                ),
+                              ),
+                              if (t.isAvailable)
+                                Positioned(
+                                  right: 2,
+                                  bottom: 2,
+                                  child: Container(
+                                    width: 14,
+                                    height: 14,
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.successColor,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white, width: 2.5),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  t.name.isNotEmpty ? t.name : 'Technician',
+                                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Colors.white),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                              if (t.isVerified) ...[
+                                const SizedBox(width: 6),
+                                const Icon(Icons.verified_rounded, color: Colors.white, size: 19),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text('${t.categoryName} Technician', style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.85))),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.star_rounded, color: Color(0xFFF5A623), size: 16),
+                              const SizedBox(width: 4),
+                              Text(
+                                t.ratingCount > 0 ? '${t.ratingAvg.toStringAsFixed(1)} (${t.ratingCount} reviews)' : 'No reviews yet',
+                                style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w600),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                child: Container(width: 1, height: 11, color: Colors.white.withValues(alpha: 0.35)),
+                              ),
+                              Icon(Icons.work_history_outlined, color: Colors.white.withValues(alpha: 0.9), size: 15),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${t.experienceYears} yrs Experience',
+                                style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.14),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: t.isAvailable ? AppTheme.successColor : Colors.grey[300],
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    t.isAvailable ? 'Available Now' : 'Currently unavailable',
+                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: Colors.white),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    t.isAvailable ? 'Ready to take new bookings' : 'Not accepting bookings',
+                                    style: TextStyle(fontSize: 10.5, color: Colors.white.withValues(alpha: 0.75)),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                          if (t.isVerified) ...[
-                            const SizedBox(width: 6),
-                            const Icon(Icons.verified_rounded, color: Colors.white, size: 20),
-                          ],
                         ],
                       ),
-                      const SizedBox(height: 2),
-                      Text('${t.categoryName} Technician', style: TextStyle(fontSize: 13.5, color: Colors.white.withValues(alpha: 0.85))),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -194,73 +275,15 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
               child: SlideTransition(
                 position: _slide,
                 child: Container(
-                  transform: Matrix4.translationValues(0, -24, 0),
+                  transform: Matrix4.translationValues(0, -36, 0),
                   decoration: const BoxDecoration(
                     color: Color(0xFFF7F8FA),
                     borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
                   ),
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          _StatChip(
-                            icon: Icons.star_rounded,
-                            iconColor: const Color(0xFFF5A623),
-                            label: t.ratingCount > 0
-                                ? '${t.ratingAvg.toStringAsFixed(1)} (${t.ratingCount} reviews)'
-                                : 'No reviews yet',
-                          ),
-                          _StatChip(icon: Icons.work_history_outlined, iconColor: _accent, label: '${t.experienceYears} yrs experience'),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: (t.isAvailable ? AppTheme.successColor : Colors.grey).withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 15,
-                              backgroundColor: t.isAvailable ? AppTheme.successColor : Colors.grey,
-                              child: Icon(
-                                t.isAvailable ? Icons.check_rounded : Icons.close_rounded,
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    t.isAvailable ? 'Available now' : 'Currently unavailable',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 13.5,
-                                      color: t.isAvailable ? AppTheme.successColor : Colors.grey[700],
-                                    ),
-                                  ),
-                                  Text(
-                                    t.isAvailable ? 'Ready to take new bookings' : 'Not accepting bookings right now',
-                                    style: TextStyle(fontSize: 11.5, color: Colors.grey[600]),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(18),
@@ -338,17 +361,17 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                         child: const Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            _TrustBadge(icon: Icons.verified_user_outlined, title: 'Background', subtitle: 'Verified'),
+                            _TrustBadge(icon: Icons.verified_user_outlined, title: 'Verified', subtitle: 'Background'),
                             _TrustBadge(icon: Icons.support_agent_rounded, title: '24/7', subtitle: 'Support'),
-                            _TrustBadge(icon: Icons.lock_outline_rounded, title: 'Secure', subtitle: 'Booking'),
+                            _TrustBadge(icon: Icons.thumb_up_outlined, title: '100%', subtitle: 'Reliability'),
+                            _TrustBadge(icon: Icons.lock_outline_rounded, title: 'Secure', subtitle: 'Bookings'),
                           ],
                         ),
                       ),
                       const SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,
-                        height: 54,
-                        child: ElevatedButton.icon(
+                        child: ElevatedButton(
                           onPressed: t.isAvailable
                               ? () {
                                   Navigator.of(context).push(
@@ -363,16 +386,24 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                                   );
                                 }
                               : null,
-                          style: ElevatedButton.styleFrom(backgroundColor: _accent, foregroundColor: Colors.white),
-                          icon: const Icon(Icons.calendar_month_rounded),
-                          label: const Text('Book Now', style: TextStyle(fontWeight: FontWeight.w600)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _accent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: const _ActionButtonLabel(
+                            icon: Icons.calendar_month_rounded,
+                            title: 'Book Now',
+                            subtitle: 'Confirm & get your service',
+                            filled: true,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,
-                        height: 54,
-                                           child: OutlinedButton.icon(
+                        child: OutlinedButton(
                           onPressed: t.isAvailable
                               ? () async {
                                   final preCheck = await showVideoCallPreCheckSheet(
@@ -395,22 +426,39 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                                   );
                                 }
                               : null,
-                          style: OutlinedButton.styleFrom(foregroundColor: _accent, side: const BorderSide(color: _accent, width: 1.4)),
-                          icon: const Icon(Icons.videocam_rounded),
-                          label: const Text('Video Call', style: TextStyle(fontWeight: FontWeight.w600)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: _accent,
+                            side: const BorderSide(color: _accent, width: 1.4),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: const _ActionButtonLabel(
+                            icon: Icons.videocam_rounded,
+                            title: 'Video Call',
+                            subtitle: 'Talk to me now',
+                            color: _accent,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
-SizedBox(
-  width: double.infinity,
-  height: 54,
-  child: OutlinedButton.icon(
-    onPressed: () => _pickScheduleTime(context),
-    style: OutlinedButton.styleFrom(foregroundColor: Colors.grey[700], side: BorderSide(color: Colors.grey[400]!, width: 1.4)),
-    icon: const Icon(Icons.event_available_outlined),
-    label: const Text('Schedule for Later', style: TextStyle(fontWeight: FontWeight.w600)),
-  ),
-),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: () => _pickScheduleTime(context),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.grey[700],
+                            side: BorderSide(color: Colors.grey[400]!, width: 1.4),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: _ActionButtonLabel(
+                            icon: Icons.event_available_outlined,
+                            title: 'Schedule for Later',
+                            subtitle: 'Pick a convenient time',
+                            color: Colors.grey[700]!,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -423,28 +471,40 @@ SizedBox(
   }
 }
 
-class _StatChip extends StatelessWidget {
+class _ActionButtonLabel extends StatelessWidget {
   final IconData icon;
-  final Color iconColor;
-  final String label;
-  const _StatChip({required this.icon, required this.iconColor, required this.label});
+  final String title;
+  final String subtitle;
+  final bool filled;
+  final Color? color;
+  const _ActionButtonLabel({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.filled = false,
+    this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.grey.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: iconColor),
-          const SizedBox(width: 6),
-          Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
-        ],
-      ),
+    final fg = filled ? Colors.white : (color ?? Colors.black87);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 20, color: fg),
+        const SizedBox(width: 10),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: fg)),
+            Text(
+              subtitle,
+              style: TextStyle(fontSize: 11.5, color: filled ? Colors.white.withValues(alpha: 0.85) : fg.withValues(alpha: 0.75)),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -459,7 +519,16 @@ class _TrustBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Icon(icon, color: const Color(0xFF0F766E), size: 22),
+        Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F766E).withValues(alpha: 0.08),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: const Color(0xFF0F766E), size: 20),
+        ),
         const SizedBox(height: 6),
         Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1A1F36))),
         Text(subtitle, style: TextStyle(fontSize: 10.5, color: Colors.grey[600])),

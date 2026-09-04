@@ -5,7 +5,6 @@ import '../../core/theme.dart';
 import '../../models/booking_model.dart';
 import '../../models/consultation_model.dart';
 import '../../providers/booking_provider.dart';
-import '../../providers/category_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/consultation_provider.dart';
 import '../../services/booking_service.dart';
@@ -19,6 +18,7 @@ import 'repeat_customers_screen.dart';
 import '../chat/booking_chat_screen.dart';
 import 'technician_estimate_screen.dart';
 import 'technician_job_detail_screen.dart';
+import '../../providers/category_provider.dart';
 
 class TechnicianJobsScreen extends StatefulWidget {
   const TechnicianJobsScreen({Key? key}) : super(key: key);
@@ -809,11 +809,12 @@ void _showInvoiceDialog(BuildContext context, BookingProvider provider, Booking 
   );
 }
 
-/// "Generate invoice" dialog — final amount, plus (if the booking's category
-/// has any warranty durations configured by admin — see
-/// Category.warrantyOptions) an optional "Offer a warranty" toggle and a
-/// duration picker constrained to exactly that category's allowed options,
-/// matching the backend's validation in BookingService.Complete.
+/// "Generate invoice" dialog — final amount, plus an optional "Offer a
+/// warranty" toggle with a free-form duration (a number + a Days/Months/Years
+/// unit). There's no admin-configured whitelist: the technician judges each
+/// job on its own merits (e.g. a compressor swap might earn 1 year, a gas
+/// top-up 15 days), and the backend only sanity-bounds the total to a
+/// positive number under 10 years — see BookingService.Complete.
 class _InvoiceDialog extends StatefulWidget {
   final BookingProvider provider;
   final Booking booking;
@@ -823,10 +824,37 @@ class _InvoiceDialog extends StatefulWidget {
   State<_InvoiceDialog> createState() => _InvoiceDialogState();
 }
 
+enum _WarrantyUnit { days, months, years }
+
+extension on _WarrantyUnit {
+  String get label {
+    switch (this) {
+      case _WarrantyUnit.days:
+        return 'Days';
+      case _WarrantyUnit.months:
+        return 'Months';
+      case _WarrantyUnit.years:
+        return 'Years';
+    }
+  }
+
+  int get inDays {
+    switch (this) {
+      case _WarrantyUnit.days:
+        return 1;
+      case _WarrantyUnit.months:
+        return 30;
+      case _WarrantyUnit.years:
+        return 365;
+    }
+  }
+}
+
 class _InvoiceDialogState extends State<_InvoiceDialog> {
   late final TextEditingController _controller;
+  late final TextEditingController _warrantyAmountController;
   bool _warrantyEnabled = false;
-  int? _selectedDays;
+  _WarrantyUnit _warrantyUnit = _WarrantyUnit.months;
 
   @override
   void initState() {
@@ -834,31 +862,27 @@ class _InvoiceDialogState extends State<_InvoiceDialog> {
     _controller = TextEditingController(
       text: (widget.booking.estimatedPrice ?? 0) > 0 ? (widget.booking.estimatedPrice ?? 0).toStringAsFixed(0) : '',
     );
-    // Nothing in the technician flow currently fetches categories, so make
-    // sure they're loaded here — otherwise Category.warrantyOptions would
-    // silently read as empty and the warranty toggle just wouldn't appear.
-    final categoryProvider = context.read<CategoryProvider>();
-    if (categoryProvider.categories.isEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => categoryProvider.fetchCategories());
-    }
+    _warrantyAmountController = TextEditingController();
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _warrantyAmountController.dispose();
     super.dispose();
   }
 
-  List<int> _warrantyOptionsFor(BuildContext context) {
-    final categories = context.watch<CategoryProvider>().categories;
-    final match = categories.where((c) => c.id == widget.booking.categoryId).toList();
-    return match.isNotEmpty ? match.first.warrantyOptions : const [];
+  /// Total warranty length in days, converted from whatever the technician
+  /// typed + the unit they picked (e.g. "6" + Months -> 180). Returns null
+  /// if the amount isn't a valid positive whole number.
+  int? get _warrantyDaysValue {
+    final amount = int.tryParse(_warrantyAmountController.text.trim());
+    if (amount == null || amount <= 0) return null;
+    return amount * _warrantyUnit.inDays;
   }
 
   @override
   Widget build(BuildContext context) {
-    final warrantyOptions = _warrantyOptionsFor(context);
-
     return AlertDialog(
       title: const Text('Generate invoice'),
       content: SingleChildScrollView(
@@ -881,33 +905,50 @@ class _InvoiceDialogState extends State<_InvoiceDialog> {
                 border: OutlineInputBorder(),
               ),
             ),
-            if (warrantyOptions.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Offer a warranty', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
-                subtitle: const Text('Customer can raise a free revisit within this window', style: TextStyle(fontSize: 11.5)),
-                value: _warrantyEnabled,
-                onChanged: (v) => setState(() {
-                  _warrantyEnabled = v;
-                  if (v && _selectedDays == null) _selectedDays = warrantyOptions.first;
-                }),
+            const SizedBox(height: 20),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Offer a warranty', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+              subtitle: const Text('Customer can raise a free revisit within this window', style: TextStyle(fontSize: 11.5)),
+              value: _warrantyEnabled,
+              onChanged: (v) => setState(() => _warrantyEnabled = v),
+            ),
+            if (_warrantyEnabled) ...[
+              const SizedBox(height: 4),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: _warrantyAmountController,
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) => setState(() {}),
+                      decoration: const InputDecoration(
+                        labelText: 'Duration',
+                        hintText: 'e.g. 6',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 3,
+                    child: DropdownButtonFormField<_WarrantyUnit>(
+                      value: _warrantyUnit,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: _WarrantyUnit.values
+                          .map((u) => DropdownMenuItem(value: u, child: Text(u.label, style: const TextStyle(fontSize: 13))))
+                          .toList(),
+                      onChanged: (u) => setState(() => _warrantyUnit = u ?? _warrantyUnit),
+                    ),
+                  ),
+                ],
               ),
-              if (_warrantyEnabled) ...[
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: warrantyOptions.map((d) {
-                    final selected = _selectedDays == d;
-                    return ChoiceChip(
-                      label: Text('$d days', style: const TextStyle(fontSize: 12.5)),
-                      selected: selected,
-                      onSelected: (_) => setState(() => _selectedDays = d),
-                    );
-                  }).toList(),
-                ),
-              ],
             ],
           ],
         ),
@@ -926,12 +967,18 @@ class _InvoiceDialogState extends State<_InvoiceDialog> {
               );
               return;
             }
+            if (_warrantyEnabled && _warrantyDaysValue == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Enter a valid warranty duration')),
+              );
+              return;
+            }
             Navigator.of(context).pop();
             widget.provider.completeBooking(
               widget.booking.id,
               price,
               warrantyEnabled: _warrantyEnabled,
-              warrantyDays: _warrantyEnabled ? _selectedDays : null,
+              warrantyDays: _warrantyEnabled ? _warrantyDaysValue : null,
             );
           },
           child: const Text('Send invoice'),

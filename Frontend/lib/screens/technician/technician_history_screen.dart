@@ -20,7 +20,7 @@ class TechnicianHistoryScreen extends StatefulWidget {
 }
 
 class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
-  int _tab = 0; // 0 = Chats, 1 = Video Call
+  int _tab = 0; // 0 = Chats, 1 = Video Call, 2 = Warranty
 
   @override
   void initState() {
@@ -46,13 +46,19 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
               Expanded(
                 child: _tabChip('Video Call', 1),
               ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _tabChip('Warranty', 2),
+              ),
             ],
           ),
         ),
         Expanded(
           child: _tab == 0
               ? _chatsList(bookings)
-              : _videoCallList(consultationProvider),
+              : _tab == 1
+                  ? _videoCallList(consultationProvider)
+                  : _warrantyList(bookings),
         ),
       ],
     );
@@ -194,6 +200,96 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
         );
       },
     );
+  }
+
+  /// Jobs this technician offered a warranty on — most recent first. Reuses
+  /// BookingProvider.bookings (already loaded for the Jobs tab), filtered to
+  /// warrantyEnabled == true, so no extra network call is needed.
+  Widget _warrantyList(List<Booking> bookings) {
+    final warrantyBookings = bookings.where((b) => b.warrantyEnabled).toList()
+      ..sort((a, b) => (b.warrantyExpiresAt ?? DateTime(0)).compareTo(a.warrantyExpiresAt ?? DateTime(0)));
+
+    if (warrantyBookings.isEmpty) {
+      return const Center(child: Text('No warranties offered yet'));
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: warrantyBookings.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, i) {
+        final b = warrantyBookings[i];
+        final customerName = b.customer?.name.isNotEmpty == true ? b.customer!.name : 'Customer';
+        final active = b.warrantyExpiresAt != null && b.warrantyExpiresAt!.isAfter(DateTime.now());
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.grey[200]!),
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: (active ? AppTheme.primaryColor : Colors.grey).withValues(alpha: 0.12),
+                child: Icon(Icons.shield_outlined, color: active ? AppTheme.primaryColor : Colors.grey[600], size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(customerName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                    const SizedBox(height: 2),
+                    Text(
+                      _formatWarrantyDuration(b.warrantyDays),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                    if (b.warrantyExpiresAt != null)
+                      Text(
+                        active
+                            ? 'Valid until ${_formatDate(b.warrantyExpiresAt!)}'
+                            : 'Expired on ${_formatDate(b.warrantyExpiresAt!)}',
+                        style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                      ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: (active ? AppTheme.primaryColor : Colors.grey).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  active ? 'Active' : 'Expired',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: active ? AppTheme.primaryColor : Colors.grey[600],
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// warrantyDays is always stored in total days (see BookingService.Complete),
+  /// regardless of whether the technician originally picked days/months/years
+  /// — so this converts back to the friendliest display unit.
+  String _formatWarrantyDuration(int? days) {
+    if (days == null) return 'Warranty offered';
+    if (days % 365 == 0 && days >= 365) {
+      final years = days ~/ 365;
+      return '$years ${years == 1 ? 'year' : 'years'} warranty';
+    }
+    if (days % 30 == 0 && days >= 30) {
+      final months = days ~/ 30;
+      return '$months ${months == 1 ? 'month' : 'months'} warranty';
+    }
+    return '$days ${days == 1 ? 'day' : 'days'} warranty';
   }
 
   String _formatDate(DateTime d) => '${d.day}/${d.month}/${d.year}';
