@@ -61,7 +61,7 @@ func (r *ConsultationRepository) GetByID(ctx context.Context, id string) (*model
 func (r *ConsultationRepository) GetWithDetails(ctx context.Context, id string) (*models.ConsultationWithDetails, error) {
 	row := r.db.QueryRow(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
-		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason, co.note, co.area, co.ai_diagnosis_session_id, co.note, co.area, co.ai_diagnosis_session_id,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason, co.note, co.area, co.ai_diagnosis_session_id,
 		       co.recommendation_summary, co.recommendation_price, co.recommendation_status, co.recommendation_sent_at,
 		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''),
@@ -221,7 +221,7 @@ func (r *ConsultationRepository) ListPendingForTechnician(ctx context.Context, t
 func (r *ConsultationRepository) ListUpcomingForTechnician(ctx context.Context, technicianID string) ([]models.ConsultationWithDetails, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
-		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason, co.note, co.area, co.ai_diagnosis_session_id, co.note, co.area, co.ai_diagnosis_session_id,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason, co.note, co.area, co.ai_diagnosis_session_id,
 		       co.recommendation_summary, co.recommendation_price, co.recommendation_status, co.recommendation_sent_at,
 		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''), '', ''
@@ -247,7 +247,7 @@ func (r *ConsultationRepository) ListUpcomingForTechnician(ctx context.Context, 
 func (r *ConsultationRepository) ListForTechnician(ctx context.Context, technicianID string) ([]models.ConsultationWithDetails, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
-		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason, co.note, co.area, co.ai_diagnosis_session_id, co.note, co.area, co.ai_diagnosis_session_id,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason, co.note, co.area, co.ai_diagnosis_session_id,
 		       co.recommendation_summary, co.recommendation_price, co.recommendation_status, co.recommendation_sent_at,
 		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''), '', ''
@@ -314,7 +314,7 @@ func (r *ConsultationRepository) PromoteToRinging(ctx context.Context, id string
 func (r *ConsultationRepository) ListForCustomer(ctx context.Context, customerID string) ([]models.ConsultationWithDetails, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
-		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason, co.note, co.area, co.ai_diagnosis_session_id, co.note, co.area, co.ai_diagnosis_session_id,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason, co.note, co.area, co.ai_diagnosis_session_id,
 		       co.recommendation_summary, co.recommendation_price, co.recommendation_status, co.recommendation_sent_at,
 		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''),
@@ -361,7 +361,7 @@ func (r *ConsultationRepository) SetRating(ctx context.Context, id string, ratin
 func (r *ConsultationRepository) listForTechnicianByStatus(ctx context.Context, technicianID, status string) ([]models.ConsultationWithDetails, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT co.id, co.customer_id, co.technician_id, co.category_id, co.status, co.fee,
-		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason, co.note, co.area, co.ai_diagnosis_session_id, co.note, co.area, co.ai_diagnosis_session_id,
+		       co.duration_seconds, co.payment_status, co.escalated_booking_id, co.decline_reason, co.note, co.area, co.ai_diagnosis_session_id,
 		       co.recommendation_summary, co.recommendation_price, co.recommendation_status, co.recommendation_sent_at,
 		       co.scheduled_at, co.started_at, co.ended_at, co.created_at, co.updated_at,
 		       COALESCE(cat.name, ''), COALESCE(cu.name, ''), COALESCE(cu.phone, ''), '', ''
