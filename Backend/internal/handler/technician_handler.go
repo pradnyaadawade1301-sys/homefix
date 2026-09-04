@@ -126,7 +126,23 @@ type availabilityBody struct {
 }
 
 func (h *TechnicianHandler) SetAvailability(c *gin.Context) {
+	userID := c.GetString("user_id")
 	technicianID := c.Param("id")
+
+	// Verify the caller is toggling their OWN availability, not some other
+	// technician's — this endpoint only requires role=technician, so without
+	// this check any technician could flip any other technician online/
+	// offline just by knowing their id.
+	self, err := h.techService.GetByUser(c.Request.Context(), userID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if self == nil || self.ID != technicianID {
+		utils.Error(c, http.StatusForbidden, "you can only update your own availability")
+		return
+	}
+
 	var body availabilityBody
 	if err := c.ShouldBindJSON(&body); err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
