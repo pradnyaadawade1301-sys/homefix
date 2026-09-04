@@ -1,9 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:video_player/video_player.dart';
 import '../../core/theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/booking_provider.dart';
+import '../../services/service_locator.dart';
 import 'booking_tracking_screen.dart';
 
 /// Step 7 of the customer flow ("Book Technician Flow"): pick/add an address,
@@ -88,8 +92,11 @@ const List<_TimeSlot> _timeSlots = [
 class _TimeSlot {
   final String label;
   final int startHour;
-  const _TimeSlot(this.label, this.startHour);
+  final int startMinute;
+  const _TimeSlot(this.label, this.startHour, [this.startMinute = 0]);
 }
+
+const String _customTimeSentinel = 'Custom time…';
 
 class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
   final _notesController = TextEditingController();
@@ -99,6 +106,22 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
   _TimeSlot? _selectedSlot;
   bool _isSubmitting = false;
   final Map<String, String> _categoryAnswers = {};
+  // Tracks the raw dropdown selection per question (may be 'Other'),
+  // separate from _categoryAnswers which holds the actual value sent to
+  // the technician (the typed text when 'Other' is chosen).
+  final Map<String, String> _categoryDropdownSelection = {};
+  final Map<String, TextEditingController> _categoryOtherControllers = {};
+
+  // Optional photos of the issue, added right on this screen — same
+  // Camera/Gallery bottom-sheet pattern as IssueDetailsScreen's "AI
+  // Assessment" flow. These are uploaded (and merged with any images
+  // already attached via the AI Assessment flow) when the booking is
+  // confirmed.
+  final _picker = ImagePicker();
+  final List<File> _newImages = [];
+  static const int _maxImages = 5;
+  final List<File> _newVideos = [];
+  static const int _maxVideos = 1;
 
   @override
   void initState() {
@@ -126,6 +149,7 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
   /// booking.
   DateTime? get _resolvedScheduledAt {
     final hour = _selectedSlot?.startHour ?? TimeOfDay.now().hour;
+    final minute = _selectedSlot?.startMinute ?? 0;
     DateTime day;
     switch (_whenChoice) {
       case _WhenChoice.today:
@@ -138,7 +162,19 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
         day = _customDate ?? DateTime.now();
         break;
     }
-    return DateTime(day.year, day.month, day.day, hour, 0);
+    return DateTime(day.year, day.month, day.day, hour, minute);
+  }
+
+  Future<void> _pickCustomTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+      helpText: 'Select preferred time',
+    );
+    if (picked == null) return;
+    setState(() {
+      _selectedSlot = _TimeSlot(picked.format(context), picked.hour, picked.minute);
+    });
   }
 
   Future<void> _addAddress() async {
@@ -155,6 +191,162 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
         setState(() => _selectedAddressId = addresses.last.id);
       }
     }
+  }
+
+  Future<void> _openAddPhotoSheet() async {
+    final canAddPhoto = _newImages.length < _maxImages;
+    final canAddVideo = _newVideos.length < _maxVideos;
+    if (!canAddPhoto && !canAddVideo) return;
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 16),
+              if (canAddPhoto) ...[
+                ListTile(
+                  leading: const Icon(Icons.camera_alt_outlined, color: AppTheme.primaryColor),
+                  title: const Text('Take a photo'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined, color: AppTheme.primaryColor),
+                  title: const Text('Choose from gallery'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+              ],
+              if (canAddVideo) ...[
+                ListTile(
+                  leading: const Icon(Icons.videocam_outlined, color: AppTheme.primaryColor),
+                  title: const Text('Record a video'),
+                  subtitle: const Text('Up to 2 minutes', style: TextStyle(fontSize: 11.5)),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _pickVideo(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.video_library_outlined, color: AppTheme.primaryColor),
+                  title: const Text('Choose video from gallery'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _pickVideo(ImageSource.gallery);
+                  },
+                ),
+              ],
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    if (_newImages.length >= _maxImages) return;
+    final picked = await _picker.pickImage(source: source, imageQuality: 80);
+    if (picked != null) {
+      setState(() => _newImages.add(File(picked.path)));
+    }
+  }
+
+  void _removeNewImage(int index) {
+    setState(() => _newImages.removeAt(index));
+  }
+
+  Future<void> _pickVideo(ImageSource source) async {
+    if (_newVideos.isNotEmpty) return;
+    final picked = await _picker.pickVideo(source: source, maxDuration: const Duration(minutes: 2));
+    if (picked != null) {
+      setState(() => _newVideos.add(File(picked.path)));
+    }
+  }
+
+  void _removeNewVideo(int index) {
+    setState(() => _newVideos.removeAt(index));
+  }
+
+  void _openVideoPreview(File file) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black,
+      builder: (_) => _BookingVideoPreviewDialog(file: file),
+    );
+  }
+
+  Widget _photoThumb({required Widget child, required VoidCallback onRemove, VoidCallback? onTap}) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 10, top: 6),
+      child: SizedBox(
+        width: 88,
+        height: 88,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            GestureDetector(
+              onTap: onTap,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(width: 80, height: 80, child: child),
+              ),
+            ),
+            Positioned(
+              top: -8,
+              right: -8,
+              child: GestureDetector(
+                onTap: onRemove,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.errorColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 4)],
+                  ),
+                  child: const Icon(Icons.close_rounded, color: Colors.white, size: 16),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _addPhotoTile() {
+    return GestureDetector(
+      onTap: _openAddPhotoSheet,
+      child: Container(
+        width: 80,
+        height: 80,
+        margin: const EdgeInsets.only(right: 10, top: 6),
+        decoration: BoxDecoration(
+          color: AppTheme.primaryColor.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.35)),
+        ),
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_circle_outline_rounded, color: AppTheme.primaryColor, size: 26),
+            SizedBox(height: 4),
+            Text('Add', style: TextStyle(color: AppTheme.primaryColor, fontSize: 11.5, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _confirmBooking() async {
@@ -181,9 +373,35 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
       // along as the Job Brief the technician sees before Accept.
       final pendingBrief = bookingProvider.pendingJobBrief;
       final pendingImages = bookingProvider.pendingJobBriefImages;
-      final brief = (_categoryAnswers.isNotEmpty)
-          ? (pendingBrief ?? const JobBrief()).copyWith(categoryAnswers: _categoryAnswers)
+
+      // Upload any photos added right here on this screen and merge them
+      // with whatever was already attached back in the AI Assessment flow.
+      final newImageUrls = <String>[];
+      if (_newImages.isNotEmpty) {
+        final uploadService = context.read<UploadService>();
+        for (final img in _newImages) {
+          newImageUrls.add(await uploadService.uploadFile(img));
+        }
+      }
+      final allImages = [...?pendingImages, ...newImageUrls];
+
+      // Video isn't a Booking field (only `images` is), so it rides along on
+      // the Job Brief instead — same as the AI Assessment flow — so
+      // JobBriefCard can render it as a proper playable thumbnail rather
+      // than a raw URL dumped into the visible problem description.
+      String? newVideoUrl;
+      if (_newVideos.isNotEmpty) {
+        final uploadService = context.read<UploadService>();
+        newVideoUrl = await uploadService.uploadFile(_newVideos.first);
+      }
+      final brief = (_categoryAnswers.isNotEmpty || newVideoUrl != null)
+          ? (pendingBrief ?? const JobBrief()).copyWith(
+              categoryAnswers: _categoryAnswers.isNotEmpty ? _categoryAnswers : null,
+              hasVideo: newVideoUrl != null ? true : null,
+              videoUrl: newVideoUrl,
+            )
           : pendingBrief;
+
       final booking = await bookingProvider.createBooking(
             categoryId: widget.categoryId,
             addressId: _selectedAddressId!,
@@ -191,10 +409,10 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
               if (widget.problemDescription != null && widget.problemDescription!.isNotEmpty) widget.problemDescription,
               if (_notesController.text.trim().isNotEmpty) _notesController.text.trim(),
             ].join('\n\n'),
-            notes: (brief != null && (brief.hasGuidedAnswers || (brief.aiDiagnosis?.isNotEmpty ?? false)))
+            notes: (brief != null && (brief.hasGuidedAnswers || brief.hasVideo || (brief.aiDiagnosis?.isNotEmpty ?? false)))
                 ? brief.encode()
                 : null,
-            images: pendingImages,
+            images: allImages.isNotEmpty ? allImages : null,
             scheduledAt: scheduledAt,
             preferredTechnicianId: widget.preferredTechnician?.id,
           );
@@ -269,6 +487,9 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
   @override
   void dispose() {
     _notesController.dispose();
+    for (final c in _categoryOtherControllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -429,16 +650,56 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
             const SizedBox(height: 16),
             const Text('Time slot', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: _timeSlots
-                  .map((slot) => _ChoiceChipButton(
-                        label: slot.label,
-                        selected: _selectedSlot?.label == slot.label,
-                        onTap: () => setState(() => _selectedSlot = slot),
-                      ))
-                  .toList(),
+            DropdownButtonFormField<String>(
+              // If the user picked a custom time via the clock picker, its
+              // label (e.g. "6:45 PM") won't match any of the fixed slots,
+              // so it's injected into the items list below on the fly.
+              value: _selectedSlot?.label,
+              isExpanded: true,
+              decoration: InputDecoration(
+                hintText: 'Select a time slot',
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                filled: true,
+                fillColor: Colors.grey[100],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              items: [
+                ..._timeSlots.map((slot) => DropdownMenuItem(value: slot.label, child: Text(slot.label))),
+                if (_selectedSlot != null && !_timeSlots.any((s) => s.label == _selectedSlot!.label))
+                  DropdownMenuItem(
+                    value: _selectedSlot!.label,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.access_time, size: 16),
+                        const SizedBox(width: 6),
+                        Text(_selectedSlot!.label),
+                      ],
+                    ),
+                  ),
+                DropdownMenuItem(
+                  value: _customTimeSentinel,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.access_time, size: 16, color: Colors.teal),
+                      SizedBox(width: 6),
+                      Text('Choose your own time', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                if (value == _customTimeSentinel) {
+                  _pickCustomTime();
+                  return;
+                }
+                setState(() => _selectedSlot = _timeSlots.firstWhere((s) => s.label == value));
+              },
             ),
             if ((_categoryQuestions[widget.categoryName] ?? const []).isNotEmpty) ...[
               const SizedBox(height: 22),
@@ -446,28 +707,96 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
               const SizedBox(height: 4),
               Text('Helps the technician come prepared', style: TextStyle(fontSize: 11.5, color: Colors.grey[600])),
               const SizedBox(height: 10),
-              ...(_categoryQuestions[widget.categoryName] ?? const []).map((q) => Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(q.question, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+              ...(_categoryQuestions[widget.categoryName] ?? const []).map((q) {
+                final otherController = _categoryOtherControllers.putIfAbsent(
+                  q.question,
+                  () => TextEditingController(text: _categoryDropdownSelection[q.question] == 'Other' ? _categoryAnswers[q.question] : null),
+                );
+                final isOtherSelected = _categoryDropdownSelection[q.question] == 'Other';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(q.question, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        value: _categoryDropdownSelection[q.question],
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          hintText: 'Select an option',
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          filled: true,
+                          fillColor: Colors.grey[100],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                        items: [
+                          ...q.options.map((opt) => DropdownMenuItem(value: opt, child: Text(opt))),
+                          const DropdownMenuItem(value: 'Other', child: Text('Other (type your issue)')),
+                        ],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(() {
+                            _categoryDropdownSelection[q.question] = value;
+                            if (value == 'Other') {
+                              _categoryAnswers[q.question] = otherController.text.trim();
+                            } else {
+                              _categoryAnswers[q.question] = value;
+                            }
+                          });
+                        },
+                      ),
+                      if (isOtherSelected) ...[
                         const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: q.options
-                              .map((opt) => _ChoiceChipButton(
-                                    label: opt,
-                                    selected: _categoryAnswers[q.question] == opt,
-                                    onTap: () => setState(() => _categoryAnswers[q.question] = opt),
-                                  ))
-                              .toList(),
+                        TextField(
+                          controller: otherController,
+                          decoration: const InputDecoration(hintText: 'Describe your issue...'),
+                          onChanged: (text) => _categoryAnswers[q.question] = text.trim(),
                         ),
                       ],
-                    ),
-                  )),
+                    ],
+                  ),
+                );
+              }),
             ],
+            const SizedBox(height: 22),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Photos & Video (optional)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                Text('${_newImages.length}/$_maxImages photos, ${_newVideos.length}/$_maxVideos video',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 11.5)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text('Helps the technician come prepared', style: TextStyle(fontSize: 11.5, color: Colors.grey[600])),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 110,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  ..._newImages.asMap().entries.map((e) => _photoThumb(
+                        child: Image.file(e.value, fit: BoxFit.cover),
+                        onRemove: () => _removeNewImage(e.key),
+                      )),
+                  ..._newVideos.asMap().entries.map((e) => _photoThumb(
+                        onTap: () => _openVideoPreview(e.value),
+                        onRemove: () => _removeNewVideo(e.key),
+                        child: Container(
+                          color: Colors.black87,
+                          child: const Center(
+                            child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 34),
+                          ),
+                        ),
+                      )),
+                  if (_newImages.length < _maxImages || _newVideos.length < _maxVideos) _addPhotoTile(),
+                ],
+              ),
+            ),
             const SizedBox(height: 8),
             const Text('Additional notes (optional)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
             const SizedBox(height: 8),
@@ -618,6 +947,77 @@ class _AddAddressSheetState extends State<_AddAddressSheet> {
               child: _isSaving
                   ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Text('Save address'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Full-screen video preview for a video attached right on this screen —
+/// tap to toggle playback, tap the close button to dismiss. Mirrors
+/// IssueDetailsScreen's own preview dialog (kept as a separate private
+/// class here since each screen owns its widget tree independently).
+class _BookingVideoPreviewDialog extends StatefulWidget {
+  final File file;
+  const _BookingVideoPreviewDialog({required this.file});
+
+  @override
+  State<_BookingVideoPreviewDialog> createState() => _BookingVideoPreviewDialogState();
+}
+
+class _BookingVideoPreviewDialogState extends State<_BookingVideoPreviewDialog> {
+  late final VideoPlayerController _controller;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.file(widget.file)
+      ..initialize().then((_) {
+        if (!mounted) return;
+        setState(() => _initialized = true);
+        _controller.play();
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.black,
+      insetPadding: const EdgeInsets.all(0),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          if (_initialized)
+            GestureDetector(
+              onTap: () => setState(() {
+                _controller.value.isPlaying ? _controller.pause() : _controller.play();
+              }),
+              child: AspectRatio(
+                aspectRatio: _controller.value.aspectRatio,
+                child: VideoPlayer(_controller),
+              ),
+            )
+          else
+            const CircularProgressIndicator(color: Colors.white),
+          Positioned(
+            top: 12,
+            right: 12,
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                child: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
+              ),
             ),
           ),
         ],

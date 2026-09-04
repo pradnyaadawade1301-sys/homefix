@@ -260,12 +260,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                   : Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
-                                        Image.asset(
-                                          'assets/images/google_logo.png',
+                                        SizedBox(
                                           width: 20,
                                           height: 20,
-                                          errorBuilder: (context, error, stackTrace) =>
-                                              const Icon(Icons.g_mobiledata_rounded, size: 24, color: Colors.redAccent),
+                                          child: CustomPaint(painter: _GoogleLogoPainter()),
                                         ),
                                         const SizedBox(width: 10),
                                         const Text(
@@ -335,4 +333,70 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+}
+
+/// Draws the official 4-colour Google "G" logo with vector paths (no PNG
+/// asset needed) — used on the "Continue with Google" button so it always
+/// renders correctly instead of falling back to a plain red "G" icon when
+/// no asset is bundled.
+class _GoogleLogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = size.width / 18.0;
+    canvas.save();
+    canvas.scale(scale);
+
+    final blue = Path()
+      ..moveTo(17.6400, 9.2045)
+      ..cubicTo(17.6400, 8.5664, 17.5827, 7.9527, 17.4764, 7.3636)
+      ..lineTo(9.0000, 7.3636)
+      ..lineTo(9.0000, 10.8450)
+      ..lineTo(13.8436, 10.8450)
+      ..cubicTo(13.6350, 11.9700, 13.0009, 12.9232, 12.0477, 13.5614)
+      ..lineTo(12.0477, 15.8195)
+      ..lineTo(14.9564, 15.8195)
+      ..cubicTo(16.6582, 14.2527, 17.6400, 11.9454, 17.6400, 9.2045)
+      ..close();
+    canvas.drawPath(blue, Paint()..color = const Color(0xFF4285F4));
+
+    final green = Path()
+      ..moveTo(9.0000, 18.0000)
+      ..cubicTo(11.4300, 18.0000, 13.4673, 17.1940, 14.9564, 15.8195)
+      ..lineTo(12.0477, 13.5614)
+      ..cubicTo(11.2413, 14.1014, 10.2109, 14.4204, 9.0000, 14.4204)
+      ..cubicTo(6.6560, 14.4204, 4.6718, 12.8373, 3.9640, 10.7100)
+      ..lineTo(0.9573, 10.7100)
+      ..lineTo(0.9573, 13.0418)
+      ..cubicTo(2.4382, 15.9832, 5.4818, 18.0000, 9.0000, 18.0000)
+      ..close();
+    canvas.drawPath(green, Paint()..color = const Color(0xFF34A853));
+
+    final yellow = Path()
+      ..moveTo(3.9640, 10.7100)
+      ..cubicTo(3.7840, 10.1700, 3.6818, 9.5932, 3.6818, 9.0000)
+      ..cubicTo(3.6818, 8.4068, 3.7841, 7.8300, 3.9641, 7.2900)
+      ..lineTo(3.9641, 4.9582)
+      ..lineTo(0.9573, 4.9582)
+      ..cubicTo(0.3477, 6.1732, 0.0000, 7.5477, 0.0000, 9.0000)
+      ..cubicTo(0.0000, 10.4523, 0.3477, 11.8268, 0.9573, 13.0418)
+      ..lineTo(3.9640, 10.7100)
+      ..close();
+    canvas.drawPath(yellow, Paint()..color = const Color(0xFFFBBC05));
+
+    final red = Path()
+      ..moveTo(9.0000, 3.5795)
+      ..cubicTo(10.3214, 3.5795, 11.5077, 4.0336, 12.4405, 4.9255)
+      ..lineTo(15.0218, 2.3441)
+      ..cubicTo(13.4632, 0.8918, 11.4260, 0.0000, 9.0000, 0.0000)
+      ..cubicTo(5.4818, 0.0000, 2.4382, 2.0168, 0.9573, 4.9582)
+      ..lineTo(3.9640, 7.2900)
+      ..cubicTo(4.6718, 5.1627, 6.6560, 3.5795, 9.0000, 3.5795)
+      ..close();
+    canvas.drawPath(red, Paint()..color = const Color(0xFFEA4335));
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -12,13 +12,21 @@ import '../../models/payment_model.dart';
 import '../../providers/payment_provider.dart';
 
 /// Shows the full GST-compliant invoice for a paid booking — service ID,
-/// base amount, CGST, SGST, total — and lets the customer download/share it
-/// as a PDF. Opened automatically right after a successful payment (see
-/// PaymentScreen._buildSuccess), and reachable again later from Payment
-/// History for any past paid booking.
+/// base amount, CGST, SGST, platform fee, total — and lets the customer
+/// download/share it as a PDF. Opened automatically right after a
+/// successful payment (see PaymentScreen._buildSuccess), reachable again
+/// later from Payment History for any past paid booking, and from
+/// BookingTrackingScreen's "View Invoice" once a booking has been paid.
+///
+/// Pass either [paymentId] (when it's already known, e.g. right after
+/// payment) or [bookingId] (e.g. from the tracking screen, which only has
+/// the booking on hand) — exactly one must be provided.
 class InvoiceScreen extends StatefulWidget {
-  final String paymentId;
-  const InvoiceScreen({Key? key, required this.paymentId}) : super(key: key);
+  final String? paymentId;
+  final String? bookingId;
+  const InvoiceScreen({Key? key, this.paymentId, this.bookingId})
+      : assert(paymentId != null || bookingId != null, 'Provide either paymentId or bookingId'),
+        super(key: key);
 
   @override
   State<InvoiceScreen> createState() => _InvoiceScreenState();
@@ -31,7 +39,11 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
-  Future<void> _load() => context.read<PaymentProvider>().loadInvoice(widget.paymentId);
+  Future<void> _load() {
+    final provider = context.read<PaymentProvider>();
+    if (widget.paymentId != null) return provider.loadInvoice(widget.paymentId!);
+    return provider.loadInvoiceByBooking(widget.bookingId!);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -236,6 +248,16 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                   style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey600),
                 ),
               ),
+              if (inv.payment.platformCommission != null) ...[
+                pw.SizedBox(height: 2),
+                pw.Align(
+                  alignment: pw.Alignment.centerRight,
+                  child: pw.Text(
+                    'Includes platform & convenience fee of Rs. ${inv.payment.platformCommission!.toStringAsFixed(2)} (already in total above)',
+                    style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey600),
+                  ),
+                ),
+              ],
 
               pw.SizedBox(height: 24),
               if (inv.problemDescription.isNotEmpty) ...[
@@ -406,6 +428,25 @@ class _InvoiceBody extends StatelessWidget {
               _priceRow('SGST (${invoice.sgstPercent.toStringAsFixed(1)}%)', invoice.sgstAmount),
               const Divider(height: 24),
               _priceRow('Total paid', invoice.totalAmount, bold: true),
+              if (invoice.payment.platformCommission != null) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(8)),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded, size: 14, color: Colors.grey[500]),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Includes platform & convenience fee of \u20B9${invoice.payment.platformCommission!.toStringAsFixed(2)} (already included in the total above)',
+                          style: TextStyle(fontSize: 10.5, color: Colors.grey[600]),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),

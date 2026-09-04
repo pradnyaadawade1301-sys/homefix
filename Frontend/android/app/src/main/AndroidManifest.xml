@@ -44,6 +44,17 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Fallback default channel for FCM pushes that (for whatever
+             reason) arrive without an explicit android.notification.channel_id
+             — without this, Android silently drops such notifications
+             instead of showing a popup, on Android 8+. The real channel
+             ("homefix_notifications") is created at runtime in
+             FcmNotificationService.initialize() and is what the backend
+             actually targets (see firebase_service.go); this is just a
+             safety net. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="homefix_notifications" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

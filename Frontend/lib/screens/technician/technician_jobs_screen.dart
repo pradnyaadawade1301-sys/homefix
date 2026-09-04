@@ -7,7 +7,6 @@ import '../../models/consultation_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/consultation_provider.dart';
-import '../../services/booking_service.dart';
 import '../../widgets/guided_tour.dart';
 import '../consultation/incoming_consultation_screen.dart';
 import '../consultation/upcoming_consultations_screen.dart';
@@ -16,9 +15,9 @@ import 'technician_settlement_screen.dart';
 import 'technician_history_screen.dart';
 import 'repeat_customers_screen.dart';
 import '../chat/booking_chat_screen.dart';
-import 'technician_estimate_screen.dart';
 import 'technician_job_detail_screen.dart';
 import '../../providers/category_provider.dart';
+import 'job_brief_card.dart';
 
 class TechnicianJobsScreen extends StatefulWidget {
   const TechnicianJobsScreen({Key? key}) : super(key: key);
@@ -54,6 +53,7 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
     _pollTimer = Timer.periodic(const Duration(seconds: 6), (_) {
       _pollPendingRequests();
       _pollUpcoming();
+      _pollBookings();
     });
   }
 
@@ -145,6 +145,18 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
     if (technicianId != null && mounted) {
       await context.read<BookingProvider>().fetchTechnicianBookings(technicianId);
     }
+  }
+
+  // Silent poll used by the periodic timer: same fetch as _load, but skips
+  // the KYC profile lookup since that never changes after login. Runs every
+  // 6s so new job assignments and status changes (e.g. "inspecting" ->
+  // "on_the_way") show up without a manual pull-to-refresh.
+  Future<void> _pollBookings() async {
+    final technicianId = context.read<TechnicianKycProvider>().profile?.id;
+    if (technicianId == null || !mounted) return;
+    try {
+      await context.read<BookingProvider>().fetchTechnicianBookings(technicianId);
+    } catch (_) {}
   }
 
   Future<void> _confirmLogout() async {
@@ -563,7 +575,12 @@ class _JobCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final customer = booking.customer;
-    return Container(
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => TechnicianJobDetailScreen(booking: booking),
+      )),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -664,8 +681,18 @@ class _JobCard extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 10),
+          // Full Job Brief (guided answers, AI notes, attachments, and a
+          // "what to bring" checklist) only shows once this job is actually
+          // assigned to this technician — while it's still 'requested' they
+          // only see the short problem_description above, enough to decide
+          // Accept/Decline without the full detail cluttering the list.
+          if (booking.status != 'requested' && (booking.jobBrief != null || booking.images.isNotEmpty)) ...[
+            JobBriefCard(booking: booking),
+            const SizedBox(height: 10),
+          ],
           JobActionRow(booking: booking),
         ],
+      ),
       ),
     );
   }
@@ -701,7 +728,7 @@ class JobActionRow extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: kycProfile == null
                     ? null
-                    : () => _acceptAndGoToEstimate(context, provider, booking, kycProfile.id),
+                    : () => _acceptBooking(context, provider, booking, kycProfile.id),
                 child: const Text('Accept job'),
               ),
             ),
@@ -732,9 +759,14 @@ class JobActionRow extends StatelessWidget {
         return _OtpVerifyRow(key: ValueKey('otp_${booking.id}'), booking: booking, technicianId: kycProfile?.id);
       case 'inspecting':
       case 'in_progress':
-        return _EstimateAwareAction(booking: booking, technicianId: kycProfile?.id);
-      case 'awaiting_estimate_approval':
-        return _WaitingOnEstimateRow(booking: booking);
+        return SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            icon: const Icon(Icons.receipt_long_rounded, size: 18),
+            onPressed: () => _showInvoiceDialog(context, provider, booking),
+            label: const Text('Generate invoice & complete'),
+          ),
+        );
       default:
         return const SizedBox.shrink();
     }
@@ -749,37 +781,22 @@ class JobActionRow extends StatelessWidget {
     }
   }
 
-  /// Accepts the job and — as soon as the accept succeeds — takes the
-  /// technician straight to the "Submit estimate" screen, instead of making
-  /// them step through "On the way" / "Arrived" first. This matches the
-  /// requested flow: customer books -> technician gets the request ->
-  /// Accept/Decline -> on Accept, go directly to Submit Estimate; on
-  /// Decline, the booking goes back into the pool and the customer is told
-  /// (in English) that we're finding another technician.
-  Future<void> _acceptAndGoToEstimate(
+  /// Accepts the job — no separate estimate/price-negotiation step. The
+  /// booking already carries a fixed price (the category's base price, set
+  /// at booking creation — see BookingService.Create), so as soon as the
+  /// technician accepts, the job card itself flips to the "accepted" state
+  /// and shows the "I'm on my way" action next.
+  Future<void> _acceptBooking(
     BuildContext context,
     BookingProvider provider,
     Booking booking,
     String technicianId,
   ) async {
     final messenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
-
     await provider.acceptBooking(booking.id, technicianId);
-
     if (provider.error != null) {
       messenger.showSnackBar(SnackBar(content: Text(provider.error!)));
-      return;
     }
-
-    if (!context.mounted) return;
-    await navigator.push(MaterialPageRoute(
-      builder: (_) => TechnicianEstimateScreen(
-        bookingId: booking.id,
-        technicianId: technicianId,
-        customerName: booking.customer?.name ?? 'the customer',
-      ),
-    ));
   }
 
   /// Confirms before declining — this is a one-way action (the booking goes
@@ -993,137 +1010,6 @@ class _InvoiceDialogState extends State<_InvoiceDialog> {
           child: const Text('Send invoice'),
         ),
       ],
-    );
-  }
-}
-
-class _EstimateAwareAction extends StatefulWidget {
-  final Booking booking;
-  final String? technicianId;
-  const _EstimateAwareAction({required this.booking, required this.technicianId});
-
-  @override
-  State<_EstimateAwareAction> createState() => _EstimateAwareActionState();
-}
-
-class _EstimateAwareActionState extends State<_EstimateAwareAction> {
-  late Future<BookingEstimate?> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = context.read<BookingService>().getLatestEstimate(widget.booking.id);
-  }
-
-  void _refresh() {
-    setState(() {
-      _future = context.read<BookingService>().getLatestEstimate(widget.booking.id);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final provider = context.read<BookingProvider>();
-
-    return FutureBuilder<BookingEstimate?>(
-      future: _future,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox(
-            height: 40,
-            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-          );
-        }
-
-        final estimate = snapshot.data;
-        if (estimate == null || estimate.isDeclined) {
-          return Column(
-            children: [
-              if (estimate != null && estimate.isDeclined && (estimate.customerNote ?? '').isNotEmpty)
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppTheme.errorColor.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    'Customer declined: ${estimate.customerNote}',
-                    style: const TextStyle(fontSize: 12, color: AppTheme.errorColor),
-                  ),
-                ),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.receipt_long_rounded, size: 18),
-                  onPressed: widget.technicianId == null
-                      ? null
-                      : () async {
-                          final sent = await Navigator.of(context).push<bool>(MaterialPageRoute(
-                            builder: (_) => TechnicianEstimateScreen(
-                              bookingId: widget.booking.id,
-                              technicianId: widget.technicianId!,
-                              customerName: widget.booking.customer?.name ?? 'the customer',
-                            ),
-                          ));
-                          if (sent == true) _refresh();
-                        },
-                  label: Text(estimate != null && estimate.isDeclined ? 'Revise & resend estimate' : 'Submit estimate'),
-                ),
-              ),
-            ],
-          );
-        }
-
-        return SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () => _showInvoiceDialog(context, provider, widget.booking),
-            child: const Text('Generate invoice & complete'),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _WaitingOnEstimateRow extends StatelessWidget {
-  final Booking booking;
-  const _WaitingOnEstimateRow({required this.booking});
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<BookingEstimate?>(
-      future: context.read<BookingService>().getLatestEstimate(booking.id),
-      builder: (context, snapshot) {
-        final estimate = snapshot.data;
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppTheme.warningColor.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              const SizedBox(
-                width: 16, height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.warningColor),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  estimate != null
-                      ? 'Waiting for customer to approve \u20b9${estimate.totalAmount.toStringAsFixed(0)} estimate'
-                      : 'Waiting for customer to review your estimate',
-                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

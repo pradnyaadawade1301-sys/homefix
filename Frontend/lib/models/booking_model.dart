@@ -267,6 +267,7 @@ class JobBrief {
   final bool? isEmergency;
   final String? unusualSigns;
   final bool hasVideo;
+  final String? videoUrl;
   final String? aiDiagnosis;
   final String? consultationNotes;
   final Map<String, String>? categoryAnswers;
@@ -278,6 +279,7 @@ class JobBrief {
     this.isEmergency,
     this.unusualSigns,
     this.hasVideo = false,
+    this.videoUrl,
     this.aiDiagnosis,
     this.consultationNotes,
     this.categoryAnswers,
@@ -300,6 +302,7 @@ class JobBrief {
     bool? isEmergency,
     String? unusualSigns,
     bool? hasVideo,
+    String? videoUrl,
     String? aiDiagnosis,
     String? consultationNotes,
     Map<String, String>? categoryAnswers,
@@ -311,6 +314,7 @@ class JobBrief {
       isEmergency: isEmergency ?? this.isEmergency,
       unusualSigns: unusualSigns ?? this.unusualSigns,
       hasVideo: hasVideo ?? this.hasVideo,
+      videoUrl: videoUrl ?? this.videoUrl,
       aiDiagnosis: aiDiagnosis ?? this.aiDiagnosis,
       consultationNotes: consultationNotes ?? this.consultationNotes,
       categoryAnswers: categoryAnswers ?? this.categoryAnswers,
@@ -333,6 +337,7 @@ class JobBrief {
       if (isEmergency != null) 'isEmergency': isEmergency,
       if (unusualSigns != null && unusualSigns!.isNotEmpty) 'unusualSigns': unusualSigns,
       if (hasVideo) 'hasVideo': hasVideo,
+      if (videoUrl != null && videoUrl!.isNotEmpty) 'videoUrl': videoUrl,
       if (aiDiagnosis != null && aiDiagnosis!.isNotEmpty) 'aiDiagnosis': aiDiagnosis,
       if (consultationNotes != null && consultationNotes!.isNotEmpty) 'consultationNotes': consultationNotes,
       if (categoryAnswers != null && categoryAnswers!.isNotEmpty) 'categoryAnswers': categoryAnswers,
@@ -355,6 +360,7 @@ class JobBrief {
         isEmergency: map['isEmergency'] as bool?,
         unusualSigns: map['unusualSigns'] as String?,
         hasVideo: map['hasVideo'] as bool? ?? false,
+        videoUrl: map['videoUrl'] as String?,
         aiDiagnosis: map['aiDiagnosis'] as String?,
         consultationNotes: map['consultationNotes'] as String?,
         categoryAnswers: (map['categoryAnswers'] as Map<String, dynamic>?)

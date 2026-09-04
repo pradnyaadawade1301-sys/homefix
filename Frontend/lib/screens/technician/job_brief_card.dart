@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 import '../../core/theme.dart';
 import '../../models/booking_model.dart';
 
@@ -144,23 +145,45 @@ class _JobBriefCardState extends State<JobBriefCard> {
                     for (final url in booking.images)
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(url, width: 72, height: 72, fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                    width: 72,
-                                    height: 72,
-                                    color: Colors.grey[200],
-                                    child: const Icon(Icons.broken_image_outlined, size: 20),
-                                  )),
+                        child: GestureDetector(
+                          onTap: () => showDialog(
+                            context: context,
+                            barrierColor: Colors.black,
+                            builder: (_) => _NetworkImagePreviewDialog(url: url),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(url, width: 72, height: 72, fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                      width: 72,
+                                      height: 72,
+                                      color: Colors.grey[200],
+                                      child: const Icon(Icons.broken_image_outlined, size: 20),
+                                    )),
+                          ),
                         ),
                       ),
                     if (brief?.hasVideo == true)
-                      Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
-                        child: const Icon(Icons.videocam_outlined, size: 24),
+                      GestureDetector(
+                        onTap: brief?.videoUrl != null && brief!.videoUrl!.isNotEmpty
+                            ? () => showDialog(
+                                  context: context,
+                                  barrierColor: Colors.black,
+                                  builder: (_) => _NetworkVideoPreviewDialog(url: brief.videoUrl!),
+                                )
+                            : null,
+                        child: Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
+                          child: Icon(
+                            brief?.videoUrl != null && brief!.videoUrl!.isNotEmpty
+                                ? Icons.play_circle_fill_rounded
+                                : Icons.videocam_outlined,
+                            size: 24,
+                            color: brief?.videoUrl != null && brief!.videoUrl!.isNotEmpty ? AppTheme.primaryColor : null,
+                          ),
+                        ),
                       ),
                   ],
                 ),
@@ -273,4 +296,126 @@ String jobBriefPreviewLine(Booking booking) {
   if (brief?.startedWhen != null) parts.add(brief!.startedWhen!.toLowerCase());
   if (brief?.isEmergency == true) parts.add('urgent');
   return parts.join(', ');
+}
+
+/// Full-screen preview for a customer-attached photo — tap the thumbnail in
+/// JobBriefCard's Attachments section to open this; tap the close button to
+/// dismiss.
+class _NetworkImagePreviewDialog extends StatelessWidget {
+  final String url;
+  const _NetworkImagePreviewDialog({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.black,
+      insetPadding: const EdgeInsets.all(0),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          InteractiveViewer(
+            child: Image.network(
+              url,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Padding(
+                padding: EdgeInsets.all(32),
+                child: Icon(Icons.broken_image_outlined, color: Colors.white54, size: 48),
+              ),
+              loadingBuilder: (context, child, progress) =>
+                  progress == null ? child : const CircularProgressIndicator(color: Colors.white),
+            ),
+          ),
+          Positioned(
+            top: 12,
+            right: 12,
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                child: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Full-screen preview for a customer-attached video — tap the thumbnail in
+/// JobBriefCard's Attachments section to open this; tap the video to
+/// play/pause, tap the close button to dismiss. Streams straight from the
+/// uploaded URL rather than downloading first.
+class _NetworkVideoPreviewDialog extends StatefulWidget {
+  final String url;
+  const _NetworkVideoPreviewDialog({required this.url});
+
+  @override
+  State<_NetworkVideoPreviewDialog> createState() => _NetworkVideoPreviewDialogState();
+}
+
+class _NetworkVideoPreviewDialogState extends State<_NetworkVideoPreviewDialog> {
+  late final VideoPlayerController _controller;
+  bool _initialized = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
+      ..initialize().then((_) {
+        if (!mounted) return;
+        setState(() => _initialized = true);
+        _controller.play();
+      }).catchError((e) {
+        if (!mounted) return;
+        setState(() => _error = 'Could not load video');
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.black,
+      insetPadding: const EdgeInsets.all(0),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          if (_error != null)
+            Text(_error!, style: const TextStyle(color: Colors.white70))
+          else if (_initialized)
+            GestureDetector(
+              onTap: () => setState(() {
+                _controller.value.isPlaying ? _controller.pause() : _controller.play();
+              }),
+              child: AspectRatio(
+                aspectRatio: _controller.value.aspectRatio,
+                child: VideoPlayer(_controller),
+              ),
+            )
+          else
+            const CircularProgressIndicator(color: Colors.white),
+          Positioned(
+            top: 12,
+            right: 12,
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                child: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

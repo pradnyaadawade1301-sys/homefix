@@ -323,6 +323,7 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
       isEmergency: _isEmergency,
       unusualSigns: _unusualSignsController.text.trim().isEmpty ? null : _unusualSignsController.text.trim(),
       hasVideo: videoUrls.isNotEmpty,
+      videoUrl: videoUrls.isNotEmpty ? videoUrls.first : null,
     );
     if (!mounted) return;
     final bookingProvider = context.read<BookingProvider>();

@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
 import '../payment/payment_screen.dart';
+import '../payment/invoice_screen.dart';
 import '../chat/booking_chat_screen.dart';
 
 /// Step 9 of the customer flow ("Booking Tracking").
@@ -21,10 +23,21 @@ class BookingTrackingScreen extends StatefulWidget {
 }
 
 class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
+  Timer? _pollTimer;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    // Auto-refresh so the timeline / OTP / technician-assigned status update
+    // live without the user having to pull-to-refresh.
+    _pollTimer = Timer.periodic(const Duration(seconds: 6), (_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -34,15 +47,13 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
     await provider.fetchJobPhotos(widget.bookingId);
   }
 
-  static const _stages = ['requested', 'accepted', 'on_the_way', 'arrived', 'inspecting', 'in_progress', 'completed'];
+  static const _stages = ['requested', 'accepted', 'on_the_way', 'arrived', 'in_progress', 'completed'];
   static const _stageLabels = {
     'requested': 'Pending Assignment',
     'accepted': 'Technician Assigned',
     'on_the_way': 'On The Way',
     'arrived': 'Technician Arrived',
-    'inspecting': 'Inspecting Issue',
     'in_progress': 'Service In Progress',
-    'awaiting_estimate_approval': 'Estimate Awaiting Approval',
     'completed': 'Service Completed',
   };
   static const _stageIcons = {
@@ -50,7 +61,6 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
     'accepted': Icons.person_pin_circle_rounded,
     'on_the_way': Icons.directions_run_rounded,
     'arrived': Icons.home_rounded,
-    'inspecting': Icons.search_rounded,
     'in_progress': Icons.build_rounded,
     'completed': Icons.check_circle_rounded,
   };
@@ -106,7 +116,7 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
                 );
               }
 
-              final currentIndex = booking.status == 'awaiting_estimate_approval'
+              final currentIndex = (booking.status == 'awaiting_estimate_approval' || booking.status == 'inspecting')
                   ? _stages.indexOf('in_progress')
                   : _stages.indexOf(booking.status).clamp(0, _stages.length - 1);
 
@@ -433,14 +443,36 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppTheme.successColor.withValues(alpha: 0.25)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.check_circle_rounded, color: AppTheme.successColor, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Paid ₹${booking.displayPrice!.toStringAsFixed(0)} — thank you!',
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+          Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: AppTheme.successColor, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Paid ₹${booking.displayPrice!.toStringAsFixed(0)} — thank you!',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.receipt_long_rounded, size: 18),
+              label: const Text('View Invoice'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.primaryColor,
+                side: const BorderSide(color: AppTheme.primaryColor),
+              ),
+              onPressed: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => InvoiceScreen(bookingId: booking.id),
+                ));
+              },
             ),
           ),
         ],
@@ -560,6 +592,14 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
     return '${dt.day} ${months[dt.month - 1]}, $hour12:$minute $period';
   }
 
+  // "Decline" writes a status_history row with status='requested' and a
+  // note containing "declined" (see BookingRepository.Decline on the
+  // backend) — filter those out from the raw history to know if/when a
+  // technician turned this job down before it got accepted.
+  List<BookingStatusHistory> _declineEvents(List<BookingStatusHistory> history) {
+    return history.where((h) => h.status == 'requested' && h.note.toLowerCase().contains('declined')).toList();
+  }
+
   Widget _buildStepper(int currentIndex, List<BookingStatusHistory> history) {
     // Latest history row for each stage — reused so every completed step
     // shows exactly when it happened, like a courier tracking timeline.
@@ -666,6 +706,28 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
                             stamp != null ? 'Updated ${_formatStamp(stamp)}' : 'In progress...',
                             style: const TextStyle(fontSize: 12, color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
                           ),
+                        ],
+                        // Between "Pending Assignment" and "Technician
+                        // Assigned" — if one or more technicians declined
+                        // this job first, show that here so the customer
+                        // can see it wasn't just sitting idle.
+                        if (stage == 'requested') ...[
+                          for (final decline in _declineEvents(history)) ...[
+                            const SizedBox(height: 6),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.person_off_outlined, size: 13, color: Colors.orange),
+                                const SizedBox(width: 5),
+                                Expanded(
+                                  child: Text(
+                                    'Declined by a technician \u2022 ${_formatStamp(decline.createdAt)} \u2014 reassigning',
+                                    style: TextStyle(fontSize: 11.5, color: Colors.orange[800], fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ],
                     ),
