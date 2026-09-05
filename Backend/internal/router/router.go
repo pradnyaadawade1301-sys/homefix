@@ -145,6 +145,7 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		// or a consultation id — see call_handler.go).
 		authed.POST("/consultations/request", h.Consultation.Request)
 		authed.GET("/consultations/pending", middleware.RequireRole("technician"), h.Consultation.Pending)
+		authed.GET("/consultations/mine", h.Consultation.Mine)
 		authed.GET("/consultations/:id", h.Consultation.Get)
 		authed.GET("/consultations/:id/call", h.Consultation.CallInfo)
 		authed.POST("/consultations/:id/cancel", h.Consultation.Cancel)
