@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
@@ -39,7 +40,6 @@ class _PostCallScreenState extends State<PostCallScreen> {
   TimeOfDay? _selectedTime;
   bool _isBooking = false;
   bool _booked = false;
-  int? _rating;
 
   // The technician's post-call recommendation, if any — fetched separately
   // from the addresses since it lives on the Consultation itself, not
@@ -47,6 +47,14 @@ class _PostCallScreenState extends State<PostCallScreen> {
   Consultation? _consultation;
   bool _isLoadingRecommendation = true;
   bool _isDecliningRecommendation = false;
+
+  // While there's no recommendation yet (technician hasn't sent one, or is
+  // still typing it up), we don't show the manual booking form at all — just
+  // a "waiting" message. This timer re-checks every few seconds so the
+  // customer doesn't have to manually refresh; it's cancelled the moment we
+  // get a definitive status (a pending recommendation, or a decline).
+  Timer? _pollTimer;
+  bool _skippedWaiting = false;
 
   @override
   void initState() {
@@ -65,10 +73,20 @@ class _PostCallScreenState extends State<PostCallScreen> {
         _consultation = consultation;
         _isLoadingRecommendation = false;
       });
+      // Still nothing decisive (no pending recommendation, not declined)?
+      // Technician might still be sending one — check again shortly instead
+      // of leaving the customer stuck on a stale "waiting" screen.
+      if (consultation?.hasPendingRecommendation != true && consultation?.recommendationStatus != 'declined') {
+        _pollTimer?.cancel();
+        _pollTimer = Timer(const Duration(seconds: 5), _loadRecommendation);
+      }
     } catch (_) {
-      // Non-fatal — the self-serve "Book Visit Slot" flow below still works
-      // without knowing about a recommendation.
-      if (mounted) setState(() => _isLoadingRecommendation = false);
+      // Non-fatal — retry on the same cadence; the "Book manually instead"
+      // escape hatch below still works even if this never resolves.
+      if (!mounted) return;
+      setState(() => _isLoadingRecommendation = false);
+      _pollTimer?.cancel();
+      _pollTimer = Timer(const Duration(seconds: 5), _loadRecommendation);
     }
   }
 
@@ -77,6 +95,7 @@ class _PostCallScreenState extends State<PostCallScreen> {
     try {
       await context.read<ConsultationProvider>().declineRecommendation(widget.consultationId);
       if (!mounted) return;
+      _pollTimer?.cancel();
       setState(() {
         _consultation = _consultation?.copyWith(recommendationStatus: 'declined');
       });
@@ -108,6 +127,7 @@ class _PostCallScreenState extends State<PostCallScreen> {
             addressId: _selectedAddressId!,
           );
       if (!mounted) return;
+      _pollTimer?.cancel();
       setState(() => _booked = true);
     } catch (e) {
       if (!mounted) return;
@@ -120,6 +140,7 @@ class _PostCallScreenState extends State<PostCallScreen> {
   @override
   void dispose() {
     _notesController.dispose();
+    _pollTimer?.cancel();
     super.dispose();
   }
 
@@ -137,15 +158,6 @@ class _PostCallScreenState extends State<PostCallScreen> {
   Future<void> _pickTime() async {
     final picked = await showTimePicker(context: context, initialTime: TimeOfDay.now());
     if (picked != null) setState(() => _selectedTime = picked);
-  }
-
-  Future<void> _rate(int stars) async {
-    setState(() => _rating = stars);
-    try {
-      await context.read<ConsultationProvider>().rateConsultation(widget.consultationId, rating: stars);
-    } catch (_) {
-      // Non-blocking — rating failure shouldn't stop the customer from booking.
-    }
   }
 
   Future<void> _bookSlot() async {
@@ -187,6 +199,7 @@ class _PostCallScreenState extends State<PostCallScreen> {
             scheduledAt: scheduledAt,
           );
       if (!mounted) return;
+      _pollTimer?.cancel();
       setState(() => _booked = true);
     } catch (e) {
       if (!mounted) return;
@@ -197,12 +210,21 @@ class _PostCallScreenState extends State<PostCallScreen> {
   }
 
   void _skip() {
+    _pollTimer?.cancel();
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
         builder: (_) => TechnicianListScreen(categoryId: widget.categoryId, categoryName: widget.categoryName),
       ),
       (route) => route.isFirst,
     );
+  }
+
+  /// The customer chose not to keep waiting for a recommendation — stop
+  /// polling and drop straight into the manual "Book Visit Slot" form
+  /// instead, same as if the technician had declined.
+  void _skipWaitingAndBookManually() {
+    _pollTimer?.cancel();
+    setState(() => _skippedWaiting = true);
   }
 
   @override
@@ -281,10 +303,13 @@ class _PostCallScreenState extends State<PostCallScreen> {
             const SizedBox(height: 18),
             if (_isLoadingRecommendation) ...[
               const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
+                padding: EdgeInsets.symmetric(vertical: 24),
                 child: Center(child: SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))),
               ),
             ] else if (_consultation?.hasPendingRecommendation == true) ...[
+              // Technician has sent a recommendation — this IS the flow now.
+              // No manual date/time form here; Accept books ASAP once an
+              // address is picked below.
               _RecommendationCard(
                 summary: _consultation!.recommendationSummary ?? '',
                 price: _consultation!.recommendationPrice,
@@ -294,178 +319,218 @@ class _PostCallScreenState extends State<PostCallScreen> {
                 onDecline: _declineRecommendation,
               ),
               const SizedBox(height: 18),
-            ] else if (_consultation?.recommendationStatus == 'declined') ...[
+              const Text('Select address', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+              const SizedBox(height: 6),
+              _addressPicker(),
+            ] else if (!_skippedWaiting && _consultation?.recommendationStatus != 'declined') ...[
+              // Nothing decisive yet: no recommendation, and the customer
+              // hasn't declined or skipped either — don't show the booking
+              // form at all, just a waiting message. _loadRecommendation is
+              // quietly re-polling every few seconds in the background.
               Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(12)),
-                child: Row(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(14)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.info_outline_rounded, size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'You declined the technician\'s recommendation. You can still book a visit slot yourself below.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
+                    Row(
+                      children: [
+                        const SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text('Waiting for the technician\'s recommendation…',
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'They\'ll send a summary of what needs to be done next. This page will update automatically.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 18),
-            ],
-            const Text('How was the call?', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-            const SizedBox(height: 8),
-            Row(
-              children: List.generate(5, (i) {
-                final star = i + 1;
-                return IconButton(
-                  onPressed: () => _rate(star),
-                  icon: Icon(
-                    _rating != null && star <= _rating! ? Icons.star_rounded : Icons.star_outline_rounded,
-                    color: const Color(0xFFF5A623),
-                    size: 28,
-                  ),
-                );
-              }),
-            ),
-            const SizedBox(height: 10),
-            const Divider(),
-            const SizedBox(height: 10),
-            const Text('Need an on-site visit? Book a slot', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-            const SizedBox(height: 4),
-            Text(
-              'Same technician will come home to fix the issue.',
-              style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Select address', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
-                TextButton.icon(
-                  onPressed: () async {
-                    await context.read<AddressProvider>().fetchAddresses();
-                  },
-                  icon: const Icon(Icons.refresh, size: 16),
-                  label: const Text('Refresh'),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: _skipWaitingAndBookManually,
+                  child: const Text('Book a visit slot myself instead'),
                 ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Consumer<AddressProvider>(
-              builder: (context, provider, _) {
-                if (provider.isLoading && provider.addresses.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                if (provider.addresses.isEmpty) {
-                  return Text('No saved addresses yet — add one from your profile.',
-                      style: TextStyle(fontSize: 12.5, color: Colors.grey[600]));
-                }
-                return Column(
-                  children: provider.addresses.map((a) {
-                    final selected = a.id == _selectedAddressId;
-                    return GestureDetector(
-                      onTap: () => setState(() => _selectedAddressId = a.id),
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: selected ? AppTheme.primaryColor.withValues(alpha: 0.06) : Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: selected ? AppTheme.primaryColor : Colors.grey[200]!, width: selected ? 1.6 : 1),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                              color: selected ? AppTheme.primaryColor : Colors.grey[400],
-                              size: 20,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(a.label.isNotEmpty ? a.label : 'Address',
-                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${a.line1}${a.line2 != null && a.line2!.isNotEmpty ? ', ${a.line2}' : ''}, ${a.city}, ${a.state} ${a.pincode}',
-                                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+              ),
+            ] else ...[
+              // Either the technician's recommendation was declined, or the
+              // customer chose not to wait — full manual self-serve flow.
+              if (_consultation?.recommendationStatus == 'declined') ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded, size: 16, color: Colors.grey[600]),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'You declined the technician\'s recommendation. You can still book a visit slot yourself below.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                         ),
                       ),
-                    );
-                  }).toList(),
-                );
-              },
-            ),
-            const SizedBox(height: 18),
-            const Text('Preferred date & time', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _pickDate,
-                    icon: const Icon(Icons.calendar_today_outlined, size: 16),
-                    label: Text(
-                      _selectedDate == null
-                          ? 'Choose date'
-                          : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
-                      style: const TextStyle(fontSize: 12.5),
-                    ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _pickTime,
-                    icon: const Icon(Icons.access_time_rounded, size: 16),
-                    label: Text(
-                      _selectedTime == null ? 'Choose time' : _selectedTime!.format(context),
-                      style: const TextStyle(fontSize: 12.5),
-                    ),
-                  ),
-                ),
+                const SizedBox(height: 18),
               ],
-            ),
-            const SizedBox(height: 18),
-            const Text('Additional notes (optional)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _notesController,
-              maxLines: 3,
-              decoration: const InputDecoration(hintText: 'Anything else the technician should know...'),
-            ),
-            const SizedBox(height: 28),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isBooking ? null : _bookSlot,
-                child: _isBooking
-                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Book Visit Slot'),
+              const Text('Need an on-site visit? Book a slot', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              const SizedBox(height: 4),
+              Text(
+                'Same technician will come home to fix the issue.',
+                style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
               ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: _isBooking ? null : _skip,
-                child: const Text('Not now'),
+              const SizedBox(height: 14),
+              const Text('Select address', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+              const SizedBox(height: 6),
+              _addressPicker(),
+              const SizedBox(height: 18),
+              const Text('Preferred date & time', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _pickDate,
+                      icon: const Icon(Icons.calendar_today_outlined, size: 16),
+                      label: Text(
+                        _selectedDate == null
+                            ? 'Choose date'
+                            : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
+                        style: const TextStyle(fontSize: 12.5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _pickTime,
+                      icon: const Icon(Icons.access_time_rounded, size: 16),
+                      label: Text(
+                        _selectedTime == null ? 'Choose time' : _selectedTime!.format(context),
+                        style: const TextStyle(fontSize: 12.5),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
+              const SizedBox(height: 18),
+              const Text('Additional notes (optional)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _notesController,
+                maxLines: 3,
+                decoration: const InputDecoration(hintText: 'Anything else the technician should know...'),
+              ),
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isBooking ? null : _bookSlot,
+                  child: _isBooking
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Book Visit Slot'),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: _isBooking ? null : _skip,
+                  child: const Text('Not now'),
+                ),
+              ),
+            ],
           ],
         ),
       ),
+    );
+  }
+
+  /// Shared address list — used both when accepting a recommendation
+  /// (Accept just needs an address, no date/time) and in the full manual
+  /// booking form below.
+  Widget _addressPicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: () async {
+              await context.read<AddressProvider>().fetchAddresses();
+            },
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('Refresh'),
+          ),
+        ),
+        Consumer<AddressProvider>(
+          builder: (context, provider, _) {
+            if (provider.isLoading && provider.addresses.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            if (provider.addresses.isEmpty) {
+              return Text('No saved addresses yet — add one from your profile.',
+                  style: TextStyle(fontSize: 12.5, color: Colors.grey[600]));
+            }
+            return Column(
+              children: provider.addresses.map((a) {
+                final selected = a.id == _selectedAddressId;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedAddressId = a.id),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: selected ? AppTheme.primaryColor.withValues(alpha: 0.06) : Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: selected ? AppTheme.primaryColor : Colors.grey[200]!, width: selected ? 1.6 : 1),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                          color: selected ? AppTheme.primaryColor : Colors.grey[400],
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(a.label.isNotEmpty ? a.label : 'Address',
+                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${a.line1}${a.line2 != null && a.line2!.isNotEmpty ? ', ${a.line2}' : ''}, ${a.city}, ${a.state} ${a.pincode}',
+                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        ),
+      ],
     );
   }
 }
