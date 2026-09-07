@@ -32,6 +32,8 @@ type RazorpayService struct {
 	commissionPct     float64
 	gstPct            float64
 	repeatDiscountPct float64
+	platformFee       float64
+	visitFee          float64
 	paymentRepo       *repository.PaymentRepository
 	bookingRepo       *repository.BookingRepository
 	technicianRepo    *repository.TechnicianRepository
@@ -43,6 +45,8 @@ func NewRazorpayService(
 	commissionPct float64,
 	gstPct float64,
 	repeatDiscountPct float64,
+	platformFee float64,
+	visitFee float64,
 	paymentRepo *repository.PaymentRepository,
 	bookingRepo *repository.BookingRepository,
 	technicianRepo *repository.TechnicianRepository,
@@ -55,6 +59,8 @@ func NewRazorpayService(
 		commissionPct:     commissionPct,
 		gstPct:            gstPct,
 		repeatDiscountPct: repeatDiscountPct,
+		platformFee:       platformFee,
+		visitFee:          visitFee,
 		paymentRepo:       paymentRepo,
 		bookingRepo:       bookingRepo,
 		technicianRepo:    technicianRepo,
@@ -119,22 +125,33 @@ func (s *RazorpayService) CreateOrder(ctx context.Context, bookingID, userID str
 		return nil, fmt.Errorf("razorpay: failed to generate transaction ref: %w", err)
 	}
 
-	gstAmount := effectiveBase * s.gstPct / 100
-	totalAmount := effectiveBase + gstAmount
-
-	// If this booking already had its ₹99 visit fee paid separately, credit
-	// it against this final invoice so the customer is never double-charged.
-	var visitFeeCredit *float64
-	if booking.VisitFeeStatus == models.VisitFeePaid {
-		if vf, err := s.paymentRepo.GetByBookingIDAndType(ctx, bookingID, models.PaymentTypeVisitFee); err == nil && vf != nil && vf.Status == models.PaymentPaid {
-			credit := vf.Amount
-			if credit > totalAmount {
-				credit = totalAmount // never credit more than the invoice is worth
-			}
-			visitFeeCredit = &credit
-			totalAmount -= credit
+	// --- Fee line items (see config.PlatformFeeAmount / VisitFeeAmount) -------
+	// A warranty-claim booking is a free re-fix: no platform fee, no visit fee.
+	platformFee := s.platformFee
+	visitCharge := s.visitFee
+	if booking.IsWarrantyClaim {
+		platformFee = 0
+		visitCharge = 0
+	} else {
+		// The visit charge is billed once per booking. Skip it if it's already
+		// been charged on an earlier invoice for this booking, or if the
+		// customer paid a separate pre-visit fee for it.
+		if already, aErr := s.bookingRepo.IsVisitFeeCharged(ctx, bookingID); aErr != nil {
+			return nil, aErr
+		} else if already {
+			visitCharge = 0
+		} else if vf, vErr := s.paymentRepo.GetByBookingIDAndType(ctx, bookingID, models.PaymentTypeVisitFee); vErr == nil && vf != nil && vf.Status == models.PaymentPaid {
+			visitCharge = 0
 		}
 	}
+
+	// GST is charged on the whole taxable subtotal: service amount (post
+	// repeat-customer discount) + platform fee + visit charge.
+	subtotal := effectiveBase + platformFee + visitCharge
+	gstAmount := subtotal * s.gstPct / 100
+	totalAmount := subtotal + gstAmount
+
+	var visitFeeCredit *float64 // legacy field — unused now that visit fee is an explicit line
 
 	amountPaise := int64(totalAmount*100 + 0.5) // Razorpay wants amount in the smallest currency unit (paise)
 
@@ -164,6 +181,8 @@ func (s *RazorpayService) CreateOrder(ctx context.Context, bookingID, userID str
 		BaseAmount:             &effectiveBase,
 		GstAmount:              &gstAmount,
 		GstPercent:             &s.gstPct,
+		PlatformFeeAmount:      &platformFee,
+		VisitChargeAmount:      &visitCharge,
 		Currency:               "INR",
 		IsRepeatCustomer:       isRepeat,
 		RepeatDiscountPercent:  repeatDiscountPercent,
@@ -171,80 +190,6 @@ func (s *RazorpayService) CreateOrder(ctx context.Context, bookingID, userID str
 		RazorpayOrderID:        &orderID,
 		PaymentType:            models.PaymentTypeService,
 		VisitFeeCredit:         visitFeeCredit,
-	}
-	created, err := s.paymentRepo.Create(ctx, p)
-	if err != nil {
-		return nil, err
-	}
-
-	return &RazorpayOrder{
-		Payment:     created,
-		OrderID:     orderID,
-		KeyID:       s.keyID,
-		AmountPaise: amountPaise,
-		Currency:    "INR",
-	}, nil
-}
-
-// CreateVisitFeeOrder creates a fixed ₹99 pre-visit inspection order for a
-// booking that requires one (visit_fee_status == "pending" — set by
-// ConsultationService.Escalate). No GST/commission split is applied to this
-// small charge; it's simply credited against the final service invoice once
-// the job is complete (see CreateOrder below).
-func (s *RazorpayService) CreateVisitFeeOrder(ctx context.Context, bookingID, userID string) (*RazorpayOrder, error) {
-	booking, err := s.bookingRepo.GetByID(ctx, bookingID)
-	if err != nil {
-		return nil, err
-	}
-	if booking == nil {
-		return nil, errors.New("booking not found")
-	}
-	if booking.CustomerID != userID {
-		return nil, errors.New("this booking does not belong to you")
-	}
-	if booking.VisitFeeStatus != models.VisitFeePending {
-		return nil, fmt.Errorf("visit fee is not payable for this booking (status: %s)", booking.VisitFeeStatus)
-	}
-
-	amount := models.DefaultVisitFeeAmount
-	if booking.VisitFeeAmount != nil {
-		amount = *booking.VisitFeeAmount
-	}
-
-	ref, err := generateTransactionRef()
-	if err != nil {
-		return nil, fmt.Errorf("razorpay: failed to generate transaction ref: %w", err)
-	}
-
-	amountPaise := int64(amount*100 + 0.5)
-	orderData := map[string]interface{}{
-		"amount":   amountPaise,
-		"currency": "INR",
-		"receipt":  ref,
-		"notes": map[string]interface{}{
-			"booking_id":   bookingID,
-			"user_id":      userID,
-			"payment_type": models.PaymentTypeVisitFee,
-		},
-	}
-	orderResp, err := s.client.Order.Create(orderData, nil)
-	if err != nil {
-		return nil, fmt.Errorf("razorpay: failed to create visit-fee order: %w", err)
-	}
-	orderID, _ := orderResp["id"].(string)
-	if orderID == "" {
-		return nil, errors.New("razorpay: visit-fee order creation did not return an order id")
-	}
-
-	p := &models.Payment{
-		BookingID:       bookingID,
-		UserID:          userID,
-		TransactionRef:  ref,
-		Amount:          amount,
-		BaseAmount:      &amount,
-		Currency:        "INR",
-		PaymentType:     models.PaymentTypeVisitFee,
-		RazorpayOrderID: &orderID,
 	}
 	created, err := s.paymentRepo.Create(ctx, p)
 	if err != nil {
@@ -331,8 +276,15 @@ func (s *RazorpayService) VerifyAndCapture(ctx context.Context, razorpayOrderID,
 		return s.paymentRepo.GetByRazorpayOrderID(ctx, razorpayOrderID)
 	}
 
-	platformCommission := p.Amount * s.commissionPct / 100
-	technicianEarning := p.Amount - platformCommission
+	// Commission and the technician's earning are based on the service amount
+	// (post repeat-customer discount) only — never on GST or the platform/visit
+	// fees, which are platform revenue the technician has no claim to.
+	serviceBase := p.Amount
+	if p.BaseAmount != nil {
+		serviceBase = *p.BaseAmount
+	}
+	platformCommission := serviceBase * s.commissionPct / 100
+	technicianEarning := serviceBase - platformCommission
 
 	// CGST/SGST split — India intra-state GST is always divided 50/50 between
 	// the two. p.GstAmount was already computed at CreateOrder time (post
@@ -356,6 +308,13 @@ func (s *RazorpayService) VerifyAndCapture(ctx context.Context, razorpayOrderID,
 	}
 	if err := s.bookingRepo.SetPaymentStatus(ctx, booking.ID, "paid"); err != nil {
 		return nil, err
+	}
+	// Remember that this booking's one-time visit charge has now been collected,
+	// so a return visit on the same booking isn't billed for it again.
+	if p.VisitChargeAmount != nil && *p.VisitChargeAmount > 0 {
+		if err := s.bookingRepo.SetVisitFeeCharged(ctx, booking.ID); err != nil {
+			return nil, err
+		}
 	}
 
 	// Credit the assigned technician's wallet with their net earning (amount

@@ -22,10 +22,6 @@ func NewBookingService(bookingRepo *repository.BookingRepository, catRepo *repos
 	return &BookingService{bookingRepo: bookingRepo, catRepo: catRepo, techRepo: techRepo, paymentRepo: paymentRepo, fcm: fcm}
 }
 
-// visitFeeAmount is the flat pre-visit inspection fee charged on bookings that
-// come from an escalated video consultation (see RequireVisitFee below).
-const visitFeeAmount = 99.0
-
 // Create makes a new booking. If preferredTechnicianID is non-empty (customer
 // picked a specific technician via "Book Now" on their profile), the booking
 // is created and routed to that technician, but it is NOT auto-confirmed —
@@ -229,21 +225,6 @@ func (s *BookingService) UpdateStatus(ctx context.Context, bookingID, status, no
 			"Your booking status changed to "+status, map[string]string{"booking_id": bookingID, "type": "booking_status"})
 	}
 	return nil
-}
-
-// RequireVisitFee marks a booking as needing the ₹99 pre-visit inspection fee
-// before the technician can head out. Called once, right when a video
-// consultation is escalated into a booking (see ConsultationService.Escalate)
-// — direct bookings (never routed through a consultation) never call this, so
-// their visit_fee_status stays unset and no fee is required.
-func (s *BookingService) RequireVisitFee(ctx context.Context, bookingID string) error {
-	return s.bookingRepo.SetVisitFeeRequired(ctx, bookingID, visitFeeAmount)
-}
-
-// MarkVisitFeePaid flips a booking's visit-fee status to "paid" once a
-// verified payment for it has actually come in (see UpiService.ConfirmPayment).
-func (s *BookingService) MarkVisitFeePaid(ctx context.Context, bookingID string) error {
-	return s.bookingRepo.SetVisitFeeStatus(ctx, bookingID, "paid")
 }
 
 // Complete records the technician's final_price — this IS the invoice, since

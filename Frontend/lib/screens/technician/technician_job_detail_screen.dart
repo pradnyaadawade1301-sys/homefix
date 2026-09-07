@@ -38,6 +38,8 @@ class TechnicianJobDetailScreen extends StatelessWidget {
     switch (status) {
       case 'requested':
         return 'Pending assignment';
+      case 'pending_technician':
+        return 'Awaiting your response';
       case 'accepted':
         return 'Accepted';
       case 'on_the_way':

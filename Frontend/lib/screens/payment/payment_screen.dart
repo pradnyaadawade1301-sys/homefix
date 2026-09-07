@@ -66,6 +66,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
     provider.reset();
     setState(() => _stage = _Stage.review);
+    // Fetch the real order up front so the review card can show the full
+    // breakdown (platform fee, visit charge, GST, discount) BEFORE the
+    // customer taps Pay Now — not just the bare service amount.
+    await provider.createOrder(widget.bookingId, widget.amount);
+    if (mounted) setState(() {});
   }
 
   @override
@@ -79,11 +84,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
   /// Razorpay's Checkout sheet with that order_id.
   Future<void> _startPayment() async {
     final provider = context.read<PaymentProvider>();
-    final ok = await provider.createOrder(widget.bookingId, widget.amount);
-    if (!mounted) return;
-    if (!ok) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(provider.error ?? 'Could not start payment')));
-      return;
+    // The review screen usually pre-creates the order; only create one here if
+    // that didn't happen (or failed) so Pay Now still works.
+    if (provider.order == null) {
+      final ok = await provider.createOrder(widget.bookingId, widget.amount);
+      if (!mounted) return;
+      if (!ok) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(provider.error ?? 'Could not start payment')));
+        return;
+      }
     }
 
     final order = provider.order!;
@@ -200,7 +209,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     return ListView(
       children: [
         const SizedBox(height: 12),
-        _buildInvoiceCard(order: null),
+        _buildInvoiceCard(order: provider.order),
         const SizedBox(height: 28),
         SizedBox(
           height: 52,
@@ -232,6 +241,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final isRepeat = payment?.isRepeatCustomer == true;
     final discountPercent = payment?.repeatDiscountPercent;
     final discountAmount = payment?.repeatDiscountAmount;
+    final platformFee = payment?.platformFeeAmount;
+    final visitCharge = payment?.visitChargeAmount;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -252,6 +263,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
               '-\u20B9${discountAmount.toStringAsFixed(2)}',
               valueColor: AppTheme.successColor,
             ),
+          ],
+          if (platformFee != null && platformFee > 0) ...[
+            const SizedBox(height: 8),
+            _invoiceRow('Platform fee', '\u20B9${platformFee.toStringAsFixed(2)}'),
+          ],
+          if (visitCharge != null && visitCharge > 0) ...[
+            const SizedBox(height: 8),
+            _invoiceRow('Visit charge', '\u20B9${visitCharge.toStringAsFixed(2)}'),
           ],
           const SizedBox(height: 8),
           _invoiceRow(

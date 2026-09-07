@@ -686,7 +686,7 @@ class _JobCard extends StatelessWidget {
           // assigned to this technician — while it's still 'requested' they
           // only see the short problem_description above, enough to decide
           // Accept/Decline without the full detail cluttering the list.
-          if (booking.status != 'requested' && (booking.jobBrief != null || booking.images.isNotEmpty)) ...[
+          if (booking.status != 'requested' && booking.status != 'pending_technician' && (booking.jobBrief != null || booking.images.isNotEmpty)) ...[
             JobBriefCard(booking: booking),
             const SizedBox(height: 10),
           ],
@@ -709,6 +709,7 @@ class JobActionRow extends StatelessWidget {
 
     switch (booking.status) {
       case 'requested':
+      case 'pending_technician':
         return Row(
           children: [
             Expanded(

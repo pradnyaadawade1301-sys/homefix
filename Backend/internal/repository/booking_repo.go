@@ -287,6 +287,24 @@ func (r *BookingRepository) SetVisitFeeStatus(ctx context.Context, bookingID, st
 	return err
 }
 
+// IsVisitFeeCharged reports whether this booking's one-time on-site visit
+// charge has already been billed on a prior service invoice (see
+// RazorpayService.CreateOrder / VerifyAndCapture).
+func (r *BookingRepository) IsVisitFeeCharged(ctx context.Context, bookingID string) (bool, error) {
+	var charged bool
+	err := r.db.QueryRow(ctx, `SELECT COALESCE(visit_fee_charged, false) FROM bookings WHERE id = $1`, bookingID).Scan(&charged)
+	if err != nil {
+		return false, err
+	}
+	return charged, nil
+}
+
+// SetVisitFeeCharged marks this booking's one-time visit charge as collected.
+func (r *BookingRepository) SetVisitFeeCharged(ctx context.Context, bookingID string) error {
+	_, err := r.db.Exec(ctx, `UPDATE bookings SET visit_fee_charged = true, updated_at = now() WHERE id = $1`, bookingID)
+	return err
+}
+
 func (r *BookingRepository) History(ctx context.Context, bookingID string) ([]models.BookingStatusHistory, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, booking_id, status, COALESCE(note,''), created_at

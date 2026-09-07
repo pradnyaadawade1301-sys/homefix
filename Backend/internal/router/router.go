@@ -103,6 +103,7 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.GET("/technicians/available", h.Technician.FindAvailable)
 		authed.GET("/technicians/:id/reviews", h.Technician.Reviews)
 		authed.PATCH("/technicians/:id/availability", middleware.RequireRole("technician"), h.Technician.SetAvailability)
+		authed.PATCH("/technicians/:id/working-hours", middleware.RequireRole("technician"), h.Technician.SetWorkingHours)
 		authed.PATCH("/technicians/:id/location", middleware.RequireRole("technician"), h.Technician.UpdateLocation)
 		authed.PATCH("/technicians/:id/verify", middleware.RequireRole("admin"), h.Technician.Verify)
 		authed.GET("/technicians/:id/bookings", middleware.RequireRole("technician", "admin"), h.Booking.TechnicianBookings)
@@ -166,7 +167,6 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.GET("/webrtc/ice-servers", h.WebRTC.IceServers)
 
 		authed.POST("/payments/orders", h.Payment.CreateOrder)
-		authed.POST("/bookings/:id/visit-fee/order", h.Payment.CreateVisitFeeOrder)
 		authed.POST("/payments/confirm", h.Payment.Confirm)
 		authed.POST("/payments/fail", h.Payment.Fail)
 		authed.GET("/payments/history", h.Payment.History)

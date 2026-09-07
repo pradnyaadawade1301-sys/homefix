@@ -32,7 +32,9 @@ type TechnicianPublic struct {
 	RatingCount     int       `json:"rating_count"`
 	IsVerified      bool      `json:"is_verified"`
 	IsAvailable     bool      `json:"is_available"`
-	CreatedAt       time.Time `json:"created_at"`
+	// WorkingHours is the technician's self-set weekly schedule (display-only).
+	WorkingHours WorkingHours `json:"working_hours,omitempty"`
+	CreatedAt    time.Time    `json:"created_at"`
 }
 
 // TechnicianNearby is the shape returned by the "find available technicians" endpoint
@@ -96,8 +98,10 @@ type Technician struct {
 	IsAvailable     bool      `json:"is_available"`
 	CurrentLat      *float64  `json:"current_lat,omitempty"`
 	CurrentLng      *float64  `json:"current_lng,omitempty"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	// WorkingHours is the technician's self-set weekly schedule (display-only).
+	WorkingHours WorkingHours `json:"working_hours,omitempty"`
+	CreatedAt    time.Time    `json:"created_at"`
+	UpdatedAt    time.Time    `json:"updated_at"`
 }
 
 // TechnicianWithUser adds the user's own name/phone and the category's display

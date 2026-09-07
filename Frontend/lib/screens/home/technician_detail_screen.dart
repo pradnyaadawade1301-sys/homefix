@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../models/booking_model.dart';
 import '../../services/service_locator.dart';
+import '../../utils/working_hours.dart';
 import '../../widgets/video_call_precheck_sheet.dart';
 import '../booking/book_technician_screen.dart';
 import '../consultation/searching_technician_screen.dart';
@@ -306,6 +307,8 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                         ),
                       ),
                       const SizedBox(height: 16),
+                      _workingHoursCard(t.workingHours),
+                      const SizedBox(height: 16),
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(18),
@@ -465,6 +468,80 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  /// Read-only weekly schedule the technician set for themself. Today's row is
+  /// highlighted and a live "Open now / Opens ..." badge sits in the header.
+  /// Display-only — the customer can still book outside these hours.
+  Widget _workingHoursCard(Map<String, DayHours?> hours) {
+    if (!hasAnyWorkingDay(hours)) return const SizedBox.shrink();
+    final now = DateTime.now();
+    final todayKey = weekdayKeyFor(now);
+    final open = isOpenNow(hours, now);
+    final badgeText = open ? 'Open now' : (nextOpenLabel(hours, now) ?? 'Closed');
+    final badgeColor = open ? AppTheme.successColor : Colors.grey;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Working hours', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5)),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: badgeColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(badgeText,
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: badgeColor)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...kWeekdayKeys.map((k) {
+            final v = hours[k];
+            final isToday = k == todayKey;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 90,
+                    child: Text(
+                      kWeekdayLabels[k]!,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isToday ? FontWeight.w800 : FontWeight.w500,
+                        color: isToday ? AppTheme.primaryColor : Colors.grey[800],
+                      ),
+                    ),
+                  ),
+                  Text(
+                    v == null ? 'Closed' : '${v.openLabel} – ${v.closeLabel}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+                      color: v == null ? Colors.grey[500] : (isToday ? AppTheme.primaryColor : Colors.grey[800]),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/booking_model.dart';
 import '../models/user_model.dart';
 import '../services/service_locator.dart';
+import '../utils/working_hours.dart';
 
 class CategoryProvider extends ChangeNotifier {
   final CategoryService _categoryService;
@@ -154,6 +155,26 @@ class TechnicianKycProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _profile = _profile?.copyWith(isAvailable: previous);
+      _error = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Saves the technician's weekly working hours (display-only for customers).
+  /// Optimistic update with rollback on failure, mirroring [setAvailability].
+  Future<bool> updateWorkingHours(Map<String, DayHours?> hours) async {
+    final profile = _profile;
+    if (profile == null) return false;
+    final previous = profile.workingHours;
+    _profile = profile.copyWith(workingHours: hours);
+    _error = null;
+    notifyListeners();
+    try {
+      await _kycService.setWorkingHours(profile.id, workingHoursToJson(hours));
+      return true;
+    } catch (e) {
+      _profile = _profile?.copyWith(workingHours: previous);
       _error = e.toString().replaceFirst('Exception: ', '');
       notifyListeners();
       return false;

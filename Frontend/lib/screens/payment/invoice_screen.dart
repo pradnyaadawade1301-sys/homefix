@@ -231,6 +231,19 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                     _pdfCell('SGST (${inv.sgstPercent.toStringAsFixed(1)}%)'),
                     _pdfCell('Rs. ${inv.sgstAmount.toStringAsFixed(2)}', alignRight: true),
                   ]),
+                  pw.TableRow(children: [
+                    _pdfCell('Platform fee'),
+                    _pdfCell('Rs. ${inv.platformFeeAmount.toStringAsFixed(2)}', alignRight: true),
+                  ]),
+                  pw.TableRow(children: [
+                    _pdfCell('Visit charge'),
+                    _pdfCell('Rs. ${inv.visitChargeAmount.toStringAsFixed(2)}', alignRight: true),
+                  ]),
+                  if (inv.visitFeeCredit != null)
+                    pw.TableRow(children: [
+                      _pdfCell('Visit fee already paid (credited)'),
+                      _pdfCell('-Rs. ${inv.visitFeeCredit!.toStringAsFixed(2)}', alignRight: true),
+                    ]),
                   pw.TableRow(
                     decoration: const pw.BoxDecoration(color: PdfColors.grey100),
                     children: [
@@ -248,16 +261,6 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                   style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey600),
                 ),
               ),
-              if (inv.payment.platformCommission != null) ...[
-                pw.SizedBox(height: 2),
-                pw.Align(
-                  alignment: pw.Alignment.centerRight,
-                  child: pw.Text(
-                    'Includes platform & convenience fee of Rs. ${inv.payment.platformCommission!.toStringAsFixed(2)} (already in total above)',
-                    style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey600),
-                  ),
-                ),
-              ],
 
               pw.SizedBox(height: 24),
               if (inv.problemDescription.isNotEmpty) ...[
@@ -426,27 +429,16 @@ class _InvoiceBody extends StatelessWidget {
                 ),
               _priceRow('CGST (${invoice.cgstPercent.toStringAsFixed(1)}%)', invoice.cgstAmount),
               _priceRow('SGST (${invoice.sgstPercent.toStringAsFixed(1)}%)', invoice.sgstAmount),
+              _priceRow('Platform fee', invoice.platformFeeAmount),
+              _priceRow('Visit charge', invoice.visitChargeAmount),
+              if (invoice.visitFeeCredit != null)
+                _priceRow(
+                  'Visit fee already paid (credited)',
+                  -(invoice.visitFeeCredit ?? 0),
+                  color: AppTheme.successColor,
+                ),
               const Divider(height: 24),
               _priceRow('Total paid', invoice.totalAmount, bold: true),
-              if (invoice.payment.platformCommission != null) ...[
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(8)),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline_rounded, size: 14, color: Colors.grey[500]),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          'Includes platform & convenience fee of \u20B9${invoice.payment.platformCommission!.toStringAsFixed(2)} (already included in the total above)',
-                          style: TextStyle(fontSize: 10.5, color: Colors.grey[600]),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ],
           ),
         ),

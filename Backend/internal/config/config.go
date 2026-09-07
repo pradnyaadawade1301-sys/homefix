@@ -74,6 +74,17 @@ type Config struct {
 	// REPEAT_CUSTOMER_DISCOUNT_PERCENT env var. Set to 0 to disable.
 	RepeatCustomerDiscountPercent float64
 
+	// PlatformFeeAmount is a flat convenience fee added as its own line item to
+	// every final service invoice (a warranty-claim booking is exempt). Part of
+	// the GST-taxable subtotal. Default ₹50; override via PLATFORM_FEE_AMOUNT.
+	PlatformFeeAmount float64
+
+	// VisitFeeAmount is the flat on-site visit charge added to a booking's FIRST
+	// service invoice only — a repeat/return visit on the same booking, and any
+	// warranty-claim booking, are not charged again. Part of the GST-taxable
+	// subtotal. Default ₹100; override via VISIT_FEE_AMOUNT.
+	VisitFeeAmount float64
+
 	FirebaseCredentialsPath string
 	FirebaseProjectID       string
 
@@ -141,6 +152,14 @@ func Load() *Config {
 	if err != nil {
 		repeatDiscountPct = 5
 	}
+	platformFeeAmount, err := strconv.ParseFloat(getOr("PLATFORM_FEE_AMOUNT", "50"), 64)
+	if err != nil {
+		platformFeeAmount = 50
+	}
+	visitFeeAmount, err := strconv.ParseFloat(getOr("VISIT_FEE_AMOUNT", "100"), 64)
+	if err != nil {
+		visitFeeAmount = 100
+	}
 
 	return &Config{
 		Port:  getOr("PORT", "8080"),
@@ -202,5 +221,7 @@ func Load() *Config {
 		PlatformCommissionPercent:     commissionPct,
 		GSTPercent:                    gstPct,
 		RepeatCustomerDiscountPercent: repeatDiscountPct,
+		PlatformFeeAmount:             platformFeeAmount,
+		VisitFeeAmount:                visitFeeAmount,
 	}
 }

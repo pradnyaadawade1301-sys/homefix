@@ -227,6 +227,21 @@ class TechnicianKycService {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
   }
+
+  /// Persists the technician's self-set weekly schedule —
+  /// PATCH /technicians/:id/working-hours. Display-only on the customer side
+  /// (does not gate matching/booking). [workingHours] is the wire shape:
+  /// `{"mon":{"open":"09:00","close":"18:00"}, ..., "sun":null}`.
+  Future<void> setWorkingHours(String technicianId, Map<String, dynamic> workingHours) async {
+    try {
+      await _httpClient.patch(
+        '${ApiConfig.technicianDetail}/$technicianId/working-hours',
+        data: {'working_hours': workingHours},
+      );
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
 }
 
 // Technician Service — public browse endpoints, no auth required.

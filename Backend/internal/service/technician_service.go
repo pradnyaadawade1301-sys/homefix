@@ -81,6 +81,15 @@ func (s *TechnicianService) SetAvailability(ctx context.Context, technicianID st
 	return s.techRepo.SetAvailability(ctx, technicianID, available)
 }
 
+// UpdateWorkingHours validates and persists a technician's self-set weekly
+// schedule. Display-only — it does not affect matching or booking.
+func (s *TechnicianService) UpdateWorkingHours(ctx context.Context, technicianID string, wh models.WorkingHours) error {
+	if err := wh.Validate(); err != nil {
+		return err
+	}
+	return s.techRepo.UpdateWorkingHours(ctx, technicianID, wh)
+}
+
 func (s *TechnicianService) UpdateLocation(ctx context.Context, technicianID string, lat, lng float64) error {
 	return s.techRepo.UpdateLocation(ctx, technicianID, lat, lng)
 }

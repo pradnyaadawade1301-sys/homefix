@@ -22,9 +22,9 @@ func (r *TechnicianRepository) Create(ctx context.Context, t *models.Technician)
 		INSERT INTO technicians (user_id, category_id, experience_years, address, government_id_url,
 		                          profile_photo_url, approval_status, is_verified, is_available)
 		VALUES ($1,$2,$3,$4,$5,$6,'pending',false,true)
-		RETURNING id, approval_status, rating_avg, rating_count, is_verified, is_available, created_at, updated_at
+		RETURNING id, approval_status, rating_avg, rating_count, is_verified, is_available, working_hours, created_at, updated_at
 	`, t.UserID, t.CategoryID, t.ExperienceYears, t.Address, t.GovernmentIDURL, t.ProfilePhotoURL).Scan(
-		&t.ID, &t.ApprovalStatus, &t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.CreatedAt, &t.UpdatedAt)
+		&t.ID, &t.ApprovalStatus, &t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.WorkingHours, &t.CreatedAt, &t.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -34,12 +34,12 @@ func (r *TechnicianRepository) Create(ctx context.Context, t *models.Technician)
 const technicianColumns = `id, user_id, category_id, experience_years, COALESCE(address,''),
 	COALESCE(government_id_url,''), COALESCE(profile_photo_url,''), approval_status,
 	COALESCE(rejection_reason,''), rating_avg, rating_count, is_verified, is_available,
-	current_lat, current_lng, created_at, updated_at`
+	current_lat, current_lng, working_hours, created_at, updated_at`
 
 func scanTechnician(row pgx.Row, t *models.Technician) error {
 	return row.Scan(&t.ID, &t.UserID, &t.CategoryID, &t.ExperienceYears, &t.Address, &t.GovernmentIDURL,
 		&t.ProfilePhotoURL, &t.ApprovalStatus, &t.RejectionReason, &t.RatingAvg, &t.RatingCount,
-		&t.IsVerified, &t.IsAvailable, &t.CurrentLat, &t.CurrentLng, &t.CreatedAt, &t.UpdatedAt)
+		&t.IsVerified, &t.IsAvailable, &t.CurrentLat, &t.CurrentLng, &t.WorkingHours, &t.CreatedAt, &t.UpdatedAt)
 }
 
 func (r *TechnicianRepository) GetByID(ctx context.Context, id string) (*models.Technician, error) {
@@ -134,7 +134,7 @@ func (r *TechnicianRepository) ListAvailableByCategory(ctx context.Context, cate
 func (r *TechnicianRepository) ListPublic(ctx context.Context, categoryID string) ([]models.TechnicianPublic, error) {
 	query := `
 		SELECT t.id, COALESCE(u.name,''), t.category_id, c.name, t.experience_years,
-		       t.rating_avg, t.rating_count, t.is_verified, t.is_available, t.created_at
+		       t.rating_avg, t.rating_count, t.is_verified, t.is_available, t.working_hours, t.created_at
 		FROM technicians t
 		JOIN users u ON u.id = t.user_id
 		JOIN categories c ON c.id = t.category_id
@@ -156,7 +156,7 @@ func (r *TechnicianRepository) ListPublic(ctx context.Context, categoryID string
 	for rows.Next() {
 		var t models.TechnicianPublic
 		if err := rows.Scan(&t.ID, &t.Name, &t.CategoryID, &t.CategoryName, &t.ExperienceYears,
-			&t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.CreatedAt); err != nil {
+			&t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.WorkingHours, &t.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, t)
@@ -169,13 +169,13 @@ func (r *TechnicianRepository) GetPublicByID(ctx context.Context, id string) (*m
 	var t models.TechnicianPublic
 	err := r.db.QueryRow(ctx, `
 		SELECT t.id, COALESCE(u.name,''), t.category_id, c.name, t.experience_years,
-		       t.rating_avg, t.rating_count, t.is_verified, t.is_available, t.created_at
+		       t.rating_avg, t.rating_count, t.is_verified, t.is_available, t.working_hours, t.created_at
 		FROM technicians t
 		JOIN users u ON u.id = t.user_id
 		JOIN categories c ON c.id = t.category_id
 		WHERE t.id = $1
 	`, id).Scan(&t.ID, &t.Name, &t.CategoryID, &t.CategoryName, &t.ExperienceYears,
-		&t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.CreatedAt)
+		&t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.WorkingHours, &t.CreatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -187,6 +187,13 @@ func (r *TechnicianRepository) GetPublicByID(ctx context.Context, id string) (*m
 
 func (r *TechnicianRepository) SetAvailability(ctx context.Context, id string, available bool) error {
 	_, err := r.db.Exec(ctx, `UPDATE technicians SET is_available = $1, updated_at = now() WHERE id = $2`, available, id)
+	return err
+}
+
+// UpdateWorkingHours persists the technician's self-set weekly schedule
+// (display-only — see models.WorkingHours). wh is stored verbatim as JSONB.
+func (r *TechnicianRepository) UpdateWorkingHours(ctx context.Context, id string, wh models.WorkingHours) error {
+	_, err := r.db.Exec(ctx, `UPDATE technicians SET working_hours = $1::jsonb, updated_at = now() WHERE id = $2`, wh, id)
 	return err
 }
 

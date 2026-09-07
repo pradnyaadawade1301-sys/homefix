@@ -35,7 +35,11 @@ func main() {
 		 ALTER TABLE consultations ADD COLUMN IF NOT EXISTS note TEXT;
 		 ALTER TABLE consultations ADD COLUMN IF NOT EXISTS area VARCHAR(120);
 		 ALTER TABLE consultations ADD COLUMN IF NOT EXISTS ai_diagnosis_session_id UUID REFERENCES ai_diagnosis_sessions(id);
-		 CREATE INDEX IF NOT EXISTS idx_consultations_ai_diagnosis ON consultations(ai_diagnosis_session_id);`); err != nil {
+		 CREATE INDEX IF NOT EXISTS idx_consultations_ai_diagnosis ON consultations(ai_diagnosis_session_id);
+		 ALTER TABLE technicians ADD COLUMN IF NOT EXISTS working_hours JSONB NOT NULL DEFAULT '{"mon":{"open":"09:00","close":"18:00"},"tue":{"open":"09:00","close":"18:00"},"wed":{"open":"09:00","close":"18:00"},"thu":{"open":"09:00","close":"18:00"},"fri":{"open":"09:00","close":"18:00"},"sat":{"open":"09:00","close":"18:00"},"sun":null}'::jsonb;
+		 ALTER TABLE payments ADD COLUMN IF NOT EXISTS platform_fee_amount NUMERIC(10,2);
+		 ALTER TABLE payments ADD COLUMN IF NOT EXISTS visit_charge_amount NUMERIC(10,2);
+		 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS visit_fee_charged BOOLEAN NOT NULL DEFAULT false;`); err != nil {
 		log.Fatalf("startup: failed to ensure otp columns exist: %v", err)
 	}
 
@@ -76,6 +80,7 @@ func main() {
 	// references it directly, but it's no longer wired into any handler below.
 	razorpayService := service.NewRazorpayService(
 		cfg.RazorpayKeyID, cfg.RazorpayKeySecret, cfg.PlatformCommissionPercent, cfg.GSTPercent, cfg.RepeatCustomerDiscountPercent,
+		cfg.PlatformFeeAmount, cfg.VisitFeeAmount,
 		paymentRepo, bookingRepo, techRepo, walletRepo,
 	)
 

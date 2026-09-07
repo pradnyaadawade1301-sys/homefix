@@ -96,6 +96,8 @@ class _BookingsScreenState extends State<BookingsScreen> {
     switch (status) {
       case 'requested':
         return 'Finding technician';
+      case 'pending_technician':
+        return 'Waiting for technician';
       case 'accepted':
         return 'Technician assigned';
       case 'in_progress':

@@ -155,6 +155,39 @@ func (h *TechnicianHandler) SetAvailability(c *gin.Context) {
 	utils.Success(c, http.StatusOK, gin.H{"message": "availability updated"})
 }
 
+type workingHoursBody struct {
+	WorkingHours models.WorkingHours `json:"working_hours" binding:"required"`
+}
+
+// SetWorkingHours lets a technician set their own weekly schedule (display-only
+// — it doesn't gate matching or booking). Like SetAvailability, a technician
+// can only update their OWN row.
+func (h *TechnicianHandler) SetWorkingHours(c *gin.Context) {
+	userID := c.GetString("user_id")
+	technicianID := c.Param("id")
+
+	self, err := h.techService.GetByUser(c.Request.Context(), userID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if self == nil || self.ID != technicianID {
+		utils.Error(c, http.StatusForbidden, "you can only update your own working hours")
+		return
+	}
+
+	var body workingHoursBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.techService.UpdateWorkingHours(c.Request.Context(), technicianID, body.WorkingHours); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"message": "working hours updated"})
+}
+
 type locationBody struct {
 	Lat float64 `json:"lat" binding:"required"`
 	Lng float64 `json:"lng" binding:"required"`

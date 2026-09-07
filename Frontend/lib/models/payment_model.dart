@@ -48,6 +48,8 @@ class Payment {
   final String? razorpayPaymentId;
   final double? platformCommission;
   final double? technicianEarning;
+  final double? platformFeeAmount;
+  final double? visitChargeAmount;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -72,6 +74,8 @@ class Payment {
     this.razorpayPaymentId,
     this.platformCommission,
     this.technicianEarning,
+    this.platformFeeAmount,
+    this.visitChargeAmount,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -102,6 +106,8 @@ class Payment {
       razorpayPaymentId: json['razorpay_payment_id'] as String?,
       platformCommission: (json['platform_commission'] as num?)?.toDouble(),
       technicianEarning: (json['technician_earning'] as num?)?.toDouble(),
+      platformFeeAmount: (json['platform_fee_amount'] as num?)?.toDouble(),
+      visitChargeAmount: (json['visit_charge_amount'] as num?)?.toDouble(),
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : DateTime.now(),
       updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'] as String) : DateTime.now(),
     );
@@ -131,6 +137,9 @@ class InvoiceDetail {
   final double sgstPercent;
   final double sgstAmount;
   final double totalAmount;
+  final double platformFeeAmount;
+  final double visitChargeAmount;
+  final double? visitFeeCredit;
   final bool isRepeatCustomer;
   final double? repeatDiscountPercent;
   final double? repeatDiscountAmount;
@@ -154,6 +163,9 @@ class InvoiceDetail {
     required this.sgstPercent,
     required this.sgstAmount,
     required this.totalAmount,
+    this.platformFeeAmount = 0.0,
+    this.visitChargeAmount = 0.0,
+    this.visitFeeCredit,
     this.isRepeatCustomer = false,
     this.repeatDiscountPercent,
     this.repeatDiscountAmount,
@@ -181,6 +193,9 @@ class InvoiceDetail {
       sgstPercent: (json['sgst_percent'] as num?)?.toDouble() ?? 0.0,
       sgstAmount: (json['sgst_amount'] as num?)?.toDouble() ?? 0.0,
       totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0.0,
+      platformFeeAmount: (json['platform_fee_amount'] as num?)?.toDouble() ?? 0.0,
+      visitChargeAmount: (json['visit_charge_amount'] as num?)?.toDouble() ?? 0.0,
+      visitFeeCredit: (json['visit_fee_credit'] as num?)?.toDouble(),
       isRepeatCustomer: json['is_repeat_customer'] as bool? ?? false,
       repeatDiscountPercent: (json['repeat_discount_percent'] as num?)?.toDouble(),
       repeatDiscountAmount: (json['repeat_discount_amount'] as num?)?.toDouble(),

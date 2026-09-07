@@ -7,6 +7,7 @@ import '../../providers/booking_provider.dart';
 import '../payment/payment_screen.dart';
 import '../payment/invoice_screen.dart';
 import '../chat/booking_chat_screen.dart';
+import 'book_technician_screen.dart';
 
 /// Step 9 of the customer flow ("Booking Tracking").
 ///
@@ -24,6 +25,10 @@ class BookingTrackingScreen extends StatefulWidget {
 
 class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
   Timer? _pollTimer;
+  // How many "technician declined" events we've already told the customer
+  // about via the pop-up — so the 6s poll doesn't re-open the dialog on
+  // every refresh, only when a NEW decline comes in.
+  int _notifiedDeclineCount = 0;
 
   @override
   void initState() {
@@ -45,11 +50,67 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
     await provider.fetchBookingDetail(widget.bookingId);
     if (!mounted) return;
     await provider.fetchJobPhotos(widget.bookingId);
+    if (!mounted) return;
+    _maybeNotifyRejected(provider);
   }
 
-  static const _stages = ['requested', 'accepted', 'on_the_way', 'arrived', 'in_progress', 'completed'];
+  /// When a technician turns down this booking it falls back to 'requested'
+  /// and a decline row lands in the status history. Show the customer a
+  /// one-time pop-up ("find another technician") the moment that happens,
+  /// on top of the persistent banner already on the screen.
+  void _maybeNotifyRejected(BookingProvider provider) {
+    final booking = provider.selectedBooking;
+    if (booking == null || booking.status != 'requested') return;
+    final declines = _declineEvents(provider.history).length;
+    if (declines == 0 || declines <= _notifiedDeclineCount) return;
+    _notifiedDeclineCount = declines;
+    _showRejectedDialog(booking);
+  }
+
+  void _showRejectedDialog(Booking booking) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Technician unavailable'),
+        content: const Text(
+          'The technician couldn’t take this booking. Please choose another '
+          'technician to continue.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Later'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => BookTechnicianScreen(
+                  categoryId: booking.categoryId,
+                  categoryName: booking.categoryName,
+                  problemDescription: booking.problemDescription,
+                ),
+              ));
+            },
+            child: const Text('Find another technician'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 'technician_response' is a synthetic stepper stage (no booking ever has
+  // that literal status) sitting between "Pending Assignment" and "Technician
+  // Assigned" — it's where the customer sees whether the routed technician
+  // accepted or rejected the job. Its label is computed per-state in
+  // _buildStepper (Waiting / Accepted / Rejected).
+  static const _stages = ['requested', 'technician_response', 'accepted', 'on_the_way', 'arrived', 'in_progress', 'completed'];
   static const _stageLabels = {
     'requested': 'Pending Assignment',
+    // A booking sits here after "Book Now" routes it to a specific
+    // technician but before that technician has accepted/rejected it.
+    'pending_technician': 'Waiting for Technician',
+    'technician_response': 'Technician Response',
     'accepted': 'Technician Assigned',
     'on_the_way': 'On The Way',
     'arrived': 'Technician Arrived',
@@ -58,6 +119,7 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
   };
   static const _stageIcons = {
     'requested': Icons.search_rounded,
+    'technician_response': Icons.how_to_reg_rounded,
     'accepted': Icons.person_pin_circle_rounded,
     'on_the_way': Icons.directions_run_rounded,
     'arrived': Icons.home_rounded,
@@ -118,7 +180,12 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
 
               final currentIndex = (booking.status == 'awaiting_estimate_approval' || booking.status == 'inspecting')
                   ? _stages.indexOf('in_progress')
-                  : _stages.indexOf(booking.status).clamp(0, _stages.length - 1);
+                  // pending_technician = the job is routed to a technician who
+                  // hasn't responded yet -> sits on the "Technician Response"
+                  // step, shown as "Waiting for technician to accept".
+                  : booking.status == 'pending_technician'
+                      ? _stages.indexOf('technician_response')
+                      : _stages.indexOf(booking.status).clamp(0, _stages.length - 1);
 
               return ListView(
                 padding: const EdgeInsets.all(20),
@@ -133,10 +200,16 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
                     _otpCard(booking.otpCode!),
                     const SizedBox(height: 24),
                   ],
-                  if (booking.technician != null) ...[
+                  // A technician object can be present on the booking even
+                  // while status is still 'pending_technician' (they've been
+                  // routed the job but haven't responded yet) — showing the
+                  // full technician card at that point would read as
+                  // "confirmed" when it isn't, so that case gets its own
+                  // "waiting for response" banner instead.
+                  if (booking.technician != null && booking.status != 'pending_technician') ...[
                     _technicianCard(booking.technician!),
                     const SizedBox(height: 24),
-                  ] else if (booking.status == 'requested') ...[
+                  ] else if (booking.status == 'pending_technician') ...[
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(16)),
@@ -147,10 +220,81 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryColor),
                           ),
                           const SizedBox(width: 12),
-                          Text('Searching for nearby technician...', style: TextStyle(color: Colors.grey[700], fontSize: 13)),
+                          Expanded(
+                            child: Text(
+                              booking.technician != null
+                                  ? 'Waiting for ${booking.technician!.name} to respond...'
+                                  : 'Waiting for technician to respond...',
+                              style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                            ),
+                          ),
                         ],
                       ),
                     ),
+                    const SizedBox(height: 24),
+                  ] else if (booking.status == 'requested') ...[
+                    Builder(builder: (context) {
+                      // If a technician previously declined this exact
+                      // booking (it fell back to 'requested' from
+                      // 'pending_technician'), say so plainly and let the
+                      // customer jump straight back into picking another
+                      // technician instead of leaving them guessing why the
+                      // assigned tech they saw earlier disappeared.
+                      final wasRejected = _declineEvents(provider.history).isNotEmpty;
+                      if (!wasRejected) {
+                        return Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(16)),
+                          child: Row(
+                            children: [
+                              const SizedBox(
+                                width: 18, height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryColor),
+                              ),
+                              const SizedBox(width: 12),
+                              Text('Searching for nearby technician...', style: TextStyle(color: Colors.grey[700], fontSize: 13)),
+                            ],
+                          ),
+                        );
+                      }
+                      return Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(color: AppTheme.errorColor.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(16)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.person_off_rounded, color: AppTheme.errorColor, size: 20),
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                  child: Text(
+                                    'The technician rejected this booking. Please choose another technician.',
+                                    style: TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  Navigator.of(context).push(MaterialPageRoute(
+                                    builder: (_) => BookTechnicianScreen(
+                                      categoryId: booking.categoryId,
+                                      categoryName: booking.categoryName,
+                                      problemDescription: booking.problemDescription,
+                                    ),
+                                  ));
+                                },
+                                child: const Text('Choose another technician'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
                     const SizedBox(height: 24),
                   ],
                   if (booking.isInvoiced && !booking.isPaid) ...[
@@ -287,7 +431,7 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
   /// once the technician has actually started the job, or the booking is
   /// already completed/cancelled, there's nothing left to cancel.
     bool _canCancel(String status) {
-    return status == 'requested' || status == 'accepted';
+    return status == 'requested' || status == 'pending_technician' || status == 'accepted';
   }
 
   Widget _cancelBookingButton(BuildContext context, BookingProvider provider, Booking booking) {
@@ -625,7 +769,36 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
           final isCurrent = i == currentIndex;
           final isDone = i < currentIndex;
           final reached = i <= currentIndex;
-          final stamp = stageTimestamps[stage];
+
+          // "Technician Response" step: a technician declined and the job
+          // bounced back to 'requested' (currentIndex 0) -> render this step
+          // in red as "Technician Rejected" even though it's not "reached".
+          final declines = _declineEvents(history);
+          final isRejectStep = stage == 'technician_response' && currentIndex == 0 && declines.isNotEmpty;
+
+          String label = _stageLabels[stage] ?? stage;
+          if (stage == 'technician_response') {
+            if (currentIndex > 1) {
+              label = 'Technician Accepted';
+            } else if (isRejectStep) {
+              label = 'Technician Rejected';
+            } else if (currentIndex == 1) {
+              label = 'Waiting for technician to accept';
+            }
+          }
+
+          DateTime? stamp = stageTimestamps[stage];
+          if (stage == 'technician_response') {
+            stamp = stageTimestamps['accepted'] ??
+                (isRejectStep ? declines.last.createdAt : stageTimestamps['pending_technician']);
+          }
+
+          final circleColor = isRejectStep
+              ? AppTheme.errorColor
+              : (reached ? AppTheme.primaryColor : Colors.grey[200]);
+          final labelColor = isRejectStep
+              ? AppTheme.errorColor
+              : (reached ? const Color(0xFF1A1F36) : Colors.grey[400]);
           return IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -637,7 +810,7 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
                       width: isCurrent ? 40 : 32,
                       height: isCurrent ? 40 : 32,
                       decoration: BoxDecoration(
-                        color: reached ? AppTheme.primaryColor : Colors.grey[200],
+                        color: circleColor,
                         shape: BoxShape.circle,
                         boxShadow: isCurrent
                             ? [
@@ -650,8 +823,10 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
                             : null,
                       ),
                       child: Icon(
-                        isDone ? Icons.check_rounded : _stageIcons[stage],
-                        color: reached ? Colors.white : Colors.grey[400],
+                        isRejectStep
+                            ? Icons.close_rounded
+                            : (isDone ? Icons.check_rounded : _stageIcons[stage]),
+                        color: (reached || isRejectStep) ? Colors.white : Colors.grey[400],
                         size: isCurrent ? 20 : 16,
                       ),
                     ),
@@ -678,24 +853,31 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              _stageLabels[stage] ?? stage,
-                              style: TextStyle(
-                                fontSize: isCurrent ? 15.5 : 13.5,
-                                fontWeight: reached ? FontWeight.w700 : FontWeight.w500,
-                                color: reached ? const Color(0xFF1A1F36) : Colors.grey[400],
+                            Expanded(
+                              child: Text(
+                                label,
+                                style: TextStyle(
+                                  fontSize: (isCurrent || isRejectStep) ? 15.5 : 13.5,
+                                  fontWeight: (reached || isRejectStep) ? FontWeight.w700 : FontWeight.w500,
+                                  color: labelColor,
+                                ),
                               ),
                             ),
                             // Timestamp on the right of the label, same as
                             // Meesho's order-tracking rows — only shown once
                             // this step has actually happened.
                             if (stamp != null)
-                              Text(
-                                _formatStamp(stamp),
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: reached ? AppTheme.primaryColor : Colors.grey[400],
+                              Padding(
+                                padding: const EdgeInsets.only(left: 8),
+                                child: Text(
+                                  _formatStamp(stamp),
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: isRejectStep
+                                        ? AppTheme.errorColor
+                                        : (reached ? AppTheme.primaryColor : Colors.grey[400]),
+                                  ),
                                 ),
                               ),
                           ],
@@ -706,23 +888,27 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
                             stamp != null ? 'Updated ${_formatStamp(stamp)}' : 'In progress...',
                             style: const TextStyle(fontSize: 12, color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
                           ),
+                        ] else if (isRejectStep) ...[
+                          const SizedBox(height: 3),
+                          const Text(
+                            'Finding another technician for you…',
+                            style: TextStyle(fontSize: 12, color: AppTheme.errorColor, fontWeight: FontWeight.w600),
+                          ),
                         ],
-                        // Between "Pending Assignment" and "Technician
-                        // Assigned" — if one or more technicians declined
-                        // this job first, show that here so the customer
-                        // can see it wasn't just sitting idle.
-                        if (stage == 'requested') ...[
+                        // If a technician turned this job down, list each
+                        // decline with its time right under the rejected step.
+                        if (stage == 'technician_response' && isRejectStep) ...[
                           for (final decline in _declineEvents(history)) ...[
                             const SizedBox(height: 6),
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Icons.person_off_outlined, size: 13, color: Colors.orange),
+                                const Icon(Icons.person_off_outlined, size: 13, color: AppTheme.errorColor),
                                 const SizedBox(width: 5),
                                 Expanded(
                                   child: Text(
-                                    'Declined by a technician \u2022 ${_formatStamp(decline.createdAt)} \u2014 reassigning',
-                                    style: TextStyle(fontSize: 11.5, color: Colors.orange[800], fontWeight: FontWeight.w600),
+                                    'Declined \u2022 ${_formatStamp(decline.createdAt)}',
+                                    style: TextStyle(fontSize: 11.5, color: Colors.grey[600], fontWeight: FontWeight.w500),
                                   ),
                                 ),
                               ],

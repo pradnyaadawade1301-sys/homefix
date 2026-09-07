@@ -48,6 +48,10 @@ type Payment struct {
 	RazorpaySignature  *string    `json:"razorpay_signature,omitempty"`
 	PlatformCommission *float64   `json:"platform_commission,omitempty"`
 	TechnicianEarning  *float64   `json:"technician_earning,omitempty"`
+	// PlatformFeeAmount / VisitChargeAmount are the flat fee line items shown on
+	// the final service invoice (see config + RazorpayService.CreateOrder).
+	PlatformFeeAmount *float64 `json:"platform_fee_amount,omitempty"`
+	VisitChargeAmount *float64 `json:"visit_charge_amount,omitempty"`
 	// PaymentType distinguishes the ₹99 visit-fee charge from the normal final
 	// service payment (default "service" for every pre-existing row).
 	PaymentType     string   `json:"payment_type"`
@@ -110,7 +114,9 @@ type InvoiceDetail struct {
 	CgstAmount  float64 `json:"cgst_amount"`
 	SgstPercent float64 `json:"sgst_percent"` // the other half
 	SgstAmount  float64 `json:"sgst_amount"`
-	VisitFeeCredit *float64 `json:"visit_fee_credit,omitempty"` // already-paid ₹99 visit fee, deducted from this total
+	PlatformFeeAmount float64 `json:"platform_fee_amount"` // flat convenience fee line
+	VisitChargeAmount float64 `json:"visit_charge_amount"` // flat on-site visit charge line (first invoice only)
+	VisitFeeCredit *float64 `json:"visit_fee_credit,omitempty"` // legacy: already-paid separate visit fee, deducted from this total
 	TotalAmount float64 `json:"total_amount"`
 
 	IsRepeatCustomer      bool     `json:"is_repeat_customer"`

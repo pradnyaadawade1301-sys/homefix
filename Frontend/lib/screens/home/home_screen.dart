@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemNavigator;
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../models/booking_model.dart';
@@ -26,6 +27,8 @@ class HomeScreen extends StatefulWidget {
 
 class HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  // For the "press back again to exit" behaviour on the Home tab.
+  DateTime? _lastBackPress;
 
   // One GlobalKey per bottom-nav destination so the Guided Tour can find each
   // icon's real on-screen position (see widgets/guided_tour.dart) — no
@@ -119,11 +122,35 @@ class HomeScreenState extends State<HomeScreen> {
     await _startGuidedTourIfNeeded(force: true);
   }
 
+  /// Back-button handling for the whole app shell:
+  /// - on any non-Home tab, back returns to the Home tab instead of leaving;
+  /// - on the Home tab, back must be pressed twice within 2s to exit.
+  void _handleBack(bool didPop) {
+    if (didPop) return;
+    if (_selectedIndex != 0) {
+      setState(() => _selectedIndex = 0);
+      return;
+    }
+    final now = DateTime.now();
+    if (_lastBackPress == null || now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
+      _lastBackPress = now;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Press back again to exit'), duration: Duration(seconds: 2)),
+      );
+      return;
+    }
+    SystemNavigator.pop();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: _tabs),
-      bottomNavigationBar: _buildBottomNav(),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) => _handleBack(didPop),
+      child: Scaffold(
+        body: IndexedStack(index: _selectedIndex, children: _tabs),
+        bottomNavigationBar: _buildBottomNav(),
+      ),
     );
   }
 
@@ -529,8 +556,8 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2E7D32), width: 1.4),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF2E7D32), width: 1.2),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
       ),
       child: TextField(
@@ -541,24 +568,30 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
           setState(() => _suggestions = []);
           _submitSearch(value);
         },
+        style: const TextStyle(fontSize: 14),
         decoration: InputDecoration(
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(vertical: 10),
           hintText: 'Search service...',
-          hintStyle: TextStyle(color: Colors.grey[500]),
-          prefixIcon: Icon(Icons.search_rounded, color: Colors.grey[500]),
+          hintStyle: TextStyle(color: Colors.grey[500], fontSize: 14),
+          prefixIcon: Icon(Icons.search_rounded, color: Colors.grey[500], size: 20),
+          prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 0),
           suffixIcon: GestureDetector(
             onTap: _openCategories,
             child: Container(
-              margin: const EdgeInsets.all(6),
+              margin: const EdgeInsets.all(5),
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: AppTheme.primaryColor,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(9),
               ),
-              child: const Icon(Icons.tune_rounded, color: Colors.white, size: 20),
+              child: const Icon(Icons.tune_rounded, color: Colors.white, size: 18),
             ),
           ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+          suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
         ),
       ),
     );

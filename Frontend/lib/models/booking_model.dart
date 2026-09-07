@@ -8,6 +8,8 @@
 
 import 'dart:convert';
 
+import '../utils/working_hours.dart';
+
 class BookingCustomerInfo {
   final String id;
   final String name;
@@ -587,6 +589,9 @@ class Technician {
   final int ratingCount;
   final bool isVerified;
   final bool isAvailable;
+  /// Technician's self-set weekly schedule (display-only). Every key in
+  /// [kWeekdayKeys] present; value null when that day is off.
+  final Map<String, DayHours?> workingHours;
   final DateTime createdAt;
 
   Technician({
@@ -599,8 +604,9 @@ class Technician {
     required this.ratingCount,
     required this.isVerified,
     required this.isAvailable,
+    Map<String, DayHours?>? workingHours,
     required this.createdAt,
-  });
+  }) : workingHours = workingHours ?? const {};
 
   factory Technician.fromJson(Map<String, dynamic> json) {
     return Technician(
@@ -613,6 +619,7 @@ class Technician {
       ratingCount: json['rating_count'] as int? ?? 0,
       isVerified: json['is_verified'] as bool? ?? false,
       isAvailable: json['is_available'] as bool? ?? true,
+      workingHours: parseWorkingHours(json['working_hours']),
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
@@ -630,6 +637,7 @@ class Technician {
       'rating_count': ratingCount,
       'is_verified': isVerified,
       'is_available': isAvailable,
+      'working_hours': workingHoursToJson(workingHours),
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -702,6 +710,9 @@ class TechnicianProfile {
   final int ratingCount;
   final bool isVerified;
   final bool isAvailable;
+  /// Technician's self-set weekly schedule (display-only). Every key in
+  /// [kWeekdayKeys] present; value null when that day is off.
+  final Map<String, DayHours?> workingHours;
   final DateTime createdAt;
 
   TechnicianProfile({
@@ -718,14 +729,15 @@ class TechnicianProfile {
     required this.ratingCount,
     required this.isVerified,
     required this.isAvailable,
+    Map<String, DayHours?>? workingHours,
     required this.createdAt,
-  });
+  }) : workingHours = workingHours ?? const {};
 
   bool get isPending => approvalStatus == 'pending';
   bool get isApproved => approvalStatus == 'approved';
   bool get isRejected => approvalStatus == 'rejected';
 
-  TechnicianProfile copyWith({bool? isAvailable}) {
+  TechnicianProfile copyWith({bool? isAvailable, Map<String, DayHours?>? workingHours}) {
     return TechnicianProfile(
       id: id,
       userId: userId,
@@ -740,6 +752,7 @@ class TechnicianProfile {
       ratingCount: ratingCount,
       isVerified: isVerified,
       isAvailable: isAvailable ?? this.isAvailable,
+      workingHours: workingHours ?? this.workingHours,
       createdAt: createdAt,
     );
   }
@@ -759,6 +772,7 @@ class TechnicianProfile {
       ratingCount: json['rating_count'] as int? ?? 0,
       isVerified: json['is_verified'] as bool? ?? false,
       isAvailable: json['is_available'] as bool? ?? true,
+      workingHours: parseWorkingHours(json['working_hours']),
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
