@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemNavigator;
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/booking_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/category_provider.dart';
@@ -47,13 +48,16 @@ class HomeScreenState extends State<HomeScreen> {
   ProfileScreen(),
 ];
 
- static const _navItems = [
-  _NavItemData(icon: Icons.home_rounded, label: 'Home'),
-  _NavItemData(icon: Icons.history_rounded, label: 'Booking'),
-  _NavItemData(icon: Icons.psychology_outlined, label: 'AI'),
-  _NavItemData(icon: Icons.chat_bubble_outline_rounded, label: 'Chat'),
-  _NavItemData(icon: Icons.person_rounded, label: 'Profile'),
-];
+ List<_NavItemData> _navItems(BuildContext context) {
+   final l10n = AppLocalizations.of(context)!;
+   return [
+     _NavItemData(icon: Icons.home_rounded, label: l10n.navHome),
+     _NavItemData(icon: Icons.history_rounded, label: l10n.navBooking),
+     _NavItemData(icon: Icons.psychology_outlined, label: l10n.navAI),
+     _NavItemData(icon: Icons.chat_bubble_outline_rounded, label: l10n.navChat),
+     _NavItemData(icon: Icons.person_rounded, label: l10n.navProfile),
+   ];
+ }
 
   @override
   void initState() {
@@ -171,8 +175,8 @@ class HomeScreenState extends State<HomeScreen> {
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: List.generate(_navItems.length, (i) {
-          final item = _navItems[i];
+        children: List.generate(_navItems(context).length, (i) {
+          final item = _navItems(context)[i];
           final selected = i == _selectedIndex;
           return InkWell(
             key: _navKeys[i],

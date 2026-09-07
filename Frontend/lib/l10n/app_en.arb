@@ -1,0 +1,63 @@
+{
+  "@@locale": "en",
+
+  "appName": "HomeFix",
+  "@appName": {"description": "App name shown on splash/login."},
+
+  "navHome": "Home",
+  "navBooking": "Booking",
+  "navAI": "AI",
+  "navChat": "Chat",
+  "navProfile": "Profile",
+
+  "commonSave": "Save",
+  "commonCancel": "Cancel",
+  "commonConfirm": "Confirm",
+  "commonYes": "Yes",
+  "commonNo": "No",
+  "commonDone": "Done",
+  "commonRetry": "Retry",
+  "commonLoading": "Loading...",
+
+  "homeGreeting": "Hi, {name}",
+  "@homeGreeting": {
+    "description": "Greeting on the home screen header.",
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "homeDetectingLocation": "Detecting location...",
+  "homeSetLocation": "Set your location",
+  "homeSearchHint": "Search service...",
+  "homeMostBooked": "Most Booked Services",
+  "homeViewAll": "View all",
+  "homeMyTechnicians": "My Technicians",
+  "homeTopPicks": "Top Picks for you",
+
+  "profileTitle": "Profile",
+  "profileSectionAccount": "Account",
+  "profileSectionAppSettings": "App Settings",
+  "profileSectionSupport": "Support",
+  "profilePersonalInfo": "Personal Information",
+  "profileSavedAddresses": "Saved Addresses",
+  "profileServiceHistory": "Service History",
+  "profileBookings": "Bookings",
+  "profilePaymentMethods": "Payment Methods",
+  "profileTransactionHistory": "Transaction History",
+  "profileNotifications": "Notifications",
+  "profileReplayTour": "Replay Guided Tour",
+  "profileHelpCenter": "Help Center",
+  "profileContactSupport": "Contact Support",
+  "profileTerms": "Terms & Conditions",
+  "profilePrivacyPolicy": "Privacy Policy",
+  "profileLanguage": "Language",
+  "profileLogout": "Logout",
+  "profileDeleteAccount": "Delete Account",
+  "profileTechnicianRole": "Technician",
+  "profileCustomerRole": "Customer",
+
+  "languageSheetTitle": "Choose your language",
+  "languageSheetSubtitle": "The app will switch to this language everywhere",
+  "languageEnglish": "English",
+  "languageHindi": "हिंदी (Hindi)",
+  "languageMarathi": "मराठी (Marathi)",
+  "languageChangedMessage": "Language updated"
+}

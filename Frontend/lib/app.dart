@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart' show FlutterRingtonePlayer;
 import 'package:provider/provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'core/http_client.dart';
 import 'core/theme.dart';
+import 'l10n/app_localizations.dart';
 import 'providers/address_provider.dart';
 import 'providers/ai_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/booking_provider.dart';
 import 'providers/category_provider.dart';
 import 'providers/consultation_provider.dart';
+import 'providers/locale_provider.dart';
 import 'providers/location_provider.dart';
 import 'providers/payment_provider.dart';
 import 'screens/auth/login_screen.dart';
@@ -65,6 +68,7 @@ class _MyAppState extends State<MyApp> {
   late PaymentService _paymentService;
   late AddressService _addressService;
   late ReviewService _reviewService;
+  late LocaleProvider _localeProvider;
 
   @override
   void initState() {
@@ -74,6 +78,7 @@ class _MyAppState extends State<MyApp> {
 
   void _initializeServices() {
     const secureStorage = FlutterSecureStorage();
+    _localeProvider = LocaleProvider()..loadSavedLocale();
     _httpClient = HttpClient(secureStorage: secureStorage);
     _authService = AuthService(httpClient: _httpClient, secureStorage: secureStorage);
     _bookingService = BookingService(httpClient: _httpClient);
@@ -134,6 +139,7 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider<LocaleProvider>.value(value: _localeProvider),
         ChangeNotifierProvider(
           create: (_) => AuthProvider(authService: _authService)
             ..onAuthenticated = () => _registerFcmToken(_httpClient),
@@ -178,13 +184,22 @@ class _MyAppState extends State<MyApp> {
         ),
         Provider<ReviewService>.value(value: _reviewService),
       ],
-      child: MaterialApp(
+      child: Consumer<LocaleProvider>(
+        builder: (context, localeProvider, _) => MaterialApp(
         navigatorKey: app.navigatorKey,
         title: 'HomeFix Live',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.light,
+        locale: localeProvider.locale,
+        supportedLocales: LocaleProvider.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         // Splash decides where to go next (checks stored tokens), then navigates
         // via these named routes — do not remove any of them or splash will crash.
         initialRoute: '/',
@@ -198,6 +213,7 @@ class _MyAppState extends State<MyApp> {
           '/technician-home': (context) => TechnicianJobsScreen(key: TechnicianJobsScreen.globalKey),
           '/consultation-requests': (context) => const IncomingConsultationScreen(),
         },
+      ),
       ),
     );
   }

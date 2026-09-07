@@ -117,6 +117,9 @@ flutter_native_splash:
 
 flutter:
   uses-material-design: true
+  generate: true  # runs `flutter gen-l10n` (config: l10n.yaml) before every build/run,
+  # turning lib/l10n/app_en.arb, app_hi.arb, app_mr.arb into the generated
+  # AppLocalizations class used throughout the app for translated strings.
 
   assets:
     - assets/images/

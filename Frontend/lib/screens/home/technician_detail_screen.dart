@@ -111,7 +111,7 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 296,
+            expandedHeight: 340,
             pinned: true,
             backgroundColor: _accent,
             iconTheme: const IconThemeData(color: Colors.white),
@@ -149,8 +149,12 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                     ),
                     SafeArea(
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        // Top-aligned (not centered) so the bottom of the teal
+                        // header stays empty — that's the zone the first card
+                        // overlaps into (see the sheet's upward transform).
+                        mainAxisAlignment: MainAxisAlignment.start,
                         children: [
+                          const SizedBox(height: 8),
                           Stack(
                             clipBehavior: Clip.none,
                             children: [
@@ -276,12 +280,17 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
               child: SlideTransition(
                 position: _slide,
                 child: Container(
-                  transform: Matrix4.translationValues(0, -36, 0),
+                  // Pull the whole sheet up so its rounded top and the first
+                  // card ride onto the empty bottom strip of the header banner
+                  // (reference design). A transform, not a margin, so it never
+                  // asserts — and the header content is top-aligned so nothing
+                  // important sits where the card lands.
+                  transform: Matrix4.translationValues(0, -56, 0),
                   decoration: const BoxDecoration(
                     color: Color(0xFFF7F8FA),
                     borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
                   ),
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -291,13 +300,19 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(18),
-                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10)],
+                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.10), blurRadius: 18, offset: const Offset(0, 8))],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('About Me', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5)),
-                            const SizedBox(height: 8),
+                            const Row(
+                              children: [
+                                Icon(Icons.person_outline_rounded, size: 18, color: AppTheme.primaryColor),
+                                SizedBox(width: 8),
+                                Text('About Me', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5)),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
                             Text(
                               'I am a professional ${t.categoryName} technician with ${t.experienceYears}+ years '
                               'of experience. Quality service and customer satisfaction is my priority.',
@@ -307,7 +322,7 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                         ),
                       ),
                       const SizedBox(height: 16),
-                      _workingHoursCard(t.workingHours),
+                      _WorkingHoursCard(hours: t.workingHours),
                       const SizedBox(height: 16),
                       Container(
                         width: double.infinity,
@@ -320,8 +335,14 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Reviews (${t.ratingCount})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5)),
-                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                const Icon(Icons.star_outline_rounded, size: 18, color: AppTheme.primaryColor),
+                                const SizedBox(width: 8),
+                                Text('Reviews (${t.ratingCount})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5)),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
                             if (_loadingReviews)
                               const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2)))
                             else if (_reviews.isEmpty)
@@ -473,75 +494,149 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
     );
   }
 
-  /// Read-only weekly schedule the technician set for themself. Today's row is
-  /// highlighted and a live "Open now / Opens ..." badge sits in the header.
-  /// Display-only — the customer can still book outside these hours.
-  Widget _workingHoursCard(Map<String, DayHours?> hours) {
+}
+
+/// Collapsible weekly-schedule card. Collapsed, it shows just today's hours and
+/// a live "Open now / Opens…" pill; tapping expands the full week with today
+/// highlighted. Display-only — the customer can still book outside these hours.
+class _WorkingHoursCard extends StatefulWidget {
+  final Map<String, DayHours?> hours;
+  const _WorkingHoursCard({required this.hours});
+
+  @override
+  State<_WorkingHoursCard> createState() => _WorkingHoursCardState();
+}
+
+class _WorkingHoursCardState extends State<_WorkingHoursCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final hours = widget.hours;
     if (!hasAnyWorkingDay(hours)) return const SizedBox.shrink();
+
     final now = DateTime.now();
     final todayKey = weekdayKeyFor(now);
+    final today = hours[todayKey];
     final open = isOpenNow(hours, now);
-    final badgeText = open ? 'Open now' : (nextOpenLabel(hours, now) ?? 'Closed');
-    final badgeColor = open ? AppTheme.successColor : Colors.grey;
+    final statusText = open ? 'Open now' : (nextOpenLabel(hours, now) ?? 'Closed');
+    final todaySummary = today == null ? 'Closed today' : 'Today · ${today.openLabel} – ${today.closeLabel}';
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10)],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text('Working hours', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5)),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: badgeColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(badgeText,
-                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: badgeColor)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ...kWeekdayKeys.map((k) {
-            final v = hours[k];
-            final isToday = k == todayKey;
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  SizedBox(
-                    width: 90,
-                    child: Text(
-                      kWeekdayLabels[k]!,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: isToday ? FontWeight.w800 : FontWeight.w500,
-                        color: isToday ? AppTheme.primaryColor : Colors.grey[800],
-                      ),
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.schedule_rounded, size: 20, color: AppTheme.primaryColor),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Working hours', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        const SizedBox(height: 2),
+                        Text(todaySummary, style: TextStyle(fontSize: 11.5, color: Colors.grey[600])),
+                      ],
                     ),
                   ),
-                  Text(
-                    v == null ? 'Closed' : '${v.openLabel} – ${v.closeLabel}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
-                      color: v == null ? Colors.grey[500] : (isToday ? AppTheme.primaryColor : Colors.grey[800]),
-                    ),
+                  const SizedBox(width: 8),
+                  _statusPill(open, statusText),
+                  const SizedBox(width: 2),
+                  AnimatedRotation(
+                    turns: _expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(Icons.keyboard_arrow_down_rounded, color: Colors.grey[500]),
                   ),
                 ],
               ),
-            );
-          }),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            alignment: Alignment.topCenter,
+            child: _expanded
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                    child: Column(
+                      children: [
+                        Divider(height: 1, color: Colors.grey[200]),
+                        const SizedBox(height: 4),
+                        ...kWeekdayKeys.map((k) => _dayRow(k, k == todayKey)),
+                      ],
+                    ),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusPill(bool open, String text) {
+    final c = open ? AppTheme.successColor : Colors.grey.shade600;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(width: 6, height: 6, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
+          const SizedBox(width: 5),
+          Text(text, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: c)),
+        ],
+      ),
+    );
+  }
+
+  Widget _dayRow(String k, bool isToday) {
+    final v = widget.hours[k];
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 1.5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        color: isToday ? AppTheme.primaryColor.withValues(alpha: 0.06) : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              kWeekdayLabels[k]!,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isToday ? FontWeight.w800 : FontWeight.w500,
+                color: isToday ? AppTheme.primaryColor : Colors.grey[800],
+              ),
+            ),
+          ),
+          Text(
+            v == null ? 'Closed' : '${v.openLabel} – ${v.closeLabel}',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+              color: v == null ? Colors.grey[500] : (isToday ? AppTheme.primaryColor : Colors.grey[800]),
+            ),
+          ),
         ],
       ),
     );

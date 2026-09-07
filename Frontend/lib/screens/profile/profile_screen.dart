@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/category_provider.dart';
+import '../../providers/locale_provider.dart';
 import '../../models/user_model.dart';
 import '../booking/bookings_screen.dart';
 import '../notifications/notifications_screen.dart';
@@ -22,6 +24,68 @@ import '../service_radius_screen.dart';
 import '../bank_details_screen.dart';
 import '../home/home_screen.dart';
 import '../../widgets/guided_tour.dart';
+
+/// Opens a bottom sheet with the three supported languages. Picking one
+/// calls LocaleProvider.setLocale, which — since MaterialApp's `locale:` in
+/// app.dart is wired to that same provider — makes literally every screen
+/// in the app (Material's own dialogs/pickers included, plus any screen
+/// using AppLocalizations.of(context)) switch language immediately, with no
+/// restart needed. Shared by both the customer and technician profile
+/// screens below.
+void _showLanguagePicker(BuildContext context) {
+  final localeProvider = context.read<LocaleProvider>();
+  final l10n = AppLocalizations.of(context)!;
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (sheetContext) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              Text(l10n.languageSheetTitle, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+              const SizedBox(height: 4),
+              Text(l10n.languageSheetSubtitle, style: TextStyle(fontSize: 12.5, color: Colors.grey[600])),
+              const SizedBox(height: 12),
+              ...[
+                (const Locale('en'), l10n.languageEnglish),
+                (const Locale('hi'), l10n.languageHindi),
+                (const Locale('mr'), l10n.languageMarathi),
+              ].map((entry) {
+                final (loc, label) = entry;
+                final selected = localeProvider.locale.languageCode == loc.languageCode;
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                    color: selected ? AppTheme.primaryColor : Colors.grey[400],
+                  ),
+                  title: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                  onTap: () async {
+                    await localeProvider.setLocale(loc);
+                    if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                  },
+                );
+              }),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
 
 class ProfileScreen extends StatefulWidget {
   /// Optional anchor the Guided Tour can spotlight when it walks onto this
@@ -232,101 +296,107 @@ class _CustomerProfileBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
       children: [
         _ProfileHeader(
           name: user.name.isNotEmpty ? user.name : 'Guest',
           subtitle: user.phone,
-          roleLabel: 'Customer',
+          roleLabel: l10n.profileCustomerRole,
           photoUrl: (user.photoUrl != null && user.photoUrl!.isNotEmpty) ? user.photoUrl : null,
           verifiedBadge: user.phoneVerified,
         ),
         const SizedBox(height: 16),
         _SectionCard(
-          title: 'Account',
+          title: l10n.profileSectionAccount,
           children: [
             _ActionTile(
               icon: Icons.person_outline_rounded,
-              label: 'Personal Information',
+              label: l10n.profilePersonalInfo,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
               ),
             ),
             _ActionTile(
               icon: Icons.location_on_outlined,
-              label: 'Saved Addresses',
+              label: l10n.profileSavedAddresses,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const SavedAddressesScreen()),
               ),
             ),
             _ActionTile(
               icon: Icons.history_rounded,
-              label: 'Service History',
+              label: l10n.profileServiceHistory,
               onTap: () => openScreen(const ServiceHistoryScreen()),
             ),
             _ActionTile(
               icon: Icons.calendar_month_outlined,
-              label: 'Bookings',
+              label: l10n.profileBookings,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const BookingsScreen()),
               ),
             ),
             _ActionTile(
               icon: Icons.payment_outlined,
-              label: 'Payment Methods',
+              label: l10n.profilePaymentMethods,
               onTap: () => openScreen(const PaymentMethodsScreen()),
             ),
             _ActionTile(
               icon: Icons.receipt_long_outlined,
-              label: 'Transaction History',
+              label: l10n.profileTransactionHistory,
               onTap: () => openScreen(const TransactionHistoryScreen()),
             ),
           ],
         ),
         const SizedBox(height: 16),
         _SectionCard(
-          title: 'App Settings',
+          title: l10n.profileSectionAppSettings,
           children: [
             _ActionTile(
               icon: Icons.notifications_outlined,
-              label: 'Notifications',
+              label: l10n.profileNotifications,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const NotificationsScreen()),
               ),
             ),
             _ActionTile(
               icon: Icons.explore_outlined,
-              label: 'Replay Guided Tour',
+              label: l10n.profileReplayTour,
               onTap: onReplayTour,
+            ),
+            _ActionTile(
+              icon: Icons.language_rounded,
+              label: l10n.profileLanguage,
+              onTap: () => _showLanguagePicker(context),
             ),
           ],
         ),
         const SizedBox(height: 16),
         _SectionCard(
-          title: 'Support',
+          title: l10n.profileSectionSupport,
           children: [
             _ActionTile(
               icon: Icons.help_outline_rounded,
-              label: 'Help Center',
+              label: l10n.profileHelpCenter,
               onTap: () => openScreen(const HelpCenterScreen()),
             ),
             
             _ActionTile(
               icon: Icons.support_agent_outlined,
-              label: 'Contact Support',
+              label: l10n.profileContactSupport,
               onTap: () => openScreen(const ContactSupportScreen()),
             ),
             _ActionTile(
               icon: Icons.description_outlined,
-              label: 'Terms & Conditions',
+              label: l10n.profileTerms,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const TermsScreen()),
               ),
             ),
             _ActionTile(
               icon: Icons.shield_outlined,
-              label: 'Privacy Policy',
+              label: l10n.profilePrivacyPolicy,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
               ),
@@ -340,14 +410,14 @@ class _CustomerProfileBody extends StatelessWidget {
           child: OutlinedButton.icon(
             onPressed: onLogout,
             icon: const Icon(Icons.logout_rounded, color: AppTheme.errorColor),
-            label: const Text('Log Out', style: TextStyle(color: AppTheme.errorColor)),
+            label: Text(l10n.profileLogout, style: const TextStyle(color: AppTheme.errorColor)),
             style: OutlinedButton.styleFrom(side: const BorderSide(color: AppTheme.errorColor)),
           ),
         ),
         const SizedBox(height: 12),
         TextButton(
           onPressed: onDelete,
-          child: const Text('Delete Account', style: TextStyle(color: Colors.grey)),
+          child: Text(l10n.profileDeleteAccount, style: const TextStyle(color: Colors.grey)),
         ),
       ],
     );
@@ -402,6 +472,7 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
     return Consumer2<TechnicianKycProvider, CategoryProvider>(
       builder: (context, kycProvider, categoryProvider, _) {
         final profile = kycProvider.profile;
+        final l10n = AppLocalizations.of(context)!;
 
         if (kycProvider.isLoading && profile == null) {
           return const Center(child: CircularProgressIndicator());
@@ -414,7 +485,7 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
               _ProfileHeader(
                 name: widget.user.name.isNotEmpty ? widget.user.name : 'Technician',
                 subtitle: widget.user.phone,
-                roleLabel: 'Technician',
+                roleLabel: l10n.profileTechnicianRole,
                 photoUrl: (widget.user.photoUrl != null && widget.user.photoUrl!.isNotEmpty) ? widget.user.photoUrl : null,
                 verifiedBadge: widget.user.phoneVerified,
               ),
@@ -618,7 +689,7 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
             ),
             const SizedBox(height: 16),
             _SectionCard(
-              title: 'App Settings',
+              title: l10n.profileSectionAppSettings,
               children: [
                 _ActionTile(
                   icon: Icons.notifications_outlined,
@@ -637,8 +708,13 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                 ),
                 _ActionTile(
                   icon: Icons.explore_outlined,
-                  label: 'Replay Guided Tour',
+                  label: l10n.profileReplayTour,
                   onTap: widget.onReplayTour,
+                ),
+                _ActionTile(
+                  icon: Icons.language_rounded,
+                  label: l10n.profileLanguage,
+                  onTap: () => _showLanguagePicker(context),
                 ),
                 _ActionTile(
                   icon: Icons.lock_outline_rounded,
@@ -649,22 +725,22 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
             ),
             const SizedBox(height: 16),
             _SectionCard(
-              title: 'Support',
+              title: l10n.profileSectionSupport,
               children: [
                 _ActionTile(
                   icon: Icons.help_outline_rounded,
-                  label: 'Help Center',
+                  label: l10n.profileHelpCenter,
                   onTap: () => widget.openScreen(const HelpCenterScreen()),
                 ),
                 _ActionTile(
                   icon: Icons.support_agent_outlined,
-                  label: 'Contact Support',
+                  label: l10n.profileContactSupport,
                   onTap: () => widget.openScreen(const ContactSupportScreen()),
                 ),
                 
                 _ActionTile(
                   icon: Icons.description_outlined,
-                  label: 'Terms & Conditions',
+                  label: l10n.profileTerms,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const TermsScreen()),
                   ),
@@ -678,14 +754,14 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
               child: OutlinedButton.icon(
                 onPressed: widget.onLogout,
                 icon: const Icon(Icons.logout_rounded, color: AppTheme.errorColor),
-                label: const Text('Log Out', style: TextStyle(color: AppTheme.errorColor)),
+                label: Text(l10n.profileLogout, style: const TextStyle(color: AppTheme.errorColor)),
                 style: OutlinedButton.styleFrom(side: const BorderSide(color: AppTheme.errorColor)),
               ),
             ),
             const SizedBox(height: 12),
             TextButton(
               onPressed: widget.onDelete,
-              child: const Text('Delete Account', style: TextStyle(color: Colors.grey)),
+              child: Text(l10n.profileDeleteAccount, style: const TextStyle(color: Colors.grey)),
             ),
           ],
         );
