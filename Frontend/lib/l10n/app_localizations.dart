@@ -393,6 +393,1044 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Language updated'**
   String get languageChangedMessage;
+
+  /// No description provided for @loginWelcomeBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome back'**
+  String get loginWelcomeBack;
+
+  /// No description provided for @loginSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to book trusted home services'**
+  String get loginSubtitle;
+
+  /// No description provided for @loginIdentifierHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Email or phone number'**
+  String get loginIdentifierHint;
+
+  /// No description provided for @loginIdentifierRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Email or phone number required'**
+  String get loginIdentifierRequired;
+
+  /// No description provided for @loginPasswordHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get loginPasswordHint;
+
+  /// No description provided for @loginPasswordRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Password is required'**
+  String get loginPasswordRequired;
+
+  /// No description provided for @loginForgotPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot password?'**
+  String get loginForgotPassword;
+
+  /// No description provided for @loginForgotPasswordComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot password flow coming soon'**
+  String get loginForgotPasswordComingSoon;
+
+  /// No description provided for @loginSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign In'**
+  String get loginSignIn;
+
+  /// No description provided for @loginOr.
+  ///
+  /// In en, this message translates to:
+  /// **'OR'**
+  String get loginOr;
+
+  /// No description provided for @loginContinueWithGoogle.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with Google'**
+  String get loginContinueWithGoogle;
+
+  /// Error shown when Google sign-in fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Google sign-in failed: {error}'**
+  String loginGoogleSignInFailed(String error);
+
+  /// No description provided for @loginTrustedBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Trusted by thousands of users'**
+  String get loginTrustedBanner;
+
+  /// No description provided for @loginTrustedSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified professionals • Secure bookings • 24/7 Support'**
+  String get loginTrustedSubtitle;
+
+  /// No description provided for @loginNoAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t have an account? '**
+  String get loginNoAccount;
+
+  /// No description provided for @loginSignUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign Up'**
+  String get loginSignUp;
+
+  /// No description provided for @signupPasswordRequiredValidator.
+  ///
+  /// In en, this message translates to:
+  /// **'Password is required'**
+  String get signupPasswordRequiredValidator;
+
+  /// No description provided for @signupPasswordTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must be at least 8 characters'**
+  String get signupPasswordTooShort;
+
+  /// No description provided for @signupPasswordNeedsLetterSpecial.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a letter and a special character (not just numbers)'**
+  String get signupPasswordNeedsLetterSpecial;
+
+  /// No description provided for @signupCreateYourAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Create your account'**
+  String get signupCreateYourAccount;
+
+  /// No description provided for @signupJoinSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Join HomeFix Live as a customer or technician'**
+  String get signupJoinSubtitle;
+
+  /// No description provided for @signupIAmA.
+  ///
+  /// In en, this message translates to:
+  /// **'I am a'**
+  String get signupIAmA;
+
+  /// No description provided for @signupRoleCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get signupRoleCustomer;
+
+  /// No description provided for @signupRoleTechnician.
+  ///
+  /// In en, this message translates to:
+  /// **'Technician'**
+  String get signupRoleTechnician;
+
+  /// No description provided for @signupNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Full name'**
+  String get signupNameHint;
+
+  /// No description provided for @signupNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Name is required'**
+  String get signupNameRequired;
+
+  /// No description provided for @signupEmailHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Email address'**
+  String get signupEmailHint;
+
+  /// No description provided for @signupEmailRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Email is required'**
+  String get signupEmailRequired;
+
+  /// No description provided for @signupEmailInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid email'**
+  String get signupEmailInvalid;
+
+  /// No description provided for @signupPhoneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone number'**
+  String get signupPhoneHint;
+
+  /// No description provided for @signupPhoneRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone number is required'**
+  String get signupPhoneRequired;
+
+  /// No description provided for @signupPhoneInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid phone number'**
+  String get signupPhoneInvalid;
+
+  /// No description provided for @signupPasswordHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get signupPasswordHint;
+
+  /// No description provided for @signupPasswordHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Min 8 chars, with a letter and a special character'**
+  String get signupPasswordHelper;
+
+  /// No description provided for @signupDataSafeBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Your data is safe with us'**
+  String get signupDataSafeBanner;
+
+  /// No description provided for @signupDataSafeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'We never share your information'**
+  String get signupDataSafeSubtitle;
+
+  /// No description provided for @signupCreateAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Account'**
+  String get signupCreateAccount;
+
+  /// No description provided for @signupHaveAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Already have an account? '**
+  String get signupHaveAccount;
+
+  /// No description provided for @signupSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign In'**
+  String get signupSignIn;
+
+  /// No description provided for @bookingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My Bookings'**
+  String get bookingsTitle;
+
+  /// No description provided for @bookingsCancelDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this booking?'**
+  String get bookingsCancelDialogTitle;
+
+  /// No description provided for @bookingsCancelDialogBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This will cancel your booking and notify the technician, if one has been assigned.'**
+  String get bookingsCancelDialogBody;
+
+  /// No description provided for @bookingsCancelReasonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason (optional)'**
+  String get bookingsCancelReasonLabel;
+
+  /// No description provided for @bookingsKeepBooking.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Booking'**
+  String get bookingsKeepBooking;
+
+  /// No description provided for @bookingsYesCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, Cancel'**
+  String get bookingsYesCancel;
+
+  /// No description provided for @bookingsCancelledMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking cancelled'**
+  String get bookingsCancelledMsg;
+
+  /// No description provided for @bookingsCouldNotCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not cancel booking'**
+  String get bookingsCouldNotCancel;
+
+  /// No description provided for @bookingsStatusFinding.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding technician'**
+  String get bookingsStatusFinding;
+
+  /// No description provided for @bookingsStatusWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for technician'**
+  String get bookingsStatusWaiting;
+
+  /// No description provided for @bookingsStatusAssigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Technician assigned'**
+  String get bookingsStatusAssigned;
+
+  /// No description provided for @bookingsStatusInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get bookingsStatusInProgress;
+
+  /// No description provided for @bookingsStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get bookingsStatusCompleted;
+
+  /// No description provided for @bookingsStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get bookingsStatusCancelled;
+
+  /// No description provided for @bookingsEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No bookings yet'**
+  String get bookingsEmptyTitle;
+
+  /// No description provided for @bookingsEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Book a service from the Home tab to see it here'**
+  String get bookingsEmptySubtitle;
+
+  /// No description provided for @bookingsServiceBookingFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Service booking'**
+  String get bookingsServiceBookingFallback;
+
+  /// Fallback date label when no scheduled date is set.
+  ///
+  /// In en, this message translates to:
+  /// **'Booked {date}'**
+  String bookingsBookedOn(String date);
+
+  /// No description provided for @bookingsTechnicianFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Technician'**
+  String get bookingsTechnicianFallback;
+
+  /// No description provided for @bookingsChatTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat'**
+  String get bookingsChatTooltip;
+
+  /// No description provided for @homePressBackExit.
+  ///
+  /// In en, this message translates to:
+  /// **'Press back again to exit'**
+  String get homePressBackExit;
+
+  /// Header greeting on home screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Hi, {name}'**
+  String homeGreetingShort(String name);
+
+  /// No description provided for @homeSetLocationShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Set your location'**
+  String get homeSetLocationShort;
+
+  /// No description provided for @homeSearchServiceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search service...'**
+  String get homeSearchServiceHint;
+
+  /// No description provided for @homeMostBookedServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Most Booked Services'**
+  String get homeMostBookedServices;
+
+  /// No description provided for @homeMyTechniciansShort.
+  ///
+  /// In en, this message translates to:
+  /// **'My Technicians'**
+  String get homeMyTechniciansShort;
+
+  /// Error loading repeat technicians.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load repeat technicians: {error}'**
+  String homeCouldNotLoadRepeatTechnicians(String error);
+
+  /// No description provided for @homeTopPicksForYou.
+  ///
+  /// In en, this message translates to:
+  /// **'Top Picks for you'**
+  String get homeTopPicksForYou;
+
+  /// No description provided for @homeViewAllShort.
+  ///
+  /// In en, this message translates to:
+  /// **'View all'**
+  String get homeViewAllShort;
+
+  /// No description provided for @homeCouldNotLoadServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load services'**
+  String get homeCouldNotLoadServices;
+
+  /// No description provided for @homeNoServicesYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No services available yet'**
+  String get homeNoServicesYet;
+
+  /// No description provided for @homeCouldNotLoadTechnicians.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load technicians'**
+  String get homeCouldNotLoadTechnicians;
+
+  /// No description provided for @homeNoVerifiedTechnicians.
+  ///
+  /// In en, this message translates to:
+  /// **'No verified technicians yet — check back soon'**
+  String get homeNoVerifiedTechnicians;
+
+  /// No description provided for @homeTechnicianFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Technician'**
+  String get homeTechnicianFallback;
+
+  /// Years of experience label.
+  ///
+  /// In en, this message translates to:
+  /// **'{years} yrs exp'**
+  String homeYearsExp(String years);
+
+  /// No description provided for @homeBannerHeading1.
+  ///
+  /// In en, this message translates to:
+  /// **'Professional\nHelp for\n'**
+  String get homeBannerHeading1;
+
+  /// No description provided for @homeBannerHeading2.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Home'**
+  String get homeBannerHeading2;
+
+  /// No description provided for @homeTrustedExperts.
+  ///
+  /// In en, this message translates to:
+  /// **'Trusted\nExperts'**
+  String get homeTrustedExperts;
+
+  /// No description provided for @homeOnTimeService.
+  ///
+  /// In en, this message translates to:
+  /// **'On-Time\nService'**
+  String get homeOnTimeService;
+
+  /// No description provided for @homeQualityGuaranteed.
+  ///
+  /// In en, this message translates to:
+  /// **'Quality\nGuaranteed'**
+  String get homeQualityGuaranteed;
+
+  /// No description provided for @guidedTourWelcomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to HomeFix!'**
+  String get guidedTourWelcomeTitle;
+
+  /// No description provided for @guidedTourWelcomeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Start your home service right here — electrician, plumber, AC repair, and much more.'**
+  String get guidedTourWelcomeDesc;
+
+  /// No description provided for @guidedTourBookingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookings'**
+  String get guidedTourBookingsTitle;
+
+  /// No description provided for @guidedTourBookingsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Track your upcoming and past bookings here.'**
+  String get guidedTourBookingsDesc;
+
+  /// No description provided for @guidedTourAiTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Assessment'**
+  String get guidedTourAiTitle;
+
+  /// No description provided for @guidedTourAiDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe your problem and get an instant AI-powered quick assessment — before the technician even arrives.'**
+  String get guidedTourAiDesc;
+
+  /// No description provided for @guidedTourConsultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Consult'**
+  String get guidedTourConsultTitle;
+
+  /// No description provided for @guidedTourConsultDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat with a technician or hop on a live video call to show them your problem instantly.'**
+  String get guidedTourConsultDesc;
+
+  /// No description provided for @guidedTourProfileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get guidedTourProfileTitle;
+
+  /// No description provided for @guidedTourProfileDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage your account, addresses, payments, and settings here.'**
+  String get guidedTourProfileDesc;
+
+  /// No description provided for @aiDiagnosisTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Diagnosis'**
+  String get aiDiagnosisTitle;
+
+  /// No description provided for @aiDiagnosisFoundTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Here\'s what we found'**
+  String get aiDiagnosisFoundTitle;
+
+  /// No description provided for @aiDiagnosisWhatIssueIs.
+  ///
+  /// In en, this message translates to:
+  /// **'What the issue is'**
+  String get aiDiagnosisWhatIssueIs;
+
+  /// No description provided for @aiDiagnosisQuickQuestions.
+  ///
+  /// In en, this message translates to:
+  /// **'A couple of quick questions'**
+  String get aiDiagnosisQuickQuestions;
+
+  /// No description provided for @aiDiagnosisFixableRemotely.
+  ///
+  /// In en, this message translates to:
+  /// **'This may be fixable remotely'**
+  String get aiDiagnosisFixableRemotely;
+
+  /// No description provided for @aiDiagnosisRecommendOnsite.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended: onsite technician visit'**
+  String get aiDiagnosisRecommendOnsite;
+
+  /// No description provided for @aiDiagnosisPossibleOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Possible Options'**
+  String get aiDiagnosisPossibleOptions;
+
+  /// No description provided for @aiDiagnosisInstantGuidanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Get Instant AI Guidance'**
+  String get aiDiagnosisInstantGuidanceTitle;
+
+  /// No description provided for @aiDiagnosisInstantGuidanceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep chatting with AI to try fixing it yourself'**
+  String get aiDiagnosisInstantGuidanceSubtitle;
+
+  /// No description provided for @aiDiagnosisBookDirectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Book Technician Directly'**
+  String get aiDiagnosisBookDirectTitle;
+
+  /// No description provided for @aiDiagnosisBookDirectSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule a visit at a time that works for you'**
+  String get aiDiagnosisBookDirectSubtitle;
+
+  /// No description provided for @aiDiagnosisFlexibilityNote.
+  ///
+  /// In en, this message translates to:
+  /// **'This gives you the flexibility to choose what works best.'**
+  String get aiDiagnosisFlexibilityNote;
+
+  /// No description provided for @aiDiagnosisSuggestedTechnicians.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested technicians'**
+  String get aiDiagnosisSuggestedTechnicians;
+
+  /// No description provided for @aiDiagnosisViewAll.
+  ///
+  /// In en, this message translates to:
+  /// **'View all'**
+  String get aiDiagnosisViewAll;
+
+  /// No description provided for @aiDiagnosisBookDirectlyBtn.
+  ///
+  /// In en, this message translates to:
+  /// **'Book Directly'**
+  String get aiDiagnosisBookDirectlyBtn;
+
+  /// No description provided for @aiDiagnosisAskFollowUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask a follow-up question...'**
+  String get aiDiagnosisAskFollowUp;
+
+  /// Error shown when AI diagnosis service is unreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'AI diagnosis is unavailable right now.\n{error}'**
+  String aiDiagnosisUnavailable(String error);
+
+  /// No description provided for @aiDiagnosisStillBookDirectly.
+  ///
+  /// In en, this message translates to:
+  /// **'You can still book a technician directly.'**
+  String get aiDiagnosisStillBookDirectly;
+
+  /// No description provided for @aiDiagnosisBookTechnicianVisit.
+  ///
+  /// In en, this message translates to:
+  /// **'Book Technician Visit'**
+  String get aiDiagnosisBookTechnicianVisit;
+
+  /// No description provided for @aiDiagnosisTechnicianFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Technician'**
+  String get aiDiagnosisTechnicianFallback;
+
+  /// Years of experience label for suggested technician cards.
+  ///
+  /// In en, this message translates to:
+  /// **'{years} yrs exp'**
+  String aiDiagnosisYearsExp(String years);
+
+  /// No description provided for @chatTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat'**
+  String get chatTitle;
+
+  /// No description provided for @chatRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get chatRetry;
+
+  /// No description provided for @chatEmptyState.
+  ///
+  /// In en, this message translates to:
+  /// **'No messages yet. Say hello!'**
+  String get chatEmptyState;
+
+  /// Composer hint text with the chat partner's name.
+  ///
+  /// In en, this message translates to:
+  /// **'Message {peerName}'**
+  String chatMessageHint(String peerName);
+
+  /// No description provided for @consultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Consult'**
+  String get consultTitle;
+
+  /// No description provided for @consultTabChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat'**
+  String get consultTabChat;
+
+  /// No description provided for @consultTabVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Video'**
+  String get consultTabVideo;
+
+  /// No description provided for @consultNoChatsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No chats yet'**
+  String get consultNoChatsTitle;
+
+  /// No description provided for @consultNoChatsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Once a technician is assigned to your booking, your conversation shows up here.'**
+  String get consultNoChatsSubtitle;
+
+  /// No description provided for @consultServiceBookingFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Service booking'**
+  String get consultServiceBookingFallback;
+
+  /// No description provided for @consultNoVideoCallsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No video calls yet'**
+  String get consultNoVideoCallsTitle;
+
+  /// No description provided for @consultNoVideoCallsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your live video consultations with technicians will show up here.'**
+  String get consultNoVideoCallsSubtitle;
+
+  /// No description provided for @consultStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get consultStatusCompleted;
+
+  /// No description provided for @consultStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get consultStatusCancelled;
+
+  /// No description provided for @consultStatusTechnicianUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Technician unavailable'**
+  String get consultStatusTechnicianUnavailable;
+
+  /// No description provided for @consultStatusDeclined.
+  ///
+  /// In en, this message translates to:
+  /// **'Declined'**
+  String get consultStatusDeclined;
+
+  /// No description provided for @consultStatusNoExpertFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No expert found'**
+  String get consultStatusNoExpertFound;
+
+  /// No description provided for @consultStatusInCall.
+  ///
+  /// In en, this message translates to:
+  /// **'In call'**
+  String get consultStatusInCall;
+
+  /// No description provided for @consultStatusConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed'**
+  String get consultStatusConfirmed;
+
+  /// No description provided for @consultStatusAwaitingConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Awaiting confirmation'**
+  String get consultStatusAwaitingConfirmation;
+
+  /// No description provided for @consultStatusUpcoming.
+  ///
+  /// In en, this message translates to:
+  /// **'Upcoming'**
+  String get consultStatusUpcoming;
+
+  /// No description provided for @consultHelperRejectedScheduled.
+  ///
+  /// In en, this message translates to:
+  /// **'The technician was busy and couldn\'t make this slot. Please request a new time.'**
+  String get consultHelperRejectedScheduled;
+
+  /// No description provided for @consultHelperRejectedInstant.
+  ///
+  /// In en, this message translates to:
+  /// **'The technician couldn\'t take your call. You can try again.'**
+  String get consultHelperRejectedInstant;
+
+  /// No description provided for @consultHelperScheduled.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the technician to confirm your requested slot.'**
+  String get consultHelperScheduled;
+
+  /// No description provided for @consultHelperConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed — the call will start automatically at your scheduled time.'**
+  String get consultHelperConfirmed;
+
+  /// No description provided for @consultHelperNoTechnician.
+  ///
+  /// In en, this message translates to:
+  /// **'No technician was available for this request. Please try again later.'**
+  String get consultHelperNoTechnician;
+
+  /// No description provided for @consultTechnicianFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Technician'**
+  String get consultTechnicianFallback;
+
+  /// No description provided for @consultVideoConsultationFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Video consultation'**
+  String get consultVideoConsultationFallback;
+
+  /// Call duration in minutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String consultMinutesShort(String minutes);
+
+  /// No description provided for @consultNewRecommendation.
+  ///
+  /// In en, this message translates to:
+  /// **'New recommendation from your technician — tap to review'**
+  String get consultNewRecommendation;
+
+  /// No description provided for @consultNewBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'NEW'**
+  String get consultNewBadge;
+
+  /// No description provided for @techDetailTechnicianFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Technician'**
+  String get techDetailTechnicianFallback;
+
+  /// Role label under technician name, e.g. 'Plumber Technician'.
+  ///
+  /// In en, this message translates to:
+  /// **'{category} Technician'**
+  String techDetailRoleSuffix(String category);
+
+  /// Rating and review count.
+  ///
+  /// In en, this message translates to:
+  /// **'{rating} ({count} reviews)'**
+  String techDetailRatingReviews(String rating, String count);
+
+  /// No description provided for @techDetailNoReviewsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No reviews yet'**
+  String get techDetailNoReviewsYet;
+
+  /// Years of experience label.
+  ///
+  /// In en, this message translates to:
+  /// **'{years} yrs Experience'**
+  String techDetailYearsExperience(String years);
+
+  /// No description provided for @techDetailAvailableNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Available Now'**
+  String get techDetailAvailableNow;
+
+  /// No description provided for @techDetailCurrentlyUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Currently unavailable'**
+  String get techDetailCurrentlyUnavailable;
+
+  /// No description provided for @techDetailReadyForBookings.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to take new bookings'**
+  String get techDetailReadyForBookings;
+
+  /// No description provided for @techDetailNotAcceptingBookings.
+  ///
+  /// In en, this message translates to:
+  /// **'Not accepting bookings'**
+  String get techDetailNotAcceptingBookings;
+
+  /// No description provided for @techDetailAboutMe.
+  ///
+  /// In en, this message translates to:
+  /// **'About Me'**
+  String get techDetailAboutMe;
+
+  /// Technician bio paragraph.
+  ///
+  /// In en, this message translates to:
+  /// **'I am a professional {category} technician with {years}+ years of experience. Quality service and customer satisfaction is my priority.'**
+  String techDetailAboutMeBody(String category, String years);
+
+  /// Reviews section title with count.
+  ///
+  /// In en, this message translates to:
+  /// **'Reviews ({count})'**
+  String techDetailReviewsCount(String count);
+
+  /// No description provided for @techDetailVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified'**
+  String get techDetailVerified;
+
+  /// No description provided for @techDetailBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Background'**
+  String get techDetailBackground;
+
+  /// No description provided for @techDetailSupport247.
+  ///
+  /// In en, this message translates to:
+  /// **'24/7'**
+  String get techDetailSupport247;
+
+  /// No description provided for @techDetailSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Support'**
+  String get techDetailSupport;
+
+  /// No description provided for @techDetailReliability100.
+  ///
+  /// In en, this message translates to:
+  /// **'100%'**
+  String get techDetailReliability100;
+
+  /// No description provided for @techDetailReliability.
+  ///
+  /// In en, this message translates to:
+  /// **'Reliability'**
+  String get techDetailReliability;
+
+  /// No description provided for @techDetailSecure.
+  ///
+  /// In en, this message translates to:
+  /// **'Secure'**
+  String get techDetailSecure;
+
+  /// No description provided for @techDetailBookings.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookings'**
+  String get techDetailBookings;
+
+  /// No description provided for @techDetailBookNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Book Now'**
+  String get techDetailBookNow;
+
+  /// No description provided for @techDetailConfirmGetService.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm & get your service'**
+  String get techDetailConfirmGetService;
+
+  /// No description provided for @techDetailVideoCall.
+  ///
+  /// In en, this message translates to:
+  /// **'Video Call'**
+  String get techDetailVideoCall;
+
+  /// No description provided for @techDetailTalkToMeNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Talk to me now'**
+  String get techDetailTalkToMeNow;
+
+  /// No description provided for @techDetailScheduleForLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule for Later'**
+  String get techDetailScheduleForLater;
+
+  /// No description provided for @techDetailPickConvenientTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a convenient time'**
+  String get techDetailPickConvenientTime;
+
+  /// No description provided for @techDetailPickTimeAtLeast10Min.
+  ///
+  /// In en, this message translates to:
+  /// **'Please pick a time at least 10 minutes from now'**
+  String get techDetailPickTimeAtLeast10Min;
+
+  /// No description provided for @techDetailWorkingHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Working hours'**
+  String get techDetailWorkingHours;
+
+  /// No description provided for @techDetailOpenNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Open now'**
+  String get techDetailOpenNow;
+
+  /// No description provided for @techDetailClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed'**
+  String get techDetailClosed;
+
+  /// No description provided for @techDetailClosedToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed today'**
+  String get techDetailClosedToday;
+
+  /// Today's working hours summary.
+  ///
+  /// In en, this message translates to:
+  /// **'Today · {open} – {close}'**
+  String techDetailTodaySummary(String open, String close);
 }
 
 class _AppLocalizationsDelegate
