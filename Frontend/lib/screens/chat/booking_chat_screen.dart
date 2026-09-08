@@ -5,6 +5,7 @@ import '../../core/theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/booking_service.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Booking-scoped chat between the customer and the technician assigned to
 /// that booking. Backed by GET/POST /bookings/:id/messages
@@ -121,6 +122,7 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
   }
 
   Widget _body(String? myId) {
+    final l10n = AppLocalizations.of(context)!;
     if (_isLoading && _messages.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -131,7 +133,7 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
           children: [
             Text(_error!, style: TextStyle(color: Colors.grey[600])),
             const SizedBox(height: 8),
-            TextButton(onPressed: _load, child: const Text('Retry')),
+            TextButton(onPressed: _load, child: Text(l10n.chatRetry)),
           ],
         ),
       );
@@ -139,7 +141,7 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
     if (_messages.isEmpty) {
       return Center(
         child: Text(
-          'No messages yet. Say hello!',
+          l10n.chatEmptyState,
           style: TextStyle(color: Colors.grey[500]),
         ),
       );
@@ -191,6 +193,7 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
   }
 
   Widget _composer() {
+    final l10n = AppLocalizations.of(context)!;
     return SafeArea(
       child: Container(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
@@ -207,7 +210,7 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
                 maxLines: 4,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
-                  hintText: 'Message ${widget.peerName}',
+                  hintText: l10n.chatMessageHint(widget.peerName),
                   filled: true,
                   fillColor: Colors.grey[100],
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),

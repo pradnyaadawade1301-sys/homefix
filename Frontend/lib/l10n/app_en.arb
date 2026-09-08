@@ -300,5 +300,6 @@
   "@techDetailTodaySummary": {
     "description": "Today's working hours summary.",
     "placeholders": {"open": {"type": "String"}, "close": {"type": "String"}}
+
   }
 }

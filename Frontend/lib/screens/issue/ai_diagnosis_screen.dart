@@ -6,6 +6,7 @@ import '../../models/booking_model.dart';
 import '../../providers/ai_provider.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/category_provider.dart';
+import '../../l10n/app_localizations.dart';
 import '../home/technician_list_screen.dart';
 import '../home/technician_detail_screen.dart';
 
@@ -148,7 +149,8 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
     }
   }
 
-  Widget _buildDiagnosisCard(Map<String, dynamic> data) {
+  Widget _buildDiagnosisCard(BuildContext context, Map<String, dynamic> data) {
+    final l10n = AppLocalizations.of(context)!;
     final fault = data['possible_fault']?.toString();
     final causes = (data['causes'] as List?)?.map((e) => e.toString()).toList() ?? [];
     final followUps = (data['follow_up_questions'] as List?)?.map((e) => e.toString()).toList() ?? [];
@@ -166,14 +168,14 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (fault != null) ...[
-            const Row(
+            Row(
               children: [
-                Icon(Icons.build_circle_outlined, size: 18, color: AppTheme.primaryColor),
-                SizedBox(width: 6),
+                const Icon(Icons.build_circle_outlined, size: 18, color: AppTheme.primaryColor),
+                const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'Here\'s what we found',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                    l10n.aiDiagnosisFoundTitle,
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                   ),
                 ),
               ],
@@ -181,7 +183,7 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
             const SizedBox(height: 10),
           ],
           if (causes.isNotEmpty) ...[
-            const Text('What the issue is', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5, color: Colors.black54)),
+            Text(l10n.aiDiagnosisWhatIssueIs, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5, color: Colors.black54)),
             const SizedBox(height: 4),
             ...causes.map((c) => Padding(
                   padding: const EdgeInsets.only(bottom: 3),
@@ -196,7 +198,7 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
             const SizedBox(height: 10),
           ],
           if (followUps.isNotEmpty) ...[
-            const Text('A couple of quick questions', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5, color: Colors.black54)),
+            Text(l10n.aiDiagnosisQuickQuestions, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5, color: Colors.black54)),
             const SizedBox(height: 4),
             ...followUps.map((q) => Padding(
                   padding: const EdgeInsets.only(bottom: 3),
@@ -213,8 +215,8 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
               ),
               child: Text(
                 canSolveRemotely == true
-                    ? 'This may be fixable remotely'
-                    : 'Recommended: onsite technician visit',
+                    ? l10n.aiDiagnosisFixableRemotely
+                    : l10n.aiDiagnosisRecommendOnsite,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -230,7 +232,8 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
   /// "Possible Options" card shown right after the AI's first response:
   /// three clear next steps, colour-coded (green/orange/blue) to match the
   /// product spec.
-  Widget _buildOptionsCard() {
+  Widget _buildOptionsCard(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
       child: Container(
@@ -244,13 +247,13 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Possible Options', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+            Text(l10n.aiDiagnosisPossibleOptions, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
             const SizedBox(height: 10),
             _OptionRow(
               color: const Color(0xFF4CAF50),
               icon: Icons.bolt_rounded,
-              title: 'Get Instant AI Guidance',
-              subtitle: 'Keep chatting with AI to try fixing it yourself',
+              title: l10n.aiDiagnosisInstantGuidanceTitle,
+              subtitle: l10n.aiDiagnosisInstantGuidanceSubtitle,
               onTap: _continueWithAI,
             ),
             const SizedBox(height: 10),
@@ -258,13 +261,13 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
             _OptionRow(
               color: const Color(0xFF2196F3),
               icon: Icons.build_rounded,
-              title: 'Book Technician Directly',
-              subtitle: 'Schedule a visit at a time that works for you',
+              title: l10n.aiDiagnosisBookDirectTitle,
+              subtitle: l10n.aiDiagnosisBookDirectSubtitle,
               onTap: _bookTechnician,
             ),
             const SizedBox(height: 8),
             Text(
-              'This gives you the flexibility to choose what works best.',
+              l10n.aiDiagnosisFlexibilityNote,
               style: TextStyle(fontSize: 11.5, color: Colors.grey[500]),
             ),
           ],
@@ -276,6 +279,7 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
   Widget _buildTechnicianSuggestions() {
     return Consumer<TechnicianProvider>(
       builder: (context, provider, _) {
+        final l10n = AppLocalizations.of(context)!;
         if (provider.isLoading && provider.technicians.isEmpty) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
@@ -298,10 +302,10 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Suggested technicians', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  Text(l10n.aiDiagnosisSuggestedTechnicians, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                   TextButton(
                     onPressed: _bookTechnician,
-                    child: const Text('View all', style: TextStyle(fontSize: 12.5)),
+                    child: Text(l10n.aiDiagnosisViewAll, style: const TextStyle(fontSize: 12.5)),
                   ),
                 ],
               ),
@@ -319,8 +323,9 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('AI Diagnosis')),
+      appBar: AppBar(title: Text(l10n.aiDiagnosisTitle)),
       body: SafeArea(
         child: Consumer<AIProvider>(
           builder: (context, ai, _) {
@@ -337,17 +342,17 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
                       const Icon(Icons.error_outline, color: AppTheme.errorColor, size: 40),
                       const SizedBox(height: 12),
                       Text(
-                        'AI diagnosis is unavailable right now.\n${ai.error}',
+                        l10n.aiDiagnosisUnavailable('${ai.error}'),
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.grey[600], fontSize: 13),
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'You can still book a technician directly.',
+                        l10n.aiDiagnosisStillBookDirectly,
                         style: TextStyle(color: Colors.grey[600], fontSize: 13),
                       ),
                       const SizedBox(height: 16),
-                      ElevatedButton(onPressed: _bookTechnician, child: const Text('Book Technician Visit')),
+                      ElevatedButton(onPressed: _bookTechnician, child: Text(l10n.aiDiagnosisBookTechnicianVisit)),
                     ],
                   ),
                 ),
@@ -394,7 +399,7 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
                                 )
                               : null,
                           child: diagnosis != null
-                              ? _buildDiagnosisCard(diagnosis)
+                              ? _buildDiagnosisCard(context, diagnosis)
                               : Text(
                                   m.content,
                                   style: TextStyle(color: m.isUser ? Colors.white : Colors.black87, fontSize: 13.5),
@@ -407,7 +412,7 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
                 // Step 1 of the spec: once the AI has replied at least once,
                 // let the customer choose how to proceed.
                 if (ai.messages.any((m) => !m.isUser) && _choice == null)
-                  _buildOptionsCard(),
+                  _buildOptionsCard(context),
                 // After "Get Instant AI Guidance" is picked, keep helping —
                 // surface suggested technicians inline too, in case the
                 // customer changes their mind mid-chat.
@@ -423,7 +428,7 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
                       child: OutlinedButton.icon(
                         onPressed: _bookTechnician,
                         icon: const Icon(Icons.build_rounded, size: 18),
-                        label: const Text('Book Directly', style: TextStyle(fontSize: 13)),
+                        label: Text(l10n.aiDiagnosisBookDirectlyBtn, style: const TextStyle(fontSize: 13)),
                         style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
                       ),
                     ),
@@ -441,7 +446,7 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
                             textInputAction: TextInputAction.send,
                             onSubmitted: (_) => _send(),
                             decoration: InputDecoration(
-                              hintText: 'Ask a follow-up question...',
+                              hintText: l10n.aiDiagnosisAskFollowUp,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                               fillColor: Colors.grey[100],
                               filled: true,
@@ -524,6 +529,7 @@ class _SuggestedTechCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: () {
@@ -554,7 +560,7 @@ class _SuggestedTechCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(technician.name.isNotEmpty ? technician.name : 'Technician',
+                  Text(technician.name.isNotEmpty ? technician.name : l10n.aiDiagnosisTechnicianFallback,
                       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
                   const SizedBox(height: 2),
                   Row(
@@ -564,7 +570,7 @@ class _SuggestedTechCard extends StatelessWidget {
                       Text('${technician.ratingAvg.toStringAsFixed(1)} (${technician.ratingCount})',
                           style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
                       const SizedBox(width: 8),
-                      Text('${technician.experienceYears} yrs exp',
+                      Text(l10n.aiDiagnosisYearsExp('${technician.experienceYears}'),
                           style: TextStyle(fontSize: 11.5, color: Colors.grey[500])),
                     ],
                   ),

@@ -78,6 +78,7 @@ class HomeScreenState extends State<HomeScreen> {
   /// Pass force: true (e.g. from a "Replay Tour" button in Settings) to show
   /// it again on demand.
   Future<void> _startGuidedTourIfNeeded({bool force = false}) async {
+    final l10n = AppLocalizations.of(context)!;
     await GuidedTour.maybeShow(
       context,
       force: force,
@@ -85,32 +86,32 @@ class HomeScreenState extends State<HomeScreen> {
         GuidedTourStep(
           targetKey: _homeNavKey,
           icon: Icons.home_rounded,
-          title: 'Welcome to HomeFix!',
-          description: 'Start your home service right here — electrician, plumber, AC repair, and much more.',
+          title: l10n.guidedTourWelcomeTitle,
+          description: l10n.guidedTourWelcomeDesc,
         ),
         GuidedTourStep(
           targetKey: _historyNavKey,
           icon: Icons.history_rounded,
-          title: 'Bookings',
-          description: 'Track your upcoming and past bookings here.',
+          title: l10n.guidedTourBookingsTitle,
+          description: l10n.guidedTourBookingsDesc,
         ),
         GuidedTourStep(
           targetKey: _aiAssessmentNavKey,
           icon: Icons.psychology_outlined,
-          title: 'AI Assessment',
-          description: 'Describe your problem and get an instant AI-powered quick assessment — before the technician even arrives.',
+          title: l10n.guidedTourAiTitle,
+          description: l10n.guidedTourAiDesc,
         ),
         GuidedTourStep(
           targetKey: _consultNavKey,
           icon: Icons.chat_bubble_outline_rounded,
-          title: 'Consult',
-          description: 'Chat with a technician or hop on a live video call to show them your problem instantly.',
+          title: l10n.guidedTourConsultTitle,
+          description: l10n.guidedTourConsultDesc,
         ),
         GuidedTourStep(
           targetKey: _profileNavKey,
           icon: Icons.person_rounded,
-          title: 'Profile',
-          description: 'Manage your account, addresses, payments, and settings here.',
+          title: l10n.guidedTourProfileTitle,
+          description: l10n.guidedTourProfileDesc,
         ),
       ],
     );
@@ -139,7 +140,7 @@ class HomeScreenState extends State<HomeScreen> {
     if (_lastBackPress == null || now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
       _lastBackPress = now;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Press back again to exit'), duration: Duration(seconds: 2)),
+        SnackBar(content: Text(AppLocalizations.of(context)!.homePressBackExit), duration: const Duration(seconds: 2)),
       );
       return;
     }
@@ -326,6 +327,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: () async => _loadData(),
@@ -339,12 +341,12 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
             const SizedBox(height: 20),
             KeyedSubtree(key: widget.promoKey, child: _buildPromoBanner(context)),
             const SizedBox(height: 24),
-            _sectionTitle('Most Booked Services', onViewAll: _openCategories),
+            _sectionTitle(l10n.homeMostBookedServices, onViewAll: _openCategories),
             const SizedBox(height: 14),
             KeyedSubtree(key: widget.categoriesKey, child: _buildCategoriesRow()),
             const SizedBox(height: 24),
             _buildRepeatTechniciansSection(),
-            _sectionTitle('Top Picks for you', onViewAll: () => _openTechnicianList()),
+            _sectionTitle(l10n.homeTopPicksForYou, onViewAll: () => _openTechnicianList()),
             const SizedBox(height: 14),
             _buildTechnicianList(),
           ],
@@ -360,6 +362,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
   Widget _buildRepeatTechniciansSection() {
     return Consumer<BookingProvider>(
       builder: (context, provider, _) {
+        final l10n = AppLocalizations.of(context)!;
         final hasData = provider.repeatTechnicians.isNotEmpty;
         final hasError = provider.error != null && provider.repeatTechnicians.isEmpty;
         if (!provider.isLoadingRepeatTechnicians && !hasData && !hasError) {
@@ -369,13 +372,13 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _sectionTitle('My Technicians', onViewAll: _openRepeatTechnicians),
+            _sectionTitle(l10n.homeMyTechniciansShort, onViewAll: _openRepeatTechnicians),
             const SizedBox(height: 14),
             if (hasError)
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Text(
-                  'Could not load repeat technicians: ${provider.error}',
+                  l10n.homeCouldNotLoadRepeatTechnicians('${provider.error}'),
                   style: const TextStyle(color: Colors.redAccent, fontSize: 12),
                 ),
               ),
@@ -442,6 +445,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
   Widget _buildHeader(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, _) {
+        final l10n = AppLocalizations.of(context)!;
         final name = authProvider.currentUser?.name;
         final photoUrl = authProvider.currentUser?.photoUrl;
         final displayName = (name != null && name.trim().isNotEmpty) ? name.split(' ').first : 'there';
@@ -473,21 +477,21 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Hi, $displayName', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                  Text(l10n.homeGreetingShort(displayName), style: TextStyle(color: Colors.grey[600], fontSize: 13)),
                   const SizedBox(height: 2),
                   Consumer<LocationProvider>(
                     builder: (context, locProvider, _) {
                       if (locProvider.isResolving && !locProvider.hasAttempted) {
-                        return const Row(
+                        return Row(
                           children: [
-                            SizedBox(
+                            const SizedBox(
                               width: 14, height: 14,
                               child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryColor),
                             ),
-                            SizedBox(width: 6),
+                            const SizedBox(width: 6),
                             Text(
-                              'Detecting location...',
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                              l10n.homeDetectingLocation,
+                              style: const TextStyle(fontSize: 12, color: Colors.grey),
                             ),
                           ],
                         );
@@ -523,13 +527,13 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                       }
                       return GestureDetector(
                         onTap: () => locProvider.resolveLocation(),
-                        child: const Row(
+                        child: Row(
                           children: [
-                            Icon(Icons.location_on, size: 16, color: AppTheme.primaryColor),
-                            SizedBox(width: 2),
+                            const Icon(Icons.location_on, size: 16, color: AppTheme.primaryColor),
+                            const SizedBox(width: 2),
                             Text(
-                              'Set your location',
-                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Color(0xFF1A1F36)),
+                              l10n.homeSetLocationShort,
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Color(0xFF1A1F36)),
                             ),
                           ],
                         ),
@@ -557,6 +561,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
   }
 
   Widget _buildSearchBar() {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -576,7 +581,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
         decoration: InputDecoration(
           isDense: true,
           contentPadding: const EdgeInsets.symmetric(vertical: 10),
-          hintText: 'Search service...',
+          hintText: l10n.homeSearchServiceHint,
           hintStyle: TextStyle(color: Colors.grey[500], fontSize: 14),
           prefixIcon: Icon(Icons.search_rounded, color: Colors.grey[500], size: 20),
           prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 0),
@@ -632,6 +637,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
   }
 
   Widget _buildPromoBanner(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return ClipRRect(
       borderRadius: BorderRadius.circular(28),
       child: Container(
@@ -681,12 +687,12 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Heading — last line in white, rest in dark ink.
-                  const Text.rich(
+                  Text.rich(
                     TextSpan(
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, height: 1.15, color: Color(0xFF241C15)),
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, height: 1.15, color: Color(0xFF241C15)),
                       children: [
-                        TextSpan(text: 'Professional\nHelp for\n'),
-                        TextSpan(text: 'Your Home', style: TextStyle(color: Colors.white)),
+                        TextSpan(text: l10n.homeBannerHeading1),
+                        TextSpan(text: l10n.homeBannerHeading2, style: const TextStyle(color: Colors.white)),
                       ],
                     ),
                   ),
@@ -696,9 +702,9 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                   // column the way a cramped horizontal Row did before.
                   Row(
                     children: [
-                      _trustBadge(Icons.verified_user_rounded, 'Trusted\nExperts'),
-                      _trustBadge(Icons.access_time_filled_rounded, 'On-Time\nService'),
-                      _trustBadge(Icons.home_rounded, 'Quality\nGuaranteed'),
+                      _trustBadge(Icons.verified_user_rounded, l10n.homeTrustedExperts),
+                      _trustBadge(Icons.access_time_filled_rounded, l10n.homeOnTimeService),
+                      _trustBadge(Icons.home_rounded, l10n.homeQualityGuaranteed),
                     ],
                   ),
                 ],
@@ -776,13 +782,14 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
   }
 
   Widget _sectionTitle(String title, {required VoidCallback onViewAll}) {
+    final l10n = AppLocalizations.of(context)!;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1A1F36))),
         GestureDetector(
           onTap: onViewAll,
-          child: const Text('View all', style: TextStyle(color: AppTheme.primaryColor, fontSize: 13, fontWeight: FontWeight.w600)),
+          child: Text(l10n.homeViewAllShort, style: const TextStyle(color: AppTheme.primaryColor, fontSize: 13, fontWeight: FontWeight.w600)),
         ),
       ],
     );
@@ -818,6 +825,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
   Widget _buildCategoriesRow() {
     return Consumer<CategoryProvider>(
       builder: (context, provider, _) {
+        final l10n = AppLocalizations.of(context)!;
         if (provider.isLoading && provider.categories.isEmpty) {
           return const SizedBox(
             height: 220,
@@ -830,7 +838,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
             height: 84,
             child: Center(
               child: Text(
-                provider.error != null ? 'Could not load services' : 'No services available yet',
+                provider.error != null ? l10n.homeCouldNotLoadServices : l10n.homeNoServicesYet,
                 style: TextStyle(color: Colors.grey[500], fontSize: 13),
               ),
             ),
@@ -902,6 +910,7 @@ itemBuilder: (context, i) {
   Widget _buildTechnicianList() {
     return Consumer<TechnicianProvider>(
       builder: (context, provider, _) {
+        final l10n = AppLocalizations.of(context)!;
         if (provider.isLoading && provider.technicians.isEmpty) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
@@ -915,8 +924,8 @@ itemBuilder: (context, i) {
             alignment: Alignment.center,
             child: Text(
               provider.error != null
-                  ? 'Could not load technicians'
-                  : 'No verified technicians yet — check back soon',
+                  ? l10n.homeCouldNotLoadTechnicians
+                  : l10n.homeNoVerifiedTechnicians,
               style: TextStyle(color: Colors.grey[500], fontSize: 13),
               textAlign: TextAlign.center,
             ),
@@ -936,6 +945,7 @@ class _TechnicianCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: () {
@@ -970,7 +980,7 @@ class _TechnicianCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(technician.name.isNotEmpty ? technician.name : 'Technician',
+                  Text(technician.name.isNotEmpty ? technician.name : l10n.homeTechnicianFallback,
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14.5)),
                   const SizedBox(height: 3),
                   Text(technician.categoryName,
@@ -985,7 +995,7 @@ class _TechnicianCard extends StatelessWidget {
                         style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(width: 10),
-                      Text('${technician.experienceYears} yrs exp',
+                      Text(l10n.homeYearsExp('${technician.experienceYears}'),
                           style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.7))),
                     ],
                   ),

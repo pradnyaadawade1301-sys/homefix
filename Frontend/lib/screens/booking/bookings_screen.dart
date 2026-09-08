@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../providers/booking_provider.dart';
 import '../../models/booking_model.dart';
+import '../../l10n/app_localizations.dart';
 import 'booking_tracking_screen.dart';
 import '../chat/booking_chat_screen.dart';
 
@@ -34,37 +35,38 @@ class _BookingsScreenState extends State<BookingsScreen> {
   }
 
   Future<void> _cancelFromList(BuildContext context, String bookingId) async {
+    final l10n = AppLocalizations.of(context)!;
     final controller = TextEditingController();
     final reason = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Cancel this booking?'),
+        title: Text(l10n.bookingsCancelDialogTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'This will cancel your booking and notify the technician, if one has been assigned.',
-              style: TextStyle(fontSize: 13),
+            Text(
+              l10n.bookingsCancelDialogBody,
+              style: const TextStyle(fontSize: 13),
             ),
             const SizedBox(height: 14),
             TextField(
               controller: controller,
               autofocus: true,
               maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Reason (optional)',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.bookingsCancelReasonLabel,
+                border: const OutlineInputBorder(),
               ),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Keep Booking')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(l10n.bookingsKeepBooking)),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
             onPressed: () => Navigator.of(dialogContext).pop(controller.text.trim()),
-            child: const Text('Yes, Cancel'),
+            child: Text(l10n.bookingsYesCancel),
           ),
         ],
       ),
@@ -74,7 +76,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
     final ok = await provider.cancelBooking(bookingId, reason);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(ok ? 'Booking cancelled' : (provider.error ?? 'Could not cancel booking'))),
+      SnackBar(content: Text(ok ? l10n.bookingsCancelledMsg : (provider.error ?? l10n.bookingsCouldNotCancel))),
     );
   }
 
@@ -92,20 +94,20 @@ class _BookingsScreenState extends State<BookingsScreen> {
     }
   }
 
-  String _statusLabel(String status) {
+  String _statusLabel(String status, AppLocalizations l10n) {
     switch (status) {
       case 'requested':
-        return 'Finding technician';
+        return l10n.bookingsStatusFinding;
       case 'pending_technician':
-        return 'Waiting for technician';
+        return l10n.bookingsStatusWaiting;
       case 'accepted':
-        return 'Technician assigned';
+        return l10n.bookingsStatusAssigned;
       case 'in_progress':
-        return 'In progress';
+        return l10n.bookingsStatusInProgress;
       case 'completed':
-        return 'Completed';
+        return l10n.bookingsStatusCompleted;
       case 'cancelled':
-        return 'Cancelled';
+        return l10n.bookingsStatusCancelled;
       default:
         return status;
     }
@@ -113,8 +115,9 @@ class _BookingsScreenState extends State<BookingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: Text('My Bookings', key: widget.tourKey)),
+      appBar: AppBar(title: Text(l10n.bookingsTitle, key: widget.tourKey)),
       body: RefreshIndicator(
         onRefresh: () => context.read<BookingProvider>().fetchUserBookings(),
         child: Consumer<BookingProvider>(
@@ -130,14 +133,14 @@ class _BookingsScreenState extends State<BookingsScreen> {
                   const SizedBox(height: 16),
                   Center(
                     child: Text(
-                      'No bookings yet',
+                      l10n.bookingsEmptyTitle,
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey[600]),
                     ),
                   ),
                   const SizedBox(height: 6),
                   Center(
                     child: Text(
-                      'Book a service from the Home tab to see it here',
+                      l10n.bookingsEmptySubtitle,
                       style: TextStyle(fontSize: 13, color: Colors.grey[500]),
                     ),
                   ),
@@ -172,7 +175,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              b.categoryName.isNotEmpty ? b.categoryName : 'Service booking',
+                              b.categoryName.isNotEmpty ? b.categoryName : l10n.bookingsServiceBookingFallback,
                               style: const TextStyle(fontWeight: FontWeight.w700),
                             ),
                           ),
@@ -183,7 +186,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              _statusLabel(b.status),
+                              _statusLabel(b.status, l10n),
                               style: TextStyle(fontSize: 11, color: _statusColor(b.status), fontWeight: FontWeight.w600),
                             ),
                           ),
@@ -213,7 +216,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
                       Text(
                         b.scheduledAt != null
                             ? '${b.scheduledAt!.day}/${b.scheduledAt!.month}/${b.scheduledAt!.year}'
-                            : 'Booked ${b.createdAt.day}/${b.createdAt.month}/${b.createdAt.year}',
+                            : l10n.bookingsBookedOn('${b.createdAt.day}/${b.createdAt.month}/${b.createdAt.year}'),
                         style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
                       ),
                     if (b.technician != null) ...[
@@ -241,6 +244,7 @@ class _TechnicianTile extends StatelessWidget {
   const _TechnicianTile({required this.technician, required this.bookingId});
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -264,7 +268,7 @@ class _TechnicianTile extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(technician.name.isNotEmpty ? technician.name : 'Technician',
+                    Text(technician.name.isNotEmpty ? technician.name : l10n.bookingsTechnicianFallback,
                         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                     if (technician.isVerified) ...[
                       const SizedBox(width: 4),
@@ -282,12 +286,12 @@ class _TechnicianTile extends StatelessWidget {
 
           IconButton(
   icon: const Icon(Icons.forum_outlined, color: AppTheme.primaryColor, size: 20),
-  tooltip: 'Chat',
+  tooltip: l10n.bookingsChatTooltip,
   onPressed: () {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => BookingChatScreen(
         bookingId: bookingId,
-        peerName: technician.name.isNotEmpty ? technician.name : 'Technician',
+        peerName: technician.name.isNotEmpty ? technician.name : l10n.bookingsTechnicianFallback,
       ),
     ));
   },

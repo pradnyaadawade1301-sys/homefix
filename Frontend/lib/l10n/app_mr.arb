@@ -236,4 +236,5 @@
   "techDetailClosed": "बंद",
   "techDetailClosedToday": "आज बंद",
   "techDetailTodaySummary": "आज · {open} – {close}"
+
 }
