@@ -1,0 +1,76 @@
+{
+  "project_info": {
+    "project_number": "299649646704",
+    "project_id": "homefix-live",
+    "storage_bucket": "homefix-live.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:299649646704:android:a3d43695262f40edb6b4b5",
+        "android_client_info": {
+          "package_name": "com.homefixlive.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "299649646704-rqarj9s3f0661jbodn77ef1o5q70780c.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBCOMKYqH0f44oMieGbRljGewoZbXWLO_Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "299649646704-rqarj9s3f0661jbodn77ef1o5q70780c.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:299649646704:android:c55aa0e209775eb3b6b4b5",
+        "android_client_info": {
+          "package_name": "com.homefixlive.homefix_live"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "299649646704-ur7k8fkevkkmgh6ovuf21t2bntqtnf08.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.homefixlive.homefix_live",
+            "certificate_hash": "31df252ece1c45ce4c4c874949feae1d94500b1b"
+          }
+        },
+        {
+          "client_id": "299649646704-rqarj9s3f0661jbodn77ef1o5q70780c.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBCOMKYqH0f44oMieGbRljGewoZbXWLO_Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "299649646704-rqarj9s3f0661jbodn77ef1o5q70780c.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -5,7 +5,6 @@ import '../../models/booking_model.dart';
 import '../../services/service_locator.dart';
 import '../../utils/working_hours.dart';
 import '../../widgets/video_call_precheck_sheet.dart';
-import '../../l10n/app_localizations.dart';
 import '../booking/book_technician_screen.dart';
 import '../consultation/searching_technician_screen.dart';
 
@@ -64,7 +63,7 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
 
   if (scheduledAt.isBefore(now.add(const Duration(minutes: 10)))) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppLocalizations.of(context)!.techDetailPickTimeAtLeast10Min)),
+      const SnackBar(content: Text('Please pick a time at least 10 minutes from now')),
     );
     return;
   }
@@ -106,7 +105,6 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     final t = widget.technician;
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
@@ -198,7 +196,7 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                             children: [
                               Flexible(
                                 child: Text(
-                                  t.name.isNotEmpty ? t.name : l10n.techDetailTechnicianFallback,
+                                  t.name.isNotEmpty ? t.name : 'Technician',
                                   style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Colors.white),
                                   textAlign: TextAlign.center,
                                 ),
@@ -210,7 +208,7 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                             ],
                           ),
                           const SizedBox(height: 2),
-                          Text(l10n.techDetailRoleSuffix(t.categoryName), style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.85))),
+                          Text('${t.categoryName} Technician', style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.85))),
                           const SizedBox(height: 10),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -218,7 +216,7 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                               const Icon(Icons.star_rounded, color: Color(0xFFF5A623), size: 16),
                               const SizedBox(width: 4),
                               Text(
-                                t.ratingCount > 0 ? l10n.techDetailRatingReviews(t.ratingAvg.toStringAsFixed(1), '${t.ratingCount}') : l10n.techDetailNoReviewsYet,
+                                t.ratingCount > 0 ? '${t.ratingAvg.toStringAsFixed(1)} (${t.ratingCount} reviews)' : 'No reviews yet',
                                 style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w600),
                               ),
                               Padding(
@@ -228,7 +226,7 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                               Icon(Icons.work_history_outlined, color: Colors.white.withValues(alpha: 0.9), size: 15),
                               const SizedBox(width: 4),
                               Text(
-                                l10n.techDetailYearsExperience('${t.experienceYears}'),
+                                '${t.experienceYears} yrs Experience',
                                 style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w600),
                               ),
                             ],
@@ -255,12 +253,12 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    t.isAvailable ? l10n.techDetailAvailableNow : l10n.techDetailCurrentlyUnavailable,
+                                    t.isAvailable ? 'Available Now' : 'Currently unavailable',
                                     style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: Colors.white),
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    t.isAvailable ? l10n.techDetailReadyForBookings : l10n.techDetailNotAcceptingBookings,
+                                    t.isAvailable ? 'Ready to take new bookings' : 'Not accepting bookings',
                                     style: TextStyle(fontSize: 10.5, color: Colors.white.withValues(alpha: 0.75)),
                                   ),
                                 ],
@@ -305,16 +303,17 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            const Row(
                               children: [
-                                const Icon(Icons.person_outline_rounded, size: 18, color: AppTheme.primaryColor),
-                                const SizedBox(width: 8),
-                                Text(l10n.techDetailAboutMe, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5)),
+                                Icon(Icons.person_outline_rounded, size: 18, color: AppTheme.primaryColor),
+                                SizedBox(width: 8),
+                                Text('About Me', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5)),
                               ],
                             ),
                             const SizedBox(height: 10),
                             Text(
-                              l10n.techDetailAboutMeBody(t.categoryName, '${t.experienceYears}'),
+                              'I am a professional ${t.categoryName} technician with ${t.experienceYears}+ years '
+                              'of experience. Quality service and customer satisfaction is my priority.',
                               style: TextStyle(fontSize: 13, color: Colors.grey[700], height: 1.45),
                             ),
                           ],
@@ -338,14 +337,14 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                               children: [
                                 const Icon(Icons.star_outline_rounded, size: 18, color: AppTheme.primaryColor),
                                 const SizedBox(width: 8),
-                                Text(l10n.techDetailReviewsCount('${t.ratingCount}'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5)),
+                                Text('Reviews (${t.ratingCount})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5)),
                               ],
                             ),
                             const SizedBox(height: 14),
                             if (_loadingReviews)
                               const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2)))
                             else if (_reviews.isEmpty)
-                              Text(l10n.techDetailNoReviewsYet, style: TextStyle(fontSize: 13, color: Colors.grey[500]))
+                              Text('No reviews yet', style: TextStyle(fontSize: 13, color: Colors.grey[500]))
                             else
                               ..._reviews.take(5).map((r) => Padding(
                                     padding: const EdgeInsets.only(bottom: 12),
@@ -381,13 +380,13 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                           borderRadius: BorderRadius.circular(18),
                           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10)],
                         ),
-                        child: Row(
+                        child: const Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            _TrustBadge(icon: Icons.verified_user_outlined, title: l10n.techDetailVerified, subtitle: l10n.techDetailBackground),
-                            _TrustBadge(icon: Icons.support_agent_rounded, title: l10n.techDetailSupport247, subtitle: l10n.techDetailSupport),
-                            _TrustBadge(icon: Icons.thumb_up_outlined, title: l10n.techDetailReliability100, subtitle: l10n.techDetailReliability),
-                            _TrustBadge(icon: Icons.lock_outline_rounded, title: l10n.techDetailSecure, subtitle: l10n.techDetailBookings),
+                            _TrustBadge(icon: Icons.verified_user_outlined, title: 'Verified', subtitle: 'Background'),
+                            _TrustBadge(icon: Icons.support_agent_rounded, title: '24/7', subtitle: 'Support'),
+                            _TrustBadge(icon: Icons.thumb_up_outlined, title: '100%', subtitle: 'Reliability'),
+                            _TrustBadge(icon: Icons.lock_outline_rounded, title: 'Secure', subtitle: 'Bookings'),
                           ],
                         ),
                       ),
@@ -415,10 +414,10 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
-                          child: _ActionButtonLabel(
+                          child: const _ActionButtonLabel(
                             icon: Icons.calendar_month_rounded,
-                            title: l10n.techDetailBookNow,
-                            subtitle: l10n.techDetailConfirmGetService,
+                            title: 'Book Now',
+                            subtitle: 'Confirm & get your service',
                             filled: true,
                           ),
                         ),
@@ -455,10 +454,10 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
-                          child: _ActionButtonLabel(
+                          child: const _ActionButtonLabel(
                             icon: Icons.videocam_rounded,
-                            title: l10n.techDetailVideoCall,
-                            subtitle: l10n.techDetailTalkToMeNow,
+                            title: 'Video Call',
+                            subtitle: 'Talk to me now',
                             color: _accent,
                           ),
                         ),
@@ -476,8 +475,8 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                           ),
                           child: _ActionButtonLabel(
                             icon: Icons.event_available_outlined,
-                            title: l10n.techDetailScheduleForLater,
-                            subtitle: l10n.techDetailPickConvenientTime,
+                            title: 'Schedule for Later',
+                            subtitle: 'Pick a convenient time',
                             color: Colors.grey[700]!,
                           ),
                         ),
@@ -511,7 +510,6 @@ class _WorkingHoursCardState extends State<_WorkingHoursCard> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     final hours = widget.hours;
     if (!hasAnyWorkingDay(hours)) return const SizedBox.shrink();
 
@@ -519,8 +517,8 @@ class _WorkingHoursCardState extends State<_WorkingHoursCard> {
     final todayKey = weekdayKeyFor(now);
     final today = hours[todayKey];
     final open = isOpenNow(hours, now);
-    final statusText = open ? l10n.techDetailOpenNow : (nextOpenLabel(hours, now) ?? l10n.techDetailClosed);
-    final todaySummary = today == null ? l10n.techDetailClosedToday : l10n.techDetailTodaySummary(today.openLabel, today.closeLabel);
+    final statusText = open ? 'Open now' : (nextOpenLabel(hours, now) ?? 'Closed');
+    final todaySummary = today == null ? 'Closed today' : 'Today · ${today.openLabel} – ${today.closeLabel}';
 
     return Container(
       width: double.infinity,
@@ -552,7 +550,7 @@ class _WorkingHoursCardState extends State<_WorkingHoursCard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(l10n.techDetailWorkingHours, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        const Text('Working hours', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                         const SizedBox(height: 2),
                         Text(todaySummary, style: TextStyle(fontSize: 11.5, color: Colors.grey[600])),
                       ],
@@ -630,7 +628,7 @@ class _WorkingHoursCardState extends State<_WorkingHoursCard> {
             ),
           ),
           Text(
-            v == null ? AppLocalizations.of(context)!.techDetailClosed : '${v.openLabel} – ${v.closeLabel}',
+            v == null ? 'Closed' : '${v.openLabel} – ${v.closeLabel}',
             style: TextStyle(
               fontSize: 12.5,
               fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,

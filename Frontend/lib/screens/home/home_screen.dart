@@ -808,6 +808,10 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
     'RO Service': Icons.water_drop_rounded,
     'CCTV': Icons.videocam_rounded,
     'Home Cleaning': Icons.cleaning_services_rounded,
+    'Civil Work': Icons.foundation_rounded,
+    'Fabrication': Icons.precision_manufacturing_rounded,
+    'POP / False Ceiling': Icons.dashboard_customize_rounded,
+    'General Repair': Icons.handyman_rounded,
   };
 
   static const Map<String, String> _categoryImages = {

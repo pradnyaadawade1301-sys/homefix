@@ -1,5 +1,18 @@
+<<<<<<< HEAD
+﻿Backend/.env
+Backend/secrets/*
+!Backend/secrets/.gitkeep
+Backend/*.exe
+Frontend/.dart_tool/
+Frontend/build/
+Frontend/.idea/
+Frontend/android/.gradle/
+Frontend/ios/Pods/
+.DS_Store
+=======
 
 # Elastic Beanstalk Files
 .elasticbeanstalk/*
 !.elasticbeanstalk/*.cfg.yml
 !.elasticbeanstalk/*.global.yml
+>>>>>>> e65f287 (Initial commit)

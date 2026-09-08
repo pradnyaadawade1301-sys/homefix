@@ -1,0 +1,172 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../config/api_config.dart';
+import '../core/http_client.dart';
+import '../models/user_model.dart';
+
+class AuthService {
+  final HttpClient _httpClient;
+  final FlutterSecureStorage _secureStorage;
+
+  AuthService({
+    required HttpClient httpClient,
+    required FlutterSecureStorage secureStorage,
+  })  : _httpClient = httpClient,
+        _secureStorage = secureStorage;
+
+  /// Login with email OR phone (identifier) + password.
+  /// Backend: POST /auth/login { identifier, password }
+  Future<AuthResponse> login(String identifier, String password) async {
+    try {
+      final response = await _httpClient.post(
+        ApiConfig.authLogin,
+        data: {'identifier': identifier, 'password': password},
+      );
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      final authResponse = AuthResponse.fromJson(data);
+      await _httpClient.setTokens(
+        authResponse.accessToken,
+        authResponse.refreshToken,
+      );
+      return authResponse;
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Signup with name/email/phone/password/role ("customer" or "technician").
+  /// Backend: POST /auth/signup { name, email, phone, password, role }
+  /// Email is required — backend enforces `binding:"required,email"` since every
+  /// new account must go through email verification (see VerifyEmailScreen).
+  Future<AuthResponse> signup({
+    required String name,
+    required String phone,
+    required String password,
+    required String email,
+    String role = 'customer',
+  }) async {
+    try {
+      final response = await _httpClient.post(
+        ApiConfig.authSignup,
+        data: {
+          'name': name,
+          'email': email,
+          'phone': phone,
+          'password': password,
+          'role': role,
+        },
+      );
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      final authResponse = AuthResponse.fromJson(data);
+      await _httpClient.setTokens(
+        authResponse.accessToken,
+        authResponse.refreshToken,
+      );
+      return authResponse;
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Phone OTP flow (backend: /auth/request-otp, /auth/verify-otp).
+  Future<void> requestOtp(String phone) async {
+    try {
+      await _httpClient.post(ApiConfig.authRequestOtp, data: {'phone': phone});
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  Future<AuthResponse> verifyOtp(String phone, String otp) async {
+    try {
+      final response = await _httpClient.post(
+        ApiConfig.authVerifyOtp,
+        data: {'phone': phone, 'otp': otp},
+      );
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      final authResponse = AuthResponse.fromJson(data);
+      await _httpClient.setTokens(
+        authResponse.accessToken,
+        authResponse.refreshToken,
+      );
+      return authResponse;
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// "Continue with Google" — sends the ID token from google_sign_in to the
+  /// backend for verification. `role` only matters the first time (brand
+  /// new account); it's ignored if the Google account is already linked to
+  /// an existing user. Backend: POST /auth/google { id_token, role }
+  Future<AuthResponse> loginWithGoogle(String idToken, {String role = 'customer'}) async {
+    try {
+      final response = await _httpClient.post(
+        ApiConfig.authGoogleLogin,
+        data: {'id_token': idToken, 'role': role},
+      );
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      final authResponse = AuthResponse.fromJson(data);
+      await _httpClient.setTokens(
+        authResponse.accessToken,
+        authResponse.refreshToken,
+      );
+      return authResponse;
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  Future<void> logout() async {
+    try {
+      await _httpClient.clearTokens();
+      await _secureStorage.deleteAll();
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Email-verification OTP flow, used right after signup (backend:
+  /// /auth/request-email-otp, /auth/verify-email-otp). Separate from the phone
+  /// OTP flow above — this only marks email_verified, it doesn't log the user in.
+  Future<void> requestEmailOtp(String email) async {
+    try {
+      await _httpClient.post(ApiConfig.authRequestEmailOtp, data: {'email': email});
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  Future<void> verifyEmailOtp(String email, String otp) async {
+    try {
+      await _httpClient.post(ApiConfig.authVerifyEmailOtp, data: {'email': email, 'otp': otp});
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  Future<bool> isLoggedIn() async {
+    try {
+      await _httpClient.loadStoredTokens();
+      return _httpClient.getAccessToken() != null;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// The in-memory access token after [isLoggedIn] (or login/signup) has
+  /// loaded it. Used by AuthProvider to re-hydrate its own copy on a
+  /// restored session — without this, a resumed session leaves
+  /// AuthProvider.accessToken null even though every REST call still works
+  /// fine (HttpClient attaches its own copy), which broke any screen that
+  /// reads AuthProvider.accessToken directly, like starting a video call.
+  String? get currentAccessToken => _httpClient.getAccessToken();
+
+  /// Guaranteed-fresh token — refreshes first if the cached one has expired.
+  /// AuthProvider.accessToken is only ever set once (at login/session
+  /// restore) and never updated when HttpClient silently refreshes it for
+  /// REST calls, so a screen that reads AuthProvider.accessToken directly
+  /// (e.g. to open the /ws/call/:id WebSocket) can end up sending an
+  /// expired token and get a 401 even though the rest of the app is fine.
+  /// Call this instead right before any such one-shot handshake.
+  Future<String?> getValidAccessToken() => _httpClient.getValidAccessToken();
+}

@@ -75,6 +75,18 @@ const Map<String, List<_CategoryQuestion>> _categoryQuestions = {
   'Painter': [
     _CategoryQuestion('Type of work', ['Interior painting', 'Exterior painting', 'Touch-up/patch work', 'Waterproofing + painting']),
   ],
+  'Civil Work': [
+    _CategoryQuestion('What\'s the issue?', ['Masonry/brickwork', 'Tiling/flooring', 'Wall crack repair', 'New construction']),
+  ],
+  'Fabrication': [
+    _CategoryQuestion('What\'s the issue?', ['Gate/grill repair', 'Welding work', 'New fabrication', 'Railing/shutter']),
+  ],
+  'POP / False Ceiling': [
+    _CategoryQuestion('Type of work', ['New false ceiling', 'POP repair/crack', 'Design work', 'Cove lighting setup']),
+  ],
+  'General Repair': [
+    _CategoryQuestion('What\'s the issue?', ['Furniture/fitting repair', 'Minor plumbing/electrical', 'Wall/door repair', 'Other household fix']),
+  ],
 };
 
 class _CategoryQuestion {

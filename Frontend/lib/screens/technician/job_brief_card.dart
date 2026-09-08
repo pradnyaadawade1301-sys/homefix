@@ -31,12 +31,15 @@ class _JobBriefCardState extends State<JobBriefCard> {
   // generic toolkit line when the category isn't in the map — this is a
   // "come prepared" nudge, not a hard requirement.
   static const Map<String, List<String>> _prepByCategory = {
-    'ac': ['AC testing/gauge set', 'Refrigerant (as needed)', 'Common electrical tester'],
-    'air conditioning': ['AC testing/gauge set', 'Refrigerant (as needed)', 'Common electrical tester'],
-    'plumbing': ['Pipe wrench set', 'Sealant/tape', 'Common fittings'],
-    'electrical': ['Multimeter', 'Insulated tools', 'Common wiring/MCB spares'],
-    'carpentry': ['Basic carpentry toolkit', 'Hinges/fasteners'],
+    'ac repair': ['AC testing/gauge set', 'Refrigerant (as needed)', 'Common electrical tester'],
+    'plumber': ['Pipe wrench set', 'Sealant/tape', 'Common fittings'],
+    'electrician': ['Multimeter', 'Insulated tools', 'Common wiring/MCB spares'],
+    'carpenter': ['Basic carpentry toolkit', 'Hinges/fasteners'],
     'appliance repair': ['Multimeter', 'Common spare parts for the brand'],
+    'civil work': ['Trowel/masonry toolkit', 'Cement/tile adhesive', 'Spirit level'],
+    'fabrication': ['Welding machine', 'Safety gear (gloves/goggles)', 'Grinder/cutting tools'],
+    'pop': ['POP material', 'Ceiling grid/track', 'Sanding tools'],
+    'general repair': ['General toolkit', 'Common fasteners/spares', 'Multimeter'],
   };
 
   List<String> _recommendedPrep(String categoryName) {
