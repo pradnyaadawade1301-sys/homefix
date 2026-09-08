@@ -87,6 +87,61 @@ func (s *AuthService) VerifyOTP(ctx context.Context, phone, otp string) (*models
 	return u, access, refresh, nil
 }
 
+func (s *AuthService) RequestPasswordReset(ctx context.Context, email string) error {
+	u, err := s.userRepo.GetByEmail(ctx, email)
+	if err != nil {
+		return err
+	}
+	if u == nil {
+		return errors.New("no account found with this email")
+	}
+
+	otp, err := utils.GenerateOTP()
+	if err != nil {
+		return err
+	}
+	expiresAt := time.Now().Add(10 * time.Minute)
+	if err := s.userRepo.SetEmailOTP(ctx, u.ID, otp, expiresAt); err != nil {
+		return err
+	}
+	if s.mailService != nil {
+		go func() {
+			if err := s.mailService.SendOTPEmail(email, otp); err != nil {
+				log.Printf("warning: async password-reset OTP email send failed for %s: %v", email, err)
+			}
+		}()
+	}
+	return nil
+}
+
+// ResetPassword verifies the code sent by RequestPasswordReset and, on
+// success, sets the new password and invalidates the OTP so it can't be
+// reused for a second reset.
+func (s *AuthService) ResetPassword(ctx context.Context, email, otp, newPassword string) error {
+	u, err := s.userRepo.GetByEmail(ctx, email)
+	if err != nil {
+		return err
+	}
+	if u == nil {
+		return errors.New("no account found with this email")
+	}
+	if u.EmailOTPCode == nil || *u.EmailOTPCode != otp {
+		return errors.New("invalid OTP")
+	}
+	if u.EmailOTPExpiresAt == nil || time.Now().After(*u.EmailOTPExpiresAt) {
+		return errors.New("OTP has expired")
+	}
+
+	hash, err := utils.HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+	if err := s.userRepo.SetPasswordHash(ctx, u.ID, hash); err != nil {
+		return err
+	}
+	return s.userRepo.ClearEmailOTP(ctx, u.ID)
+}
+
 // LoginWithPassword supports login via either email or phone (identifier) + password,// used by both customer and technician login screens.
 func (s *AuthService) LoginWithPassword(ctx context.Context, identifier, password string) (*models.User, string, string, error) {
 	u, err := s.userRepo.GetByIdentifier(ctx, identifier)

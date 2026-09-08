@@ -187,6 +187,11 @@ func (r *UserRepository) SetPasswordHash(ctx context.Context, userID, hash strin
 	return err
 }
 
+func (r *UserRepository) ClearEmailOTP(ctx context.Context, userID string) error {
+	_, err := r.db.Exec(ctx, `UPDATE users SET email_otp_code = NULL, email_otp_expires_at = NULL, updated_at = now() WHERE id = $1`, userID)
+	return err
+}
+
 func (r *UserRepository) SetFCMToken(ctx context.Context, userID, token string) error {
 	_, err := r.db.Exec(ctx, `UPDATE users SET fcm_token = $1, updated_at = now() WHERE id = $2`, token, userID)
 	return err

@@ -196,6 +196,41 @@ type googleLoginBody struct {
 	IDToken string `json:"id_token" binding:"required"`
 	Role    string `json:"role"` // "customer" or "technician"; ignored if the account already exists
 }
+type forgotPasswordBody struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	var body forgotPasswordBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.authService.RequestPasswordReset(c.Request.Context(), body.Email); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"message": "reset code sent"})
+}
+
+type resetPasswordBody struct {
+	Email       string `json:"email" binding:"required,email"`
+	OTP         string `json:"otp" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=6"`
+}
+
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	var body resetPasswordBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.authService.ResetPassword(c.Request.Context(), body.Email, body.OTP, body.NewPassword); err != nil {
+		utils.Error(c, http.StatusUnauthorized, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"message": "password reset successful"})
+}
 
 // LoginWithGoogle is "Continue with Google" — POST /auth/google. Verifies
 // the ID token server-side and finds-or-creates the user, returning the
