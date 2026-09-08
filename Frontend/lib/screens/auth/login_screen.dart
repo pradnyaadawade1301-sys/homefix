@@ -4,6 +4,7 @@ import '../../core/theme.dart';
 import '../../core/google_auth_helper.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/category_provider.dart';
+import '../../l10n/app_localizations.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -61,7 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       setState(() => _isGoogleLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Google sign-in failed: ${e.toString().replaceFirst('Exception: ', '')}'), backgroundColor: AppTheme.errorColor),
+        SnackBar(content: Text(AppLocalizations.of(context)!.loginGoogleSignInFailed(e.toString().replaceFirst('Exception: ', ''))), backgroundColor: AppTheme.errorColor),
       );
       return;
     }
@@ -111,6 +112,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -140,7 +142,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     const SizedBox(height: 28),
                     Text(
-                      'Welcome back',
+                      l10n.loginWelcomeBack,
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: const Color(0xFF1A1F36),
@@ -148,7 +150,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Sign in to book trusted home services',
+                      l10n.loginSubtitle,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
                     ),
                     const SizedBox(height: 32),
@@ -160,13 +162,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           TextFormField(
                             controller: _identifierController,
                             keyboardType: TextInputType.text,
-                            decoration: const InputDecoration(
-                              hintText: 'Email or phone number',
-                              prefixIcon: Icon(Icons.person_outline_rounded),
+                            decoration: InputDecoration(
+                              hintText: l10n.loginIdentifierHint,
+                              prefixIcon: const Icon(Icons.person_outline_rounded),
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'Email or phone number required';
+                                return l10n.loginIdentifierRequired;
                               }
                               return null;
                             },
@@ -176,7 +178,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             controller: _passwordController,
                             obscureText: _obscurePassword,
                             decoration: InputDecoration(
-                              hintText: 'Password',
+                              hintText: l10n.loginPasswordHint,
                               prefixIcon: const Icon(Icons.lock_outline_rounded),
                               suffixIcon: IconButton(
                                 icon: Icon(_obscurePassword
@@ -187,7 +189,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return 'Password is required';
+                                return l10n.loginPasswordRequired;
                               }
                               return null;
                             },
@@ -197,10 +199,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: TextButton(
                               onPressed: () {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Forgot password flow coming soon')),
+                                  SnackBar(content: Text(l10n.loginForgotPasswordComingSoon)),
                                 );
                               },
-                              child: const Text('Forgot password?'),
+                              child: Text(l10n.loginForgotPassword),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -219,12 +221,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                           ),
                                         )
-                                      : const Row(
+                                      : Row(
                                           mainAxisAlignment: MainAxisAlignment.center,
                                           children: [
-                                            Text('Sign In'),
-                                            SizedBox(width: 8),
-                                            Icon(Icons.arrow_forward_rounded, size: 20),
+                                            Text(l10n.loginSignIn),
+                                            const SizedBox(width: 8),
+                                            const Icon(Icons.arrow_forward_rounded, size: 20),
                                           ],
                                         ),
                                 ),
@@ -237,7 +239,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               Expanded(child: Divider(color: Colors.grey[300])),
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                                child: Text('OR', style: TextStyle(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.w600)),
+                                child: Text(l10n.loginOr, style: TextStyle(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.w600)),
                               ),
                               Expanded(child: Divider(color: Colors.grey[300])),
                             ],
@@ -266,9 +268,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                           child: CustomPaint(painter: _GoogleLogoPainter()),
                                         ),
                                         const SizedBox(width: 10),
-                                        const Text(
-                                          'Continue with Google',
-                                          style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1A1F36)),
+                                        Text(
+                                          l10n.loginContinueWithGoogle,
+                                          style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1A1F36)),
                                         ),
                                       ],
                                     ),
@@ -292,10 +294,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Trusted by thousands of users',
-                                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                                Text(l10n.loginTrustedBanner,
+                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                                 Text(
-                                  'Verified professionals • Secure bookings • 24/7 Support',
+                                  l10n.loginTrustedSubtitle,
                                   style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                                 ),
                               ],
@@ -309,16 +311,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text("Don't have an account? ", style: TextStyle(color: Colors.grey[600])),
+                          Text(l10n.loginNoAccount, style: TextStyle(color: Colors.grey[600])),
                           GestureDetector(
                             onTap: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(builder: (_) => const SignupScreen()),
                               );
                             },
-                            child: const Text(
-                              'Sign Up',
-                              style: TextStyle(fontWeight: FontWeight.w700, color: AppTheme.primaryColor),
+                            child: Text(
+                              l10n.loginSignUp,
+                              style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.primaryColor),
                             ),
                           ),
                         ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../l10n/app_localizations.dart';
 import 'verify_email_screen.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -32,12 +33,13 @@ class _SignupScreenState extends State<SignupScreen> {
   /// Strong password rule: at least 8 chars, must contain a letter AND a
   /// special character — plain numeric strings like "123456" are rejected.
   String? _validatePassword(String? v) {
-    if (v == null || v.isEmpty) return 'Password is required';
-    if (v.length < 8) return 'Password must be at least 8 characters';
+    final l10n = AppLocalizations.of(context)!;
+    if (v == null || v.isEmpty) return l10n.signupPasswordRequiredValidator;
+    if (v.length < 8) return l10n.signupPasswordTooShort;
     final hasLetter = RegExp(r'[A-Za-z]').hasMatch(v);
     final hasSpecial = RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=~`\[\]/;]').hasMatch(v);
     if (!hasLetter || !hasSpecial) {
-      return 'Add a letter and a special character (not just numbers)';
+      return l10n.signupPasswordNeedsLetterSpecial;
     }
     return null;
   }
@@ -77,6 +79,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -129,7 +132,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     children: [
                       const SizedBox(height: 24),
                       Text(
-                        'Create your account',
+                        l10n.signupCreateYourAccount,
                         style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: const Color(0xFF1A1F36),
@@ -137,25 +140,25 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Join HomeFix Live as a customer or technician',
+                        l10n.signupJoinSubtitle,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
                       ),
                       const SizedBox(height: 24),
 
                       // Role selector
-                      Text('I am a', style: Theme.of(context).textTheme.labelLarge),
+                      Text(l10n.signupIAmA, style: Theme.of(context).textTheme.labelLarge),
                       const SizedBox(height: 10),
                       Row(
                         children: [
                           Expanded(child: _RoleCard(
-                            label: 'Customer',
+                            label: l10n.signupRoleCustomer,
                             icon: Icons.person_outline_rounded,
                             selected: _role == 'customer',
                             onTap: () => setState(() => _role = 'customer'),
                           )),
                           const SizedBox(width: 12),
                           Expanded(child: _RoleCard(
-                            label: 'Technician',
+                            label: l10n.signupRoleTechnician,
                             icon: Icons.build_outlined,
                             selected: _role == 'technician',
                             onTap: () => setState(() => _role = 'technician'),
@@ -167,37 +170,37 @@ class _SignupScreenState extends State<SignupScreen> {
                       TextFormField(
                         controller: _nameController,
                         textCapitalization: TextCapitalization.words,
-                        decoration: const InputDecoration(
-                          hintText: 'Full name',
-                          prefixIcon: Icon(Icons.person_outline_rounded),
+                        decoration: InputDecoration(
+                          hintText: l10n.signupNameHint,
+                          prefixIcon: const Icon(Icons.person_outline_rounded),
                         ),
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+                        validator: (v) => (v == null || v.trim().isEmpty) ? l10n.signupNameRequired : null,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          hintText: 'Email address',
-                          prefixIcon: Icon(Icons.mail_outline_rounded),
+                        decoration: InputDecoration(
+                          hintText: l10n.signupEmailHint,
+                          prefixIcon: const Icon(Icons.mail_outline_rounded),
                         ),
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Email is required';
+                          if (v == null || v.trim().isEmpty) return l10n.signupEmailRequired;
                           final ok = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim());
-                          return ok ? null : 'Enter a valid email';
+                          return ok ? null : l10n.signupEmailInvalid;
                         },
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _phoneController,
                         keyboardType: TextInputType.phone,
-                        decoration: const InputDecoration(
-                          hintText: 'Phone number',
-                          prefixIcon: Icon(Icons.phone_outlined),
+                        decoration: InputDecoration(
+                          hintText: l10n.signupPhoneHint,
+                          prefixIcon: const Icon(Icons.phone_outlined),
                         ),
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Phone number is required';
-                          if (v.trim().length < 10) return 'Enter a valid phone number';
+                          if (v == null || v.trim().isEmpty) return l10n.signupPhoneRequired;
+                          if (v.trim().length < 10) return l10n.signupPhoneInvalid;
                           return null;
                         },
                       ),
@@ -206,8 +209,8 @@ class _SignupScreenState extends State<SignupScreen> {
                         controller: _passwordController,
                         obscureText: _obscurePassword,
                         decoration: InputDecoration(
-                          hintText: 'Password',
-                          helperText: 'Min 8 chars, with a letter and a special character',
+                          hintText: l10n.signupPasswordHint,
+                          helperText: l10n.signupPasswordHelper,
                           helperMaxLines: 2,
                           prefixIcon: const Icon(Icons.lock_outline_rounded),
                           suffixIcon: IconButton(
@@ -234,10 +237,10 @@ class _SignupScreenState extends State<SignupScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('Your data is safe with us',
-                                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                                  Text(l10n.signupDataSafeBanner,
+                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                                   Text(
-                                    'We never share your information',
+                                    l10n.signupDataSafeSubtitle,
                                     style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                                   ),
                                 ],
@@ -262,12 +265,12 @@ class _SignupScreenState extends State<SignupScreen> {
                                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                       ),
                                     )
-                                  : const Row(
+                                  : Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
-                                        Text('Create Account'),
-                                        SizedBox(width: 8),
-                                        Icon(Icons.arrow_forward_rounded, size: 20),
+                                        Text(l10n.signupCreateAccount),
+                                        const SizedBox(width: 8),
+                                        const Icon(Icons.arrow_forward_rounded, size: 20),
                                       ],
                                     ),
                             ),
@@ -278,12 +281,12 @@ class _SignupScreenState extends State<SignupScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text('Already have an account? ', style: TextStyle(color: Colors.grey[600])),
+                          Text(l10n.signupHaveAccount, style: TextStyle(color: Colors.grey[600])),
                           GestureDetector(
                             onTap: () => Navigator.of(context).maybePop(),
-                            child: const Text(
-                              'Sign In',
-                              style: TextStyle(fontWeight: FontWeight.w700, color: AppTheme.primaryColor),
+                            child: Text(
+                              l10n.signupSignIn,
+                              style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.primaryColor),
                             ),
                           ),
                         ],
