@@ -59,6 +59,8 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		auth.POST("/google", middleware.RateLimit(rdb, "google-login", 10, time.Minute), h.Auth.LoginWithGoogle)
 		auth.POST("/request-email-otp", middleware.RateLimit(rdb, "email-otp", 5, time.Minute), h.Auth.RequestEmailOTP)
 		auth.POST("/verify-email-otp", middleware.RateLimit(rdb, "email-otp-verify", 10, time.Minute), h.Auth.VerifyEmailOTP)
+		auth.POST("/forgot-password", middleware.RateLimit(rdb, "forgot-password", 5, time.Minute), h.Auth.ForgotPassword)
+		auth.POST("/reset-password", middleware.RateLimit(rdb, "reset-password", 10, time.Minute), h.Auth.ResetPassword)
 		auth.POST("/refresh", h.Auth.Refresh)
 	}
 	api.GET("/categories", h.Category.List)
