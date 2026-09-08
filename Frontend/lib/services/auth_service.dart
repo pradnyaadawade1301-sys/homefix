@@ -94,6 +94,26 @@ class AuthService {
     }
   }
 
+  /// Forgot-password flow (backend: /auth/forgot-password, /auth/reset-password).
+  /// Reuses the same email OTP delivery path as signup verification.
+  Future<void> forgotPassword(String email) async {
+    try {
+      await _httpClient.post(ApiConfig.authForgotPassword, data: {'email': email});
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  Future<void> resetPassword(String email, String otp, String newPassword) async {
+    try {
+      await _httpClient.post(
+        ApiConfig.authResetPassword,
+        data: {'email': email, 'otp': otp, 'new_password': newPassword},
+      );
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
   /// "Continue with Google" — sends the ID token from google_sign_in to the
   /// backend for verification. `role` only matters the first time (brand
   /// new account); it's ignored if the Google account is already linked to

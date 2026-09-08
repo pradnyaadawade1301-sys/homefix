@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../l10n/app_localizations.dart';
 import 'signup_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -198,9 +199,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             alignment: Alignment.centerRight,
                             child: TextButton(
                               onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(l10n.loginForgotPasswordComingSoon)),
-                                );
+                                Navigator.of(context).push(
+MaterialPageRoute(builder: (_) => ForgotPasswordScreen()),                                );
                               },
                               child: Text(l10n.loginForgotPassword),
                             ),

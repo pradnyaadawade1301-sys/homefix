@@ -23,6 +23,8 @@ class ApiConfig {
   static const String authVerifyOtp = '/auth/verify-otp';
   static const String authRequestEmailOtp = '/auth/request-email-otp';
   static const String authVerifyEmailOtp = '/auth/verify-email-otp';
+    static const String authForgotPassword = '/auth/forgot-password';
+  static const String authResetPassword = '/auth/reset-password';
   static const String authRefresh = '/auth/refresh';
   static const String authSetPassword = '/auth/set-password';
   static const String authLogout = '/auth/logout';

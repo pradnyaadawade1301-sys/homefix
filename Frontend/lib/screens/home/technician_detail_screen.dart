@@ -113,7 +113,7 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 340,
+            expandedHeight: 292,
             pinned: true,
             backgroundColor: _accent,
             iconTheme: const IconThemeData(color: Colors.white),
@@ -154,9 +154,8 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                         // Top-aligned (not centered) so the bottom of the teal
                         // header stays empty — that's the zone the first card
                         // overlaps into (see the sheet's upward transform).
-                        mainAxisAlignment: MainAxisAlignment.start,
+                                                mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const SizedBox(height: 8),
                           Stack(
                             clipBehavior: Clip.none,
                             children: [
@@ -281,14 +280,13 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
               opacity: _fade,
               child: SlideTransition(
                 position: _slide,
-                child: Container(
+                               child: Container(
                   // Pull the whole sheet up so its rounded top and the first
                   // card ride onto the empty bottom strip of the header banner
                   // (reference design). A transform, not a margin, so it never
                   // asserts — and the header content is top-aligned so nothing
                   // important sits where the card lands.
-                  transform: Matrix4.translationValues(0, -56, 0),
-                  decoration: const BoxDecoration(
+                  transform: Matrix4.translationValues(0, -26, 0),                  decoration: const BoxDecoration(
                     color: Color(0xFFF7F8FA),
                     borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
                   ),

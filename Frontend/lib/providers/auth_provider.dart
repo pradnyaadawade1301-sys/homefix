@@ -200,4 +200,27 @@ class AuthProvider extends ChangeNotifier {
       return e.toString().replaceFirst('Exception: ', '');
     }
   }
+
+  
+  /// Sends a password-reset code to `email`. Returns an error message on
+  /// failure, or null on success.
+  Future<String?> forgotPassword(String email) async {
+    try {
+      await _authService.forgotPassword(email);
+      return null;
+    } catch (e) {
+      return e.toString().replaceFirst('Exception: ', '');
+    }
+  }
+
+  /// Verifies the code sent by forgotPassword and sets a new password.
+  /// Returns an error message on failure, or null on success.
+  Future<String?> resetPassword(String email, String otp, String newPassword) async {
+    try {
+      await _authService.resetPassword(email, otp, newPassword);
+      return null;
+    } catch (e) {
+      return e.toString().replaceFirst('Exception: ', '');
+    }
+  }
 }
