@@ -43,6 +43,21 @@ func main() {
 		log.Fatalf("startup: failed to ensure otp columns exist: %v", err)
 	}
 
+	// Self-healing startup migration: 030_seed_more_categories_2.sql only ever
+	// runs via `make migrate` against the local Docker Postgres container —
+	// Render's deploy just runs the compiled binary and never applies files
+	// under migrations/, so these 4 categories never reached production.
+	// This is a safe no-op once the rows already exist.
+	if _, err := pool.Exec(context.Background(),
+		`INSERT INTO categories (name, description, is_active) VALUES
+			('Civil Work',          'Masonry, tiling, and construction work', true),
+			('Fabrication',         'Metal fabrication and welding work',     true),
+			('POP / False Ceiling', 'POP work and false ceiling installation', true),
+			('General Repair',      'General home repair and maintenance',    true)
+		 ON CONFLICT (name) DO NOTHING;`); err != nil {
+		log.Fatalf("startup: failed to seed new categories: %v", err)
+	}
+
 	rdb := cache.New(cfg.RedisURL) // no-op now — Redis removed, see internal/cache
 	mailService := service.NewMailService(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPass, cfg.SMTPFrom)
 	if mailService.Enabled() {
