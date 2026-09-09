@@ -203,8 +203,8 @@ func Load() *Config {
 		UpiPayeeVPA:  getOr("UPI_PAYEE_VPA", "homefixlive@okaxis"),
 		UpiPayeeName: getOr("UPI_PAYEE_NAME", "HomeFix Live"),
 
-		RazorpayKeyID:     getOr("RAZORPAY_KEY_ID", ""),
-		RazorpayKeySecret: getOr("RAZORPAY_KEY_SECRET", ""),
+		RazorpayKeyID:     strings.TrimSpace(getOr("RAZORPAY_KEY_ID", "")),
+		RazorpayKeySecret: strings.TrimSpace(getOr("RAZORPAY_KEY_SECRET", "")),
 
 		FirebaseCredentialsPath: getOr("FIREBASE_CREDENTIALS_PATH", ""),
 		FirebaseProjectID:       getOr("FIREBASE_PROJECT_ID", ""),
