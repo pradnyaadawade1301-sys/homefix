@@ -352,6 +352,38 @@ func (s *RazorpayService) ListByUser(ctx context.Context, userID string) ([]mode
 	return s.paymentRepo.ListByUser(ctx, userID)
 }
 
+// ListByTechnician powers the technician side of the Payment History tab —
+// see PaymentRepository.ListByTechnician for why this can't just reuse
+// ListByUser (payments are keyed to the paying customer, not the technician).
+func (s *RazorpayService) ListByTechnician(ctx context.Context, technicianID string) ([]models.Payment, error) {
+	return s.paymentRepo.ListByTechnician(ctx, technicianID)
+}
+
+// HistoryForRequester is the single entry point GET /payments/history uses.
+// A customer's own payments are keyed by user_id directly (ListByUser), but
+// a technician viewing "their" payment history means "payments for jobs I
+// worked", which lives on the booking, not the payment row — so for a
+// technician we first resolve their technician_id from the logged-in user_id
+// and go through ListByTechnician instead. Without this split, a technician
+// calling this endpoint always got back an empty list (their user_id never
+// matches payments.user_id, which belongs to the customer who paid) —
+// that's why the Payment History tab and Total Earned looked empty even
+// with completed, invoiced jobs.
+func (s *RazorpayService) HistoryForRequester(ctx context.Context, userID, role string) ([]models.Payment, error) {
+	if role != "technician" {
+		return s.paymentRepo.ListByUser(ctx, userID)
+	}
+	tech, err := s.technicianRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if tech == nil {
+		// No technician profile yet (e.g. KYC not submitted) — nothing to show.
+		return []models.Payment{}, nil
+	}
+	return s.paymentRepo.ListByTechnician(ctx, tech.ID)
+}
+
 // GetInvoiceByBooking resolves the booking's most recent payment and returns
 // its invoice — used by the technician side, which only has a booking ID on
 // hand. Delegates to GetInvoice for the actual authorization + invoice build

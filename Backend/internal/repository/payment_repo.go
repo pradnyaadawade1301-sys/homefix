@@ -133,6 +133,40 @@ func (r *PaymentRepository) ListByUser(ctx context.Context, userID string) ([]mo
 	return out, rows.Err()
 }
 
+// ListByTechnician powers the technician's Payment History tab. Payments
+// belong to the customer who paid (user_id), not the technician who did the
+// job — there's no technician_id column on the payments table — so this
+// joins through the booking each payment is for instead. Columns are
+// explicitly qualified with p. since bookings shares column names like id,
+// status, created_at with payments, which would otherwise be ambiguous.
+func (r *PaymentRepository) ListByTechnician(ctx context.Context, technicianID string) ([]models.Payment, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT p.id, p.booking_id, p.user_id, p.transaction_ref, p.upi_txn_id, p.invoice_number,
+		       p.amount, p.base_amount, p.gst_amount, p.gst_percent, p.cgst_amount, p.sgst_amount, p.currency, p.method, p.status, p.upi_status, p.upi_response_code, p.upi_approval_ref,
+		       p.verified, p.is_repeat_customer, p.repeat_discount_percent, p.repeat_discount_amount,
+		       p.razorpay_order_id, p.razorpay_payment_id, p.razorpay_signature,
+		       p.platform_commission, p.technician_earning, p.payment_type, p.visit_fee_credit,
+		       p.platform_fee_amount, p.visit_charge_amount, p.refunded_at, p.created_at, p.updated_at
+		FROM payments p
+		JOIN bookings b ON b.id = p.booking_id
+		WHERE b.technician_id = $1
+		ORDER BY p.created_at DESC`, technicianID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []models.Payment
+	for rows.Next() {
+		p, err := scanPayment(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *p)
+	}
+	return out, rows.Err()
+}
+
 // ListAll powers the admin panel's Payment Monitoring screen. status == "" lists
 // every payment regardless of status.
 func (r *PaymentRepository) ListAll(ctx context.Context, status string) ([]models.Payment, error) {

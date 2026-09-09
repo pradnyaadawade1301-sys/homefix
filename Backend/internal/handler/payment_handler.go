@@ -122,10 +122,13 @@ func (h *PaymentHandler) Fail(c *gin.Context) {
 	utils.Success(c, http.StatusOK, gin.H{"message": "payment marked failed"})
 }
 
-// History powers the customer's Payment History screen.
+// History powers both the customer's and technician's Payment History
+// screens (customer sees payments they made; technician sees payments for
+// jobs they worked) — see RazorpayService.HistoryForRequester.
 func (h *PaymentHandler) History(c *gin.Context) {
 	userID := c.GetString("user_id")
-	list, err := h.razorpay.ListByUser(c.Request.Context(), userID)
+	role := c.GetString("role")
+	list, err := h.razorpay.HistoryForRequester(c.Request.Context(), userID, role)
 	if err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
 		return
