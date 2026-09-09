@@ -7,7 +7,6 @@
 // `technician` is null until one is assigned.
 
 import 'dart:convert';
-
 import '../utils/working_hours.dart';
 
 class BookingCustomerInfo {
@@ -126,32 +125,19 @@ class Booking {
   final BookingAddressInfo? address;
   final BookingCustomerInfo? customer;
   final BookingTechnicianInfo? technician;
-
-  // --- Warranty (see backend migration 022) ---
-  // Set once, at completion, by the technician (if the category allows it —
-  // see Category.warrantyOptions).
+  // --- Warranty (technician-controlled, admin-configured — see migration
+  // 022_booking_warranty.sql on the backend) ---
+  // Set once, at completion, by the technician's optional "Warranty: Yes"
+  // choice; warrantyDays is always one of the category's configured
+  // options, never an arbitrary/unlimited number the technician typed.
   final bool warrantyEnabled;
   final int? warrantyDays;
   final DateTime? warrantyExpiresAt;
-  // True only for a booking that WAS a warranty claim (created via "Claim
-  // Warranty" on the original booking) — not to be confused with
-  // warrantyEnabled, which is about whether THIS booking itself offers a
-  // warranty once completed.
+  // True if this booking is itself a warranty claim raised against an
+  // earlier, completed booking (see [warrantyClaimOf]).
   final bool isWarrantyClaim;
   final String? warrantyClaimOf;
-  // Human-readable service code of the original booking this one is a claim
-  // against (e.g. "SRV-001042") — only present when isWarrantyClaim is true,
-  // via the detail endpoint.
   final String? warrantyClaimOfServiceCode;
-
-  /// True only when the customer can actually tap "Claim Warranty" right
-  /// now: warranty was offered, it hasn't expired, and this booking isn't
-  /// itself already a warranty claim (a claim can't be claimed again).
-  bool get canClaimWarranty =>
-      warrantyEnabled &&
-      !isWarrantyClaim &&
-      warrantyExpiresAt != null &&
-      warrantyExpiresAt!.isAfter(DateTime.now());
 
   Booking({
     required this.id,
@@ -196,6 +182,21 @@ class Booking {
   /// customer still needs to approve/decline (Physical Inspection ->
   /// Estimate -> Approval flow).
   bool get isAwaitingEstimateApproval => status == 'awaiting_estimate_approval';
+
+  /// True if this completed booking is currently covered by a warranty the
+  /// technician chose to offer at completion — the single source of truth
+  /// for whether to show the "Claim Warranty" action.
+  bool get isUnderWarranty =>
+      warrantyEnabled && warrantyExpiresAt != null && DateTime.now().isBefore(warrantyExpiresAt!) && !isWarrantyClaim;
+
+  /// Alias for [isUnderWarranty] — same check, named to match how
+  /// ServiceHistoryScreen reads it ("can the customer claim this now").
+  bool get canClaimWarranty => isUnderWarranty;
+
+  /// True once a booking has been completed and the technician made *some*
+  /// explicit warranty choice (yes or no) — used to decide whether to show
+  /// the warranty section on the invoice/service-details screen at all.
+  bool get hasWarrantyDecision => status == 'completed';
 
   // ---------------------------------------------------------------------
   // Job Brief
@@ -244,7 +245,8 @@ class Booking {
           : null,
       warrantyEnabled: json['warranty_enabled'] as bool? ?? false,
       warrantyDays: json['warranty_days'] as int?,
-      warrantyExpiresAt: json['warranty_expires_at'] != null ? DateTime.tryParse(json['warranty_expires_at'] as String) : null,
+      warrantyExpiresAt:
+          json['warranty_expires_at'] != null ? DateTime.tryParse(json['warranty_expires_at'] as String) : null,
       isWarrantyClaim: json['is_warranty_claim'] as bool? ?? false,
       warrantyClaimOf: json['warranty_claim_of'] as String?,
       warrantyClaimOfServiceCode: json['warranty_claim_of_service_code'] as String?,
@@ -294,8 +296,7 @@ class JobBrief {
   /// section vs. its empty-state message.
   bool get hasGuidedAnswers =>
       startedWhen != null || isContinuous != null || previousRepair != null || isEmergency != null ||
-      (unusualSigns != null && unusualSigns!.isNotEmpty) ||
-      (categoryAnswers != null && categoryAnswers!.isNotEmpty);
+      (unusualSigns != null && unusualSigns!.isNotEmpty);
 
   JobBrief copyWith({
     String? startedWhen,
@@ -366,7 +367,7 @@ class JobBrief {
         aiDiagnosis: map['aiDiagnosis'] as String?,
         consultationNotes: map['consultationNotes'] as String?,
         categoryAnswers: (map['categoryAnswers'] as Map<String, dynamic>?)
-            ?.map((k, v) => MapEntry(k, v as String)),
+            ?.map((key, value) => MapEntry(key, value as String)),
       );
     } catch (_) {
       return null;
@@ -589,10 +590,8 @@ class Technician {
   final int ratingCount;
   final bool isVerified;
   final bool isAvailable;
-  /// Technician's self-set weekly schedule (display-only). Every key in
-  /// [kWeekdayKeys] present; value null when that day is off.
-  final Map<String, DayHours?> workingHours;
   final DateTime createdAt;
+  final Map<String, DayHours?> workingHours;
 
   Technician({
     required this.id,
@@ -604,9 +603,9 @@ class Technician {
     required this.ratingCount,
     required this.isVerified,
     required this.isAvailable,
-    Map<String, DayHours?>? workingHours,
     required this.createdAt,
-  }) : workingHours = workingHours ?? const {};
+    this.workingHours = const {},
+  });
 
   factory Technician.fromJson(Map<String, dynamic> json) {
     return Technician(
@@ -619,10 +618,10 @@ class Technician {
       ratingCount: json['rating_count'] as int? ?? 0,
       isVerified: json['is_verified'] as bool? ?? false,
       isAvailable: json['is_available'] as bool? ?? true,
-      workingHours: parseWorkingHours(json['working_hours']),
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
+      workingHours: parseWorkingHours(json['working_hours']),
     );
   }
 
@@ -637,8 +636,8 @@ class Technician {
       'rating_count': ratingCount,
       'is_verified': isVerified,
       'is_available': isAvailable,
-      'working_hours': workingHoursToJson(workingHours),
       'created_at': createdAt.toIso8601String(),
+      'working_hours': workingHours.map((k, v) => MapEntry(k, v?.toJson())),
     };
   }
 }
@@ -710,10 +709,8 @@ class TechnicianProfile {
   final int ratingCount;
   final bool isVerified;
   final bool isAvailable;
-  /// Technician's self-set weekly schedule (display-only). Every key in
-  /// [kWeekdayKeys] present; value null when that day is off.
-  final Map<String, DayHours?> workingHours;
   final DateTime createdAt;
+  final Map<String, DayHours?> workingHours;
 
   TechnicianProfile({
     required this.id,
@@ -729,9 +726,9 @@ class TechnicianProfile {
     required this.ratingCount,
     required this.isVerified,
     required this.isAvailable,
-    Map<String, DayHours?>? workingHours,
     required this.createdAt,
-  }) : workingHours = workingHours ?? const {};
+    this.workingHours = const {},
+  });
 
   bool get isPending => approvalStatus == 'pending';
   bool get isApproved => approvalStatus == 'approved';
@@ -752,8 +749,8 @@ class TechnicianProfile {
       ratingCount: ratingCount,
       isVerified: isVerified,
       isAvailable: isAvailable ?? this.isAvailable,
-      workingHours: workingHours ?? this.workingHours,
       createdAt: createdAt,
+      workingHours: workingHours ?? this.workingHours,
     );
   }
 
@@ -772,10 +769,10 @@ class TechnicianProfile {
       ratingCount: json['rating_count'] as int? ?? 0,
       isVerified: json['is_verified'] as bool? ?? false,
       isAvailable: json['is_available'] as bool? ?? true,
-      workingHours: parseWorkingHours(json['working_hours']),
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
+      workingHours: parseWorkingHours(json['working_hours']),
     );
   }
 }
@@ -787,10 +784,11 @@ class Category {
   final String? iconUrl;
   final double basePrice;
   final bool isActive;
-  // Admin-configured whitelist of warranty durations (in days) a technician
-  // may offer for a job in this category — see backend
-  // CategoryHandler.UpdateWarrantyOptions. A technician completing a job
-  // must pick warranty duration from exactly this list (or offer none).
+  // Admin-configured whitelist of warranty durations (days) a technician may
+  // offer at job completion for this category — e.g. [7, 15, 30, 90]. The
+  // technician-facing completion screen must only ever offer these values;
+  // it's also enforced server-side (see BookingService.Complete on the
+  // backend), so this is purely for building the picker UI.
   final List<int> warrantyOptions;
 
   Category({
@@ -800,7 +798,7 @@ class Category {
     this.iconUrl,
     required this.basePrice,
     required this.isActive,
-    this.warrantyOptions = const [],
+    this.warrantyOptions = const [7, 15, 30, 90],
   });
 
   factory Category.fromJson(Map<String, dynamic> json) {
@@ -811,7 +809,8 @@ class Category {
       iconUrl: json['icon_url'] as String?,
       basePrice: (json['base_price'] as num?)?.toDouble() ?? 0.0,
       isActive: json['is_active'] as bool? ?? true,
-      warrantyOptions: (json['warranty_options'] as List?)?.map((e) => (e as num).toInt()).toList() ?? const [],
+      warrantyOptions: (json['warranty_options'] as List?)?.map((e) => (e as num).toInt()).toList() ??
+          const [7, 15, 30, 90],
     );
   }
 
@@ -823,6 +822,7 @@ class Category {
       'icon_url': iconUrl,
       'base_price': basePrice,
       'is_active': isActive,
+      'warranty_options': warrantyOptions,
     };
   }
 }
@@ -971,6 +971,38 @@ class Review {
       rating: (json['rating'] as num?)?.toInt() ?? 0,
       comment: (json['comment'] as String?) ?? '',
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : DateTime.now(),
+    );
+  }
+}
+
+/// Response shape from GET /bookings/:id/call and POST
+/// /bookings/:id/call/initiate — everything needed to join the WebRTC
+/// signaling room for a booking's audio call (technician "Audio Call"
+/// button). See CallHandler.Signal on the backend for the actual relay.
+class BookingCallInfo {
+  final String roomId;
+  final List<Map<String, dynamic>> iceServers;
+  final String? technicianName;
+  final String? customerName;
+
+  BookingCallInfo({
+    required this.roomId,
+    required this.iceServers,
+    this.technicianName,
+    this.customerName,
+  });
+
+  factory BookingCallInfo.fromJson(Map<String, dynamic> json) {
+    final booking = json['booking'] as Map<String, dynamic>?;
+    final tech = booking?['technician'] as Map<String, dynamic>?;
+    final cust = booking?['customer'] as Map<String, dynamic>?;
+    return BookingCallInfo(
+      roomId: json['room_id'] as String,
+      iceServers: (json['ice_servers'] as List? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList(),
+      technicianName: tech?['name'] as String?,
+      customerName: cust?['name'] as String?,
     );
   }
 }

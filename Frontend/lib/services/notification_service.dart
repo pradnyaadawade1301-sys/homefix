@@ -41,6 +41,14 @@ class FcmNotificationService {
   /// straight to the incoming-request screen, like a real incoming call.
   void Function(Map<String, dynamic> payload)? onIncomingConsultation;
 
+  /// Callback invoked the moment a technician's "Audio Call" push arrives
+  /// (data['type'] == 'booking_call_incoming') — the customer side of
+  /// BookingService.InitiateCall. Like [onIncomingConsultation], fires
+  /// immediately (foreground, background-tap, or terminated-launch) so the
+  /// app can ring and jump straight into the call screen rather than
+  /// waiting for a notification tap.
+  void Function(Map<String, dynamic> payload)? onIncomingBookingCall;
+
   /// Set this callback to send the FCM token to your backend whenever
   /// it is first obtained or refreshed. Called with the new token value.
   void Function(String token)? onTokenRefreshed;
@@ -136,6 +144,8 @@ class FcmNotificationService {
         final payload = _toTapPayload(initialMessage);
         if (initialMessage.data['type'] == 'consultation_request') {
           onIncomingConsultation?.call(payload);
+        } else if (initialMessage.data['type'] == 'booking_call_incoming') {
+          onIncomingBookingCall?.call(payload);
         } else {
           _handleNotificationTap(payload);
         }
@@ -213,6 +223,13 @@ class FcmNotificationService {
       return;
     }
 
+    // Technician's "Audio Call" about an active booking — same
+    // ring-immediately treatment, straight into the call screen.
+    if (message.data['type'] == 'booking_call_incoming') {
+      onIncomingBookingCall?.call(_toTapPayload(message));
+      return;
+    }
+
     // Show local notification
     await _showLocalNotification(message);
   }
@@ -223,6 +240,10 @@ class FcmNotificationService {
     final payload = _toTapPayload(message);
     if (message.data['type'] == 'consultation_request') {
       onIncomingConsultation?.call(payload);
+      return;
+    }
+    if (message.data['type'] == 'booking_call_incoming') {
+      onIncomingBookingCall?.call(payload);
       return;
     }
     _handleNotificationTap(payload);

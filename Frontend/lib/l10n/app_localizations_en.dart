@@ -533,4 +533,94 @@ class AppLocalizationsEn extends AppLocalizations {
   String chatMessageHint(String peerName) {
     return 'Message $peerName';
   }
+
+  @override
+  String get consultTitle => 'Consult';
+
+  @override
+  String get consultTabChat => 'Chat';
+
+  @override
+  String get consultTabVideo => 'Video';
+
+  @override
+  String get consultNoChatsTitle => 'No chats yet';
+
+  @override
+  String get consultNoChatsSubtitle =>
+      'Once a technician is assigned to your booking, you can chat with them here.';
+
+  @override
+  String get consultServiceBookingFallback => 'Service booking';
+
+  @override
+  String get consultNoVideoCallsTitle => 'No video calls yet';
+
+  @override
+  String get consultNoVideoCallsSubtitle =>
+      'Your live video consultations with technicians will show up here.';
+
+  @override
+  String get consultStatusCompleted => 'Completed';
+
+  @override
+  String get consultStatusCancelled => 'Cancelled';
+
+  @override
+  String get consultStatusTechnicianUnavailable => 'Technician unavailable';
+
+  @override
+  String get consultStatusDeclined => 'Declined';
+
+  @override
+  String get consultStatusNoExpertFound => 'No expert found';
+
+  @override
+  String get consultStatusInCall => 'In call';
+
+  @override
+  String get consultStatusConfirmed => 'Confirmed';
+
+  @override
+  String get consultStatusAwaitingConfirmation => 'Awaiting confirmation';
+
+  @override
+  String get consultStatusUpcoming => 'Upcoming';
+
+  @override
+  String get consultHelperRejectedScheduled =>
+      'The technician couldn\'t hold this slot. Please choose a new time.';
+
+  @override
+  String get consultHelperRejectedInstant =>
+      'The technician was unable to take this call.';
+
+  @override
+  String get consultHelperScheduled =>
+      'Waiting for the technician to confirm this slot.';
+
+  @override
+  String get consultHelperConfirmed =>
+      'Confirmed — the call will start automatically at the scheduled time.';
+
+  @override
+  String get consultHelperNoTechnician =>
+      'No technician was available to take this call.';
+
+  @override
+  String get consultTechnicianFallback => 'Technician';
+
+  @override
+  String get consultVideoConsultationFallback => 'Video consultation';
+
+  @override
+  String consultMinutesShort(String minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String get consultNewRecommendation => 'New recommendation from technician';
+
+  @override
+  String get consultNewBadge => 'NEW';
 }

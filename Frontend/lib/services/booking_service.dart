@@ -189,9 +189,8 @@ class BookingService {
     }
   }
 
-  /// Technician declines a requested booking that was routed to them —
-  /// POST /bookings/:id/decline. The booking goes back into the pool
-  /// (unassigned, still 'requested') so another technician can be found.
+  /// Technician turns down a booking that's been routed to them — POST
+  /// /bookings/:id/decline. Mirrors acceptBooking's request shape.
   Future<void> declineBooking(String bookingId, String technicianId) async {
     try {
       await _httpClient.post(
@@ -243,6 +242,10 @@ class BookingService {
     }
   }
 
+  /// warrantyDays is only sent (and only required) when warrantyEnabled is
+  /// true — must be one of the category's admin-configured options; the
+  /// completion screen's picker already restricts it to those, and the
+  /// backend re-validates it regardless.
   Future<void> completeBooking(
     String bookingId,
     double finalPrice, {
@@ -255,7 +258,7 @@ class BookingService {
         data: {
           'final_price': finalPrice,
           'warranty_enabled': warrantyEnabled,
-          if (warrantyDays != null) 'warranty_days': warrantyDays,
+          if (warrantyEnabled && warrantyDays != null) 'warranty_days': warrantyDays,
         },
       );
     } catch (e) {
@@ -264,17 +267,43 @@ class BookingService {
   }
 
   /// Customer taps "Claim Warranty" on a completed, still-under-warranty
-  /// booking — POST /bookings/:id/warranty-claim. Returns the brand-new
-  /// linked booking created for the revisit (see backend
-  /// BookingService.RaiseWarrantyClaim).
-  Future<Booking> raiseWarrantyClaim(String bookingId, {String note = ''}) async {
+  /// booking — creates a brand-new linked booking (see
+  /// BookingService.RaiseWarrantyClaim on the backend), which then goes
+  /// through the normal accept/track/complete flow like any other booking.
+  Future<Booking> raiseWarrantyClaim(String originalBookingId, {String? note}) async {
     try {
       final response = await _httpClient.post(
-        '${ApiConfig.baseUrl}/bookings/$bookingId/warranty-claim',
-        data: {if (note.isNotEmpty) 'note': note},
+        '${ApiConfig.bookingComplete}/$originalBookingId/warranty-claim',
+        data: {if (note != null && note.isNotEmpty) 'note': note},
       );
-      final body = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
-      return Booking.fromJson(body);
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return Booking.fromJson(data);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Technician taps "Audio Call" on an active job's card — notifies the
+  /// customer via FCM (see BookingService.InitiateCall on the backend) and
+  /// returns everything needed to immediately join the call room.
+  Future<BookingCallInfo> initiateCall(String bookingId) async {
+    try {
+      final response = await _httpClient.post('${ApiConfig.bookingComplete}/$bookingId/call/initiate');
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return BookingCallInfo.fromJson(data);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Customer side: called after receiving the "Incoming call" push, to
+  /// fetch ICE servers and confirm they're actually a participant on this
+  /// booking before joining the call room.
+  Future<BookingCallInfo> getCallInfo(String bookingId) async {
+    try {
+      final response = await _httpClient.get('${ApiConfig.bookingComplete}/$bookingId/call');
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return BookingCallInfo.fromJson(data);
     } catch (e) {
       throw Exception(ApiEnvelope.errorMessage(e));
     }

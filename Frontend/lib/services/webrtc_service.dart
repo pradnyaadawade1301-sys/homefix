@@ -6,6 +6,11 @@ class WebRTCService {
   final String peerId; // doosre user (technician ya customer) ki id
   final String myId;
 
+  /// When true, only an audio track is captured (no camera) — used for a
+  /// technician's plain "Audio Call" to a customer about an active booking,
+  /// as opposed to a Live Video Consultation which always wants video.
+  final bool audioOnly;
+
   RTCPeerConnection? peerConnection;
   MediaStream? localStream;
   MediaStream? remoteStream;
@@ -26,6 +31,7 @@ class WebRTCService {
     required this.peerId,
     required this.myId,
     List<Map<String, dynamic>>? iceServers,
+    this.audioOnly = false,
   }) : _rtcConfig = {
           'iceServers': (iceServers != null && iceServers.isNotEmpty)
               ? iceServers
@@ -64,7 +70,7 @@ class WebRTCService {
 
     localStream = await navigator.mediaDevices.getUserMedia({
       'audio': true,
-      'video': {'facingMode': 'user'},
+      'video': audioOnly ? false : {'facingMode': 'user'},
     });
     onLocalStream?.call(localStream!);
 

@@ -17,6 +17,15 @@ class VideoCallScreen extends StatefulWidget {
   final bool isCaller; // true = customer (offer create karega)
   final List<Map<String, dynamic>>? iceServers;
 
+  /// True for a plain booking audio call (technician "Audio Call" button) —
+  /// no camera is requested and the UI shows an avatar instead of video.
+  /// False (default) is the normal Live Video Consultation experience.
+  final bool audioOnly;
+  /// Shown in the audio-only UI's avatar/name area — the *other* party's
+  /// name (e.g. the technician's name on the customer's screen, or the
+  /// customer's name on the technician's screen). Has no effect otherwise.
+  final String? peerDisplayName;
+
   // Consultation context — when this call is a Live Video Consultation
   // (customer side, started from SearchingTechnicianScreen), these are set
   // so we can (a) tell the backend the call ended, which is what makes it
@@ -38,6 +47,8 @@ class VideoCallScreen extends StatefulWidget {
     required this.peerId,
     required this.isCaller,
     this.iceServers,
+    this.audioOnly = false,
+    this.peerDisplayName,
     this.consultationId,
     this.categoryId,
     this.categoryName,
@@ -94,6 +105,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       peerId: widget.peerId,
       myId: widget.myId,
       iceServers: widget.iceServers,
+      audioOnly: widget.audioOnly,
     );
 
     _webrtc.onLocalStream = (stream) {
@@ -267,6 +279,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.audioOnly) {
+      return _buildAudioOnlyUI();
+    }
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -335,6 +350,67 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Plain-audio-call UI: no camera preview at all (no camera was even
+  /// requested — see WebRTCService's audioOnly branch), just the peer's
+  /// name/avatar, a call-status label, and mic/end-call controls. Used for
+  /// a technician's "Audio Call" about an active booking.
+  Widget _buildAudioOnlyUI() {
+    final name = widget.peerDisplayName?.trim();
+    final initial = (name != null && name.isNotEmpty) ? name[0].toUpperCase() : '?';
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF121212),
+      body: SafeArea(
+        child: Column(
+          children: [
+            const Spacer(flex: 2),
+            Container(
+              width: 120,
+              height: 120,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white12,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                initial,
+                style: const TextStyle(color: Colors.white, fontSize: 44, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              name != null && name.isNotEmpty ? name : 'HomeFix',
+              style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              _connecting ? (widget.isCaller ? 'Calling...' : 'Connecting...') : 'Audio call in progress',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14),
+            ),
+            const Spacer(flex: 3),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _controlButton(
+                  icon: _micOn ? Icons.mic : Icons.mic_off,
+                  onPressed: _toggleMic,
+                  active: _micOn,
+                ),
+                const SizedBox(width: 24),
+                FloatingActionButton(
+                  backgroundColor: Colors.red,
+                  onPressed: () => _endCall(),
+                  child: const Icon(Icons.call_end, color: Colors.white),
+                ),
+              ],
+            ),
+            const SizedBox(height: 40),
+          ],
+        ),
       ),
     );
   }

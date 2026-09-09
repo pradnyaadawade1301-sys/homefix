@@ -1077,6 +1077,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Message {peerName}'**
   String chatMessageHint(String peerName);
+
+  /// consultTitle label.
+  ///
+  /// In en, this message translates to:
+  /// **'Consult'**
+  String get consultTitle;
+
+  /// consultTabChat label.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat'**
+  String get consultTabChat;
+
+  /// consultTabVideo label.
+  ///
+  /// In en, this message translates to:
+  /// **'Video'**
+  String get consultTabVideo;
+
+  /// consultNoChatsTitle label.
+  ///
+  /// In en, this message translates to:
+  /// **'No chats yet'**
+  String get consultNoChatsTitle;
+
+  /// consultNoChatsSubtitle label.
+  ///
+  /// In en, this message translates to:
+  /// **'Once a technician is assigned to your booking, you can chat with them here.'**
+  String get consultNoChatsSubtitle;
+
+  /// consultServiceBookingFallback label.
+  ///
+  /// In en, this message translates to:
+  /// **'Service booking'**
+  String get consultServiceBookingFallback;
+
+  /// consultNoVideoCallsTitle label.
+  ///
+  /// In en, this message translates to:
+  /// **'No video calls yet'**
+  String get consultNoVideoCallsTitle;
+
+  /// consultNoVideoCallsSubtitle label.
+  ///
+  /// In en, this message translates to:
+  /// **'Your live video consultations with technicians will show up here.'**
+  String get consultNoVideoCallsSubtitle;
+
+  /// consultStatusCompleted label.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get consultStatusCompleted;
+
+  /// consultStatusCancelled label.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get consultStatusCancelled;
+
+  /// consultStatusTechnicianUnavailable label.
+  ///
+  /// In en, this message translates to:
+  /// **'Technician unavailable'**
+  String get consultStatusTechnicianUnavailable;
+
+  /// consultStatusDeclined label.
+  ///
+  /// In en, this message translates to:
+  /// **'Declined'**
+  String get consultStatusDeclined;
+
+  /// consultStatusNoExpertFound label.
+  ///
+  /// In en, this message translates to:
+  /// **'No expert found'**
+  String get consultStatusNoExpertFound;
+
+  /// consultStatusInCall label.
+  ///
+  /// In en, this message translates to:
+  /// **'In call'**
+  String get consultStatusInCall;
+
+  /// consultStatusConfirmed label.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed'**
+  String get consultStatusConfirmed;
+
+  /// consultStatusAwaitingConfirmation label.
+  ///
+  /// In en, this message translates to:
+  /// **'Awaiting confirmation'**
+  String get consultStatusAwaitingConfirmation;
+
+  /// consultStatusUpcoming label.
+  ///
+  /// In en, this message translates to:
+  /// **'Upcoming'**
+  String get consultStatusUpcoming;
+
+  /// consultHelperRejectedScheduled label.
+  ///
+  /// In en, this message translates to:
+  /// **'The technician couldn\'t hold this slot. Please choose a new time.'**
+  String get consultHelperRejectedScheduled;
+
+  /// consultHelperRejectedInstant label.
+  ///
+  /// In en, this message translates to:
+  /// **'The technician was unable to take this call.'**
+  String get consultHelperRejectedInstant;
+
+  /// consultHelperScheduled label.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the technician to confirm this slot.'**
+  String get consultHelperScheduled;
+
+  /// consultHelperConfirmed label.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed — the call will start automatically at the scheduled time.'**
+  String get consultHelperConfirmed;
+
+  /// consultHelperNoTechnician label.
+  ///
+  /// In en, this message translates to:
+  /// **'No technician was available to take this call.'**
+  String get consultHelperNoTechnician;
+
+  /// consultTechnicianFallback label.
+  ///
+  /// In en, this message translates to:
+  /// **'Technician'**
+  String get consultTechnicianFallback;
+
+  /// consultVideoConsultationFallback label.
+  ///
+  /// In en, this message translates to:
+  /// **'Video consultation'**
+  String get consultVideoConsultationFallback;
+
+  /// consultMinutesShort label.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String consultMinutesShort(String minutes);
+
+  /// consultNewRecommendation label.
+  ///
+  /// In en, this message translates to:
+  /// **'New recommendation from technician'**
+  String get consultNewRecommendation;
+
+  /// consultNewBadge label.
+  ///
+  /// In en, this message translates to:
+  /// **'NEW'**
+  String get consultNewBadge;
 }
 
 class _AppLocalizationsDelegate

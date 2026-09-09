@@ -533,4 +533,93 @@ class AppLocalizationsHi extends AppLocalizations {
   String chatMessageHint(String peerName) {
     return '$peerName को संदेश भेजें';
   }
+
+  @override
+  String get consultTitle => 'परामर्श';
+
+  @override
+  String get consultTabChat => 'चैट';
+
+  @override
+  String get consultTabVideo => 'वीडियो';
+
+  @override
+  String get consultNoChatsTitle => 'अभी तक कोई चैट नहीं';
+
+  @override
+  String get consultNoChatsSubtitle =>
+      'जब आपकी बुकिंग के लिए तकनीशियन असाइन हो जाएगा, तो आप यहां उनसे चैट कर सकेंगे।';
+
+  @override
+  String get consultServiceBookingFallback => 'सेवा बुकिंग';
+
+  @override
+  String get consultNoVideoCallsTitle => 'अभी तक कोई वीडियो कॉल नहीं';
+
+  @override
+  String get consultNoVideoCallsSubtitle =>
+      'तकनीशियनों के साथ आपकी लाइव वीडियो परामर्श यहां दिखाई देंगी।';
+
+  @override
+  String get consultStatusCompleted => 'पूर्ण';
+
+  @override
+  String get consultStatusCancelled => 'रद्द';
+
+  @override
+  String get consultStatusTechnicianUnavailable => 'तकनीशियन अनुपलब्ध';
+
+  @override
+  String get consultStatusDeclined => 'अस्वीकृत';
+
+  @override
+  String get consultStatusNoExpertFound => 'कोई विशेषज्ञ नहीं मिला';
+
+  @override
+  String get consultStatusInCall => 'कॉल में';
+
+  @override
+  String get consultStatusConfirmed => 'पुष्टि की गई';
+
+  @override
+  String get consultStatusAwaitingConfirmation => 'पुष्टि की प्रतीक्षा में';
+
+  @override
+  String get consultStatusUpcoming => 'आगामी';
+
+  @override
+  String get consultHelperRejectedScheduled =>
+      'तकनीशियन इस स्लॉट को होल्ड नहीं कर सका। कृपया नया समय चुनें।';
+
+  @override
+  String get consultHelperRejectedInstant => 'तकनीशियन यह कॉल नहीं ले सका।';
+
+  @override
+  String get consultHelperScheduled =>
+      'तकनीशियन द्वारा इस स्लॉट की पुष्टि की प्रतीक्षा है।';
+
+  @override
+  String get consultHelperConfirmed =>
+      'पुष्टि हो गई — कॉल निर्धारित समय पर स्वतः शुरू होगी।';
+
+  @override
+  String get consultHelperNoTechnician =>
+      'इस कॉल को लेने के लिए कोई तकनीशियन उपलब्ध नहीं था।';
+
+  @override
+  String get consultTechnicianFallback => 'तकनीशियन';
+
+  @override
+  String get consultVideoConsultationFallback => 'वीडियो परामर्श';
+
+  @override
+  String consultMinutesShort(String minutes) {
+    return '$minutes मिनट';
+  }
+
+  @override
+  String get consultNewRecommendation => 'तकनीशियन की ओर से नई सिफारिश';
+
+  @override
+  String get consultNewBadge => 'नया';
 }

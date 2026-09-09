@@ -5,6 +5,7 @@ import '../../models/booking_model.dart';
 import '../../models/consultation_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/consultation_provider.dart';
+import '../../l10n/app_localizations.dart';
 import '../chat/booking_chat_screen.dart';
 import '../consultation/post_call_screen.dart';
 
@@ -46,10 +47,11 @@ class _ConsultScreenState extends State<ConsultScreen> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       appBar: AppBar(
-        title: const Text('Consult'),
+        title: Text(l10n.consultTitle),
         centerTitle: false,
         elevation: 0,
         backgroundColor: const Color(0xFFF7F8FA),
@@ -60,9 +62,9 @@ class _ConsultScreenState extends State<ConsultScreen> with SingleTickerProvider
           labelColor: AppTheme.primaryColor,
           unselectedLabelColor: Colors.grey,
           indicatorColor: AppTheme.primaryColor,
-          tabs: const [
-            Tab(icon: Icon(Icons.chat_bubble_outline_rounded), text: 'Chat'),
-            Tab(icon: Icon(Icons.videocam_outlined), text: 'Video'),
+          tabs: [
+            Tab(icon: const Icon(Icons.chat_bubble_outline_rounded), text: l10n.consultTabChat),
+            Tab(icon: const Icon(Icons.videocam_outlined), text: l10n.consultTabVideo),
           ],
         ),
       ),
@@ -98,10 +100,10 @@ class _ChatHistoryTab extends StatelessWidget {
             ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
           if (withTechnician.isEmpty) {
-            return const _EmptyState(
+            return _EmptyState(
               icon: Icons.chat_bubble_outline_rounded,
-              title: 'No chats yet',
-              subtitle: 'Once a technician is assigned to your booking, your conversation shows up here.',
+              title: AppLocalizations.of(context)!.consultNoChatsTitle,
+              subtitle: AppLocalizations.of(context)!.consultNoChatsSubtitle,
             );
           }
           return ListView.separated(
@@ -155,7 +157,7 @@ class _ChatRow extends StatelessWidget {
                     Text(tech.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
                     const SizedBox(height: 3),
                     Text(
-                      booking.categoryName.isNotEmpty ? booking.categoryName : 'Service booking',
+                      booking.categoryName.isNotEmpty ? booking.categoryName : AppLocalizations.of(context)!.consultServiceBookingFallback,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
@@ -189,10 +191,10 @@ class _VideoHistoryTab extends StatelessWidget {
           final calls = [...provider.history]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
           if (calls.isEmpty) {
-            return const _EmptyState(
+            return _EmptyState(
               icon: Icons.videocam_off_rounded,
-              title: 'No video calls yet',
-              subtitle: 'Your live video consultations with technicians will show up here.',
+              title: AppLocalizations.of(context)!.consultNoVideoCallsTitle,
+              subtitle: AppLocalizations.of(context)!.consultNoVideoCallsSubtitle,
             );
           }
           return ListView.separated(
@@ -228,28 +230,29 @@ class _VideoRow extends StatelessWidget {
     }
   }
 
-  String _statusLabel() {
+  String _statusLabel(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     switch (consultation.status) {
       case ConsultationStatus.ended:
-        return 'Completed';
+        return l10n.consultStatusCompleted;
       case ConsultationStatus.cancelled:
-        return 'Cancelled';
+        return l10n.consultStatusCancelled;
       case ConsultationStatus.rejected:
         // A scheduled slot the technician couldn't hold reads differently from
         // an instant call nobody picked up — same underlying status, different
         // customer-facing story, so distinguish it here rather than showing a
         // flat "Declined" for both.
-        return consultation.scheduledAt != null ? 'Technician unavailable' : 'Declined';
+        return consultation.scheduledAt != null ? l10n.consultStatusTechnicianUnavailable : l10n.consultStatusDeclined;
       case ConsultationStatus.noTechnician:
-        return 'No expert found';
+        return l10n.consultStatusNoExpertFound;
       case ConsultationStatus.inCall:
-        return 'In call';
+        return l10n.consultStatusInCall;
       case ConsultationStatus.confirmed:
-        return 'Confirmed';
+        return l10n.consultStatusConfirmed;
       case ConsultationStatus.scheduled:
-        return 'Awaiting confirmation';
+        return l10n.consultStatusAwaitingConfirmation;
       default:
-        return 'Upcoming';
+        return l10n.consultStatusUpcoming;
     }
   }
 
@@ -258,18 +261,19 @@ class _VideoRow extends StatelessWidget {
   /// importantly a declined "Schedule for later" slot, where the customer
   /// should see plainly that the technician was busy and they need to pick a
   /// new time, not just a bare "Declined" tag with no next step.
-  String? _helperText() {
+  String? _helperText(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     switch (consultation.status) {
       case ConsultationStatus.rejected:
         return consultation.scheduledAt != null
-            ? 'The technician was busy and couldn\'t make this slot. Please request a new time.'
-            : 'The technician couldn\'t take your call. You can try again.';
+            ? l10n.consultHelperRejectedScheduled
+            : l10n.consultHelperRejectedInstant;
       case ConsultationStatus.scheduled:
-        return 'Waiting for the technician to confirm your requested slot.';
+        return l10n.consultHelperScheduled;
       case ConsultationStatus.confirmed:
-        return 'Confirmed — the call will start automatically at your scheduled time.';
+        return l10n.consultHelperConfirmed;
       case ConsultationStatus.noTechnician:
-        return 'No technician was available for this request. Please try again later.';
+        return l10n.consultHelperNoTechnician;
       default:
         return null;
     }
@@ -288,12 +292,13 @@ class _VideoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final peerName = (consultation.technicianName != null && consultation.technicianName!.isNotEmpty)
         ? consultation.technicianName!
-        : 'Technician';
+        : l10n.consultTechnicianFallback;
     final minutes = consultation.durationSeconds != null ? (consultation.durationSeconds! / 60).ceil() : null;
     final ended = consultation.status == ConsultationStatus.ended;
-    final helper = _helperText();
+    final helper = _helperText(context);
     final color = _statusColor();
 
     return Material(
@@ -339,9 +344,9 @@ class _VideoRow extends StatelessWidget {
                         Text(peerName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
                         const SizedBox(height: 3),
                         Text(
-                          '${consultation.categoryName.isNotEmpty ? consultation.categoryName : 'Video consultation'}'
+                          '${consultation.categoryName.isNotEmpty ? consultation.categoryName : l10n.consultVideoConsultationFallback}'
                           '${consultation.scheduledAt != null ? ' • ${_formatSlot(consultation.scheduledAt!)}' : ' • ${consultation.createdAt.day}/${consultation.createdAt.month}/${consultation.createdAt.year}'}'
-                          '${minutes != null ? ' • $minutes min' : ''}',
+                          '${minutes != null ? ' • ${l10n.consultMinutesShort('$minutes')}' : ''}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
@@ -350,7 +355,7 @@ class _VideoRow extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    _statusLabel(),
+                    _statusLabel(context),
                     style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: color),
                   ),
                 ],
@@ -369,10 +374,10 @@ class _VideoRow extends StatelessWidget {
                     children: [
                       const Icon(Icons.assignment_turned_in_outlined, size: 18, color: AppTheme.primaryColor),
                       const SizedBox(width: 8),
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'New recommendation from your technician — tap to review',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.primaryColor),
+                          l10n.consultNewRecommendation,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.primaryColor),
                         ),
                       ),
                       Container(
@@ -381,7 +386,7 @@ class _VideoRow extends StatelessWidget {
                           color: AppTheme.primaryColor,
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Text('NEW', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white)),
+                        child: Text(l10n.consultNewBadge, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white)),
                       ),
                     ],
                   ),

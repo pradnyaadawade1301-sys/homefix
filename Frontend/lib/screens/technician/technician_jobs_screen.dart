@@ -5,8 +5,13 @@ import '../../core/theme.dart';
 import '../../models/booking_model.dart';
 import '../../models/consultation_model.dart';
 import '../../providers/booking_provider.dart';
+import '../../providers/category_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/consultation_provider.dart';
+import '../../services/booking_service.dart';
+import '../../services/signaling_service.dart';
+import '../../config/api_config.dart';
+import '../video_call_screen.dart';
 import '../../widgets/guided_tour.dart';
 import '../consultation/incoming_consultation_screen.dart';
 import '../consultation/upcoming_consultations_screen.dart';
@@ -15,9 +20,8 @@ import 'technician_settlement_screen.dart';
 import 'technician_history_screen.dart';
 import 'repeat_customers_screen.dart';
 import '../chat/booking_chat_screen.dart';
+import 'technician_estimate_screen.dart';
 import 'technician_job_detail_screen.dart';
-import '../../providers/category_provider.dart';
-import 'job_brief_card.dart';
 
 class TechnicianJobsScreen extends StatefulWidget {
   const TechnicianJobsScreen({Key? key}) : super(key: key);
@@ -53,7 +57,6 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
     _pollTimer = Timer.periodic(const Duration(seconds: 6), (_) {
       _pollPendingRequests();
       _pollUpcoming();
-      _pollBookings();
     });
   }
 
@@ -145,18 +148,6 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
     if (technicianId != null && mounted) {
       await context.read<BookingProvider>().fetchTechnicianBookings(technicianId);
     }
-  }
-
-  // Silent poll used by the periodic timer: same fetch as _load, but skips
-  // the KYC profile lookup since that never changes after login. Runs every
-  // 6s so new job assignments and status changes (e.g. "inspecting" ->
-  // "on_the_way") show up without a manual pull-to-refresh.
-  Future<void> _pollBookings() async {
-    final technicianId = context.read<TechnicianKycProvider>().profile?.id;
-    if (technicianId == null || !mounted) return;
-    try {
-      await context.read<BookingProvider>().fetchTechnicianBookings(technicianId);
-    } catch (_) {}
   }
 
   Future<void> _confirmLogout() async {
@@ -395,7 +386,7 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
                 return ListView.builder(
                   padding: const EdgeInsets.all(20),
                   itemCount: jobs.length,
-                  itemBuilder: (context, i) => _JobCard(key: ValueKey(jobs[i].id), booking: jobs[i]),
+                  itemBuilder: (context, i) => _JobCard(booking: jobs[i]),
                 );
               },
             ),
@@ -552,7 +543,7 @@ class _FilterChip extends StatelessWidget {
 
 class _JobCard extends StatelessWidget {
   final Booking booking;
-  const _JobCard({super.key, required this.booking});
+  const _JobCard({required this.booking});
 
   Color _statusColor(String status) {
     switch (status) {
@@ -575,12 +566,7 @@ class _JobCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final customer = booking.customer;
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => TechnicianJobDetailScreen(booking: booking),
-      )),
-      child: Container(
+    return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -681,18 +667,8 @@ class _JobCard extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 10),
-          // Full Job Brief (guided answers, AI notes, attachments, and a
-          // "what to bring" checklist) only shows once this job is actually
-          // assigned to this technician — while it's still 'requested' they
-          // only see the short problem_description above, enough to decide
-          // Accept/Decline without the full detail cluttering the list.
-          if (booking.status != 'requested' && booking.status != 'pending_technician' && (booking.jobBrief != null || booking.images.isNotEmpty)) ...[
-            JobBriefCard(booking: booking),
-            const SizedBox(height: 10),
-          ],
           JobActionRow(booking: booking),
         ],
-      ),
       ),
     );
   }
@@ -702,41 +678,34 @@ class JobActionRow extends StatelessWidget {
   final Booking booking;
   const JobActionRow({super.key, required this.booking});
 
+  static const _callableStatuses = {
+    'accepted',
+    'on_the_way',
+    'arrived',
+    'inspecting',
+    'in_progress',
+  };
+
   @override
   Widget build(BuildContext context) {
     final provider = context.read<BookingProvider>();
     final kycProfile = context.watch<TechnicianKycProvider>().profile;
 
+    Widget primary;
     switch (booking.status) {
       case 'requested':
-      case 'pending_technician':
-        return Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.errorColor,
-                  side: BorderSide(color: AppTheme.errorColor.withValues(alpha: 0.4)),
-                ),
-                onPressed: kycProfile == null
-                    ? null
-                    : () => _confirmDecline(context, provider, booking.id, kycProfile.id),
-                child: const Text('Decline'),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: kycProfile == null
-                    ? null
-                    : () => _acceptBooking(context, provider, booking, kycProfile.id),
-                child: const Text('Accept job'),
-              ),
-            ),
-          ],
+        primary = SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: kycProfile == null
+                ? null
+                : () => _runAction(context, () => provider.acceptBooking(booking.id, kycProfile.id)),
+            child: const Text('Accept job'),
+          ),
         );
+        break;
       case 'accepted':
-        return SizedBox(
+        primary = SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
             icon: const Icon(Icons.directions_run_rounded, size: 18),
@@ -745,8 +714,9 @@ class JobActionRow extends StatelessWidget {
             label: const Text("I'm on my way"),
           ),
         );
+        break;
       case 'on_the_way':
-        return SizedBox(
+        primary = SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
             icon: const Icon(Icons.home_rounded, size: 18),
@@ -756,20 +726,80 @@ class JobActionRow extends StatelessWidget {
             label: const Text("I've arrived"),
           ),
         );
+        break;
       case 'arrived':
-        return _OtpVerifyRow(key: ValueKey('otp_${booking.id}'), booking: booking, technicianId: kycProfile?.id);
+        primary = _OtpVerifyRow(booking: booking, technicianId: kycProfile?.id);
+        break;
       case 'inspecting':
       case 'in_progress':
-        return SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            icon: const Icon(Icons.receipt_long_rounded, size: 18),
-            onPressed: () => _showInvoiceDialog(context, provider, booking),
-            label: const Text('Generate invoice & complete'),
-          ),
-        );
+        primary = _EstimateAwareAction(booking: booking, technicianId: kycProfile?.id);
+        break;
+      case 'awaiting_estimate_approval':
+        primary = _WaitingOnEstimateRow(booking: booking);
+        break;
       default:
-        return const SizedBox.shrink();
+        primary = const SizedBox.shrink();
+    }
+
+    if (!_callableStatuses.contains(booking.status)) {
+      return primary;
+    }
+
+    // "Audio Call" is offered alongside the normal status action for any
+    // active job — a technician might want to call the customer at any
+    // point between accepting and completing (confirm the address, ask a
+    // quick question before raising an estimate, etc.), not just during a
+    // single specific step.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        primary,
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          icon: const Icon(Icons.call_outlined, size: 18),
+          onPressed: () => _startAudioCall(context, booking),
+          label: const Text('Audio Call'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _startAudioCall(BuildContext context, Booking booking) async {
+    final bookingService = context.read<BookingService>();
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
+    try {
+      final callInfo = await bookingService.initiateCall(booking.id);
+      final token = await context.read<AuthProvider>().getValidAccessToken();
+      final myId = context.read<AuthProvider>().currentUser?.id ?? '';
+      if (token == null) {
+        messenger.showSnackBar(const SnackBar(content: Text('Could not start the call — please try again')));
+        return;
+      }
+
+      final signaling = SignalingService(
+        serverUrl: ApiConfig.wsCallUrl(booking.id, token),
+        userId: myId,
+        isDirectUrl: true,
+      );
+      signaling.connect();
+
+      await navigator.push(MaterialPageRoute(
+        builder: (_) => VideoCallScreen(
+          signaling: signaling,
+          myId: myId,
+          peerId: booking.id, // room only ever has 2 sockets — exact id unused by the relay
+          isCaller: true,
+          audioOnly: true,
+          iceServers: callInfo.iceServers,
+          peerDisplayName: booking.customer?.name,
+        ),
+      ));
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
     }
   }
 
@@ -781,236 +811,250 @@ class JobActionRow extends StatelessWidget {
       messenger.showSnackBar(SnackBar(content: Text(provider.error!)));
     }
   }
-
-  /// Accepts the job — no separate estimate/price-negotiation step. The
-  /// booking already carries a fixed price (the category's base price, set
-  /// at booking creation — see BookingService.Create), so as soon as the
-  /// technician accepts, the job card itself flips to the "accepted" state
-  /// and shows the "I'm on my way" action next.
-  Future<void> _acceptBooking(
-    BuildContext context,
-    BookingProvider provider,
-    Booking booking,
-    String technicianId,
-  ) async {
-    final messenger = ScaffoldMessenger.of(context);
-    await provider.acceptBooking(booking.id, technicianId);
-    if (provider.error != null) {
-      messenger.showSnackBar(SnackBar(content: Text(provider.error!)));
-    }
-  }
-
-  /// Confirms before declining — this is a one-way action (the booking goes
-  /// back into the pool for another technician), so it's worth one extra tap
-  /// to avoid accidental taps costing the technician a job.
-  Future<void> _confirmDecline(
-    BuildContext context,
-    BookingProvider provider,
-    String bookingId,
-    String technicianId,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Decline this job?'),
-        content: const Text("We'll find another technician for this booking. This can't be undone."),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Decline', style: TextStyle(color: AppTheme.errorColor)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      await _runAction(context, () => provider.declineBooking(bookingId, technicianId));
-    }
-  }
 }
 
 void _showInvoiceDialog(BuildContext context, BookingProvider provider, Booking booking) {
+  final controller = TextEditingController(
+    text: (booking.estimatedPrice ?? 0) > 0 ? (booking.estimatedPrice ?? 0).toStringAsFixed(0) : '',
+  );
+
+  // Admin-configured allowed warranty durations for this booking's category
+  // (see CategoryProvider/Category.warrantyOptions) — the technician can
+  // only pick one of these, never type a custom number of days.
+  final categories = context.read<CategoryProvider>().categories;
+  final category = categories.where((c) => c.id == booking.categoryId).toList();
+  final warrantyOptions = category.isNotEmpty ? category.first.warrantyOptions : const [7, 15, 30, 90];
+
+  bool warrantyEnabled = false;
+  int? selectedDays = warrantyOptions.isNotEmpty ? warrantyOptions.first : null;
+
   showDialog(
     context: context,
-    builder: (dialogContext) => _InvoiceDialog(provider: provider, booking: booking),
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (dialogContext, setState) => AlertDialog(
+        title: const Text('Complete job & generate invoice'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Enter the final amount the customer should pay. This is sent to them immediately as the amount due.',
+                style: TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  prefixText: '₹ ',
+                  labelText: 'Final amount',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const Divider(height: 32),
+              // Warranty is opt-in — off unless the technician explicitly
+              // switches it on, per HomeFix's "not automatic" rule.
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Offer a warranty on this service?'),
+                subtitle: Text(
+                  warrantyEnabled ? 'Customer will see this warranty on their invoice.' : 'Customer will see "No Warranty Provided".',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+                value: warrantyEnabled,
+                onChanged: (v) => setState(() => warrantyEnabled = v),
+              ),
+              if (warrantyEnabled) ...[
+                const SizedBox(height: 8),
+                Text('Warranty duration', style: Theme.of(dialogContext).textTheme.labelLarge),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: warrantyOptions.map((d) {
+                    return ChoiceChip(
+                      label: Text('$d days'),
+                      selected: selectedDays == d,
+                      onSelected: (_) => setState(() => selectedDays = d),
+                    );
+                  }).toList(),
+                ),
+                if (warrantyOptions.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      'No warranty durations are configured for this category yet.',
+                      style: TextStyle(fontSize: 12, color: AppTheme.errorColor),
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final price = double.tryParse(controller.text.trim());
+              if (price == null || price <= 0) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(content: Text('Enter a valid amount')),
+                );
+                return;
+              }
+              if (warrantyEnabled && selectedDays == null) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(content: Text('Select a warranty duration')),
+                );
+                return;
+              }
+              Navigator.of(dialogContext).pop();
+              provider.completeBooking(
+                booking.id,
+                price,
+                warrantyEnabled: warrantyEnabled,
+                warrantyDays: warrantyEnabled ? selectedDays : null,
+              );
+            },
+            child: const Text('Send invoice'),
+          ),
+        ],
+      ),
+    ),
   );
 }
 
-/// "Generate invoice" dialog — final amount, plus an optional "Offer a
-/// warranty" toggle with a free-form duration (a number + a Days/Months/Years
-/// unit). There's no admin-configured whitelist: the technician judges each
-/// job on its own merits (e.g. a compressor swap might earn 1 year, a gas
-/// top-up 15 days), and the backend only sanity-bounds the total to a
-/// positive number under 10 years — see BookingService.Complete.
-class _InvoiceDialog extends StatefulWidget {
-  final BookingProvider provider;
+class _EstimateAwareAction extends StatefulWidget {
   final Booking booking;
-  const _InvoiceDialog({required this.provider, required this.booking});
+  final String? technicianId;
+  const _EstimateAwareAction({required this.booking, required this.technicianId});
 
   @override
-  State<_InvoiceDialog> createState() => _InvoiceDialogState();
+  State<_EstimateAwareAction> createState() => _EstimateAwareActionState();
 }
 
-enum _WarrantyUnit { days, months, years }
-
-extension on _WarrantyUnit {
-  String get label {
-    switch (this) {
-      case _WarrantyUnit.days:
-        return 'Days';
-      case _WarrantyUnit.months:
-        return 'Months';
-      case _WarrantyUnit.years:
-        return 'Years';
-    }
-  }
-
-  int get inDays {
-    switch (this) {
-      case _WarrantyUnit.days:
-        return 1;
-      case _WarrantyUnit.months:
-        return 30;
-      case _WarrantyUnit.years:
-        return 365;
-    }
-  }
-}
-
-class _InvoiceDialogState extends State<_InvoiceDialog> {
-  late final TextEditingController _controller;
-  late final TextEditingController _warrantyAmountController;
-  bool _warrantyEnabled = false;
-  _WarrantyUnit _warrantyUnit = _WarrantyUnit.months;
+class _EstimateAwareActionState extends State<_EstimateAwareAction> {
+  late Future<BookingEstimate?> _future;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(
-      text: (widget.booking.estimatedPrice ?? 0) > 0 ? (widget.booking.estimatedPrice ?? 0).toStringAsFixed(0) : '',
-    );
-    _warrantyAmountController = TextEditingController();
+    _future = context.read<BookingService>().getLatestEstimate(widget.booking.id);
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    _warrantyAmountController.dispose();
-    super.dispose();
-  }
-
-  /// Total warranty length in days, converted from whatever the technician
-  /// typed + the unit they picked (e.g. "6" + Months -> 180). Returns null
-  /// if the amount isn't a valid positive whole number.
-  int? get _warrantyDaysValue {
-    final amount = int.tryParse(_warrantyAmountController.text.trim());
-    if (amount == null || amount <= 0) return null;
-    return amount * _warrantyUnit.inDays;
+  void _refresh() {
+    setState(() {
+      _future = context.read<BookingService>().getLatestEstimate(widget.booking.id);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Generate invoice'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Enter the final amount the customer should pay. This is sent to them immediately as the amount due.',
-              style: TextStyle(fontSize: 13, color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _controller,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                prefixText: '₹ ',
-                labelText: 'Final amount',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 20),
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Offer a warranty', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
-              subtitle: const Text('Customer can raise a free revisit within this window', style: TextStyle(fontSize: 11.5)),
-              value: _warrantyEnabled,
-              onChanged: (v) => setState(() => _warrantyEnabled = v),
-            ),
-            if (_warrantyEnabled) ...[
-              const SizedBox(height: 4),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: TextField(
-                      controller: _warrantyAmountController,
-                      keyboardType: TextInputType.number,
-                      onChanged: (_) => setState(() {}),
-                      decoration: const InputDecoration(
-                        labelText: 'Duration',
-                        hintText: 'e.g. 6',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                    ),
+    final provider = context.read<BookingProvider>();
+
+    return FutureBuilder<BookingEstimate?>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 40,
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        }
+
+        final estimate = snapshot.data;
+        if (estimate == null || estimate.isDeclined) {
+          return Column(
+            children: [
+              if (estimate != null && estimate.isDeclined && (estimate.customerNote ?? '').isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.errorColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    flex: 3,
-                    child: DropdownButtonFormField<_WarrantyUnit>(
-                      value: _warrantyUnit,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      items: _WarrantyUnit.values
-                          .map((u) => DropdownMenuItem(value: u, child: Text(u.label, style: const TextStyle(fontSize: 13))))
-                          .toList(),
-                      onChanged: (u) => setState(() => _warrantyUnit = u ?? _warrantyUnit),
-                    ),
+                  child: Text(
+                    'Customer declined: ${estimate.customerNote}',
+                    style: const TextStyle(fontSize: 12, color: AppTheme.errorColor),
                   ),
-                ],
+                ),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.receipt_long_rounded, size: 18),
+                  onPressed: widget.technicianId == null
+                      ? null
+                      : () async {
+                          final sent = await Navigator.of(context).push<bool>(MaterialPageRoute(
+                            builder: (_) => TechnicianEstimateScreen(
+                              bookingId: widget.booking.id,
+                              technicianId: widget.technicianId!,
+                              customerName: widget.booking.customer?.name ?? 'the customer',
+                            ),
+                          ));
+                          if (sent == true) _refresh();
+                        },
+                  label: Text(estimate != null && estimate.isDeclined ? 'Revise & resend estimate' : 'Submit estimate'),
+                ),
               ),
             ],
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            final price = double.tryParse(_controller.text.trim());
-            if (price == null || price <= 0) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Enter a valid amount')),
-              );
-              return;
-            }
-            if (_warrantyEnabled && _warrantyDaysValue == null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Enter a valid warranty duration')),
-              );
-              return;
-            }
-            Navigator.of(context).pop();
-            widget.provider.completeBooking(
-              widget.booking.id,
-              price,
-              warrantyEnabled: _warrantyEnabled,
-              warrantyDays: _warrantyEnabled ? _warrantyDaysValue : null,
-            );
-          },
-          child: const Text('Send invoice'),
-        ),
-      ],
+          );
+        }
+
+        return SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () => _showInvoiceDialog(context, provider, widget.booking),
+            child: const Text('Generate invoice & complete'),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _WaitingOnEstimateRow extends StatelessWidget {
+  final Booking booking;
+  const _WaitingOnEstimateRow({required this.booking});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<BookingEstimate?>(
+      future: context.read<BookingService>().getLatestEstimate(booking.id),
+      builder: (context, snapshot) {
+        final estimate = snapshot.data;
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppTheme.warningColor.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const SizedBox(
+                width: 16, height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.warningColor),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  estimate != null
+                      ? 'Waiting for customer to approve \u20b9${estimate.totalAmount.toStringAsFixed(0)} estimate'
+                      : 'Waiting for customer to review your estimate',
+                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -1018,7 +1062,7 @@ class _InvoiceDialogState extends State<_InvoiceDialog> {
 class _OtpVerifyRow extends StatefulWidget {
   final Booking booking;
   final String? technicianId;
-  const _OtpVerifyRow({super.key, required this.booking, required this.technicianId});
+  const _OtpVerifyRow({required this.booking, required this.technicianId});
 
   @override
   State<_OtpVerifyRow> createState() => _OtpVerifyRowState();

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'core/http_client.dart';
 import 'core/theme.dart';
+import 'config/api_config.dart';
 import 'l10n/app_localizations.dart';
 import 'providers/address_provider.dart';
 import 'providers/ai_provider.dart';
@@ -25,9 +26,10 @@ import 'screens/technician/technician_status_screen.dart';
 import 'services/auth_service.dart';
 import 'services/booking_service.dart';
 import 'services/consultation_service.dart';
-import 'services/dispute_service.dart';
 import 'services/location_service.dart';
 import 'services/service_locator.dart';
+import 'services/signaling_service.dart';
+import 'screens/video_call_screen.dart';
 import 'screens/technician/technician_jobs_screen.dart';
 import 'screens/notifications/notification_detail_screen.dart';
 import 'main.dart' as app; // for fcmNotificationService, navigatorKey
@@ -56,7 +58,6 @@ class _MyAppState extends State<MyApp> {
   late HttpClient _httpClient;
   late AuthService _authService;
   late BookingService _bookingService;
-  late DisputeService _disputeService;
   late CategoryService _categoryService;
   late TechnicianService _technicianService;
   late TechnicianKycService _technicianKycService;
@@ -74,15 +75,14 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     _initializeServices();
+    _localeProvider = LocaleProvider()..loadSavedLocale();
   }
 
   void _initializeServices() {
     const secureStorage = FlutterSecureStorage();
-    _localeProvider = LocaleProvider()..loadSavedLocale();
     _httpClient = HttpClient(secureStorage: secureStorage);
     _authService = AuthService(httpClient: _httpClient, secureStorage: secureStorage);
     _bookingService = BookingService(httpClient: _httpClient);
-    _disputeService = DisputeService(httpClient: _httpClient);
     _categoryService = CategoryService(httpClient: _httpClient);
     _technicianService = TechnicianService(httpClient: _httpClient);
     _technicianKycService = TechnicianKycService(httpClient: _httpClient);
@@ -133,22 +133,73 @@ class _MyAppState extends State<MyApp> {
       FlutterRingtonePlayer().playRingtone(looping: true, volume: 1.0, asAlarm: false);
       app.navigatorKey.currentState?.pushNamed('/consultation-requests');
     };
+
+    // Wire up a technician's "Audio Call" about an active booking: ring,
+    // fetch ICE servers + confirm we're actually a participant (see
+    // BookingService.getCallInfo -> GET /bookings/:id/call), then jump
+    // straight into the audio-only call screen — the customer shouldn't
+    // have to tap anything to answer, same as the consultation flow above,
+    // just going directly to the call instead of a request-list screen
+    // since there's nothing to accept/decline here.
+    app.fcmNotificationService.onIncomingBookingCall = (payload) async {
+      debugPrint('[FCM] Incoming booking audio call: $payload');
+      final bookingId = payload['booking_id'] as String?;
+      if (bookingId == null) return;
+
+      final navContext = app.navigatorKey.currentState?.context;
+      if (navContext == null) return;
+
+      FlutterRingtonePlayer().playRingtone(looping: true, volume: 1.0, asAlarm: false);
+
+      try {
+        final callInfo = await _bookingService.getCallInfo(bookingId);
+        final token = await navContext.read<AuthProvider>().getValidAccessToken();
+        final myId = navContext.read<AuthProvider>().currentUser?.id ?? '';
+
+        if (token == null) {
+          FlutterRingtonePlayer().stop();
+          return;
+        }
+
+        final signaling = SignalingService(
+          serverUrl: ApiConfig.wsCallUrl(bookingId, token),
+          userId: myId,
+          isDirectUrl: true,
+        );
+        signaling.connect();
+
+        FlutterRingtonePlayer().stop();
+        app.navigatorKey.currentState?.push(MaterialPageRoute(
+          builder: (_) => VideoCallScreen(
+            signaling: signaling,
+            myId: myId,
+            peerId: bookingId, // room only ever has 2 sockets — exact id unused by the relay
+            isCaller: false,
+            audioOnly: true,
+            iceServers: callInfo.iceServers,
+            peerDisplayName: callInfo.technicianName ?? (payload['technician_name'] as String?),
+          ),
+        ));
+      } catch (e) {
+        debugPrint('[FCM] Failed to join booking call: $e');
+        FlutterRingtonePlayer().stop();
+      }
+    };
   }
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider<LocaleProvider>.value(value: _localeProvider),
         ChangeNotifierProvider(
           create: (_) => AuthProvider(authService: _authService)
             ..onAuthenticated = () => _registerFcmToken(_httpClient),
         ),
+        ChangeNotifierProvider<LocaleProvider>.value(value: _localeProvider),
         ChangeNotifierProvider(
           create: (_) => BookingProvider(bookingService: _bookingService),
         ),
         Provider<BookingService>.value(value: _bookingService),
-        Provider<DisputeService>.value(value: _disputeService),
         ChangeNotifierProvider(
           create: (_) => CategoryProvider(categoryService: _categoryService),
         ),
@@ -186,34 +237,34 @@ class _MyAppState extends State<MyApp> {
       ],
       child: Consumer<LocaleProvider>(
         builder: (context, localeProvider, _) => MaterialApp(
-        navigatorKey: app.navigatorKey,
-        title: 'HomeFix Live',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.light,
-        locale: localeProvider.locale,
-        supportedLocales: LocaleProvider.supportedLocales,
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        // Splash decides where to go next (checks stored tokens), then navigates
-        // via these named routes — do not remove any of them or splash will crash.
-        initialRoute: '/',
-        routes: {
-          '/': (context) => const SplashScreen(),
-          '/login': (context) => const LoginScreen(),
-          '/signup': (context) => const SignupScreen(),
-          '/home': (context) => const HomeScreen(),
-          '/technician-kyc': (context) => const TechnicianKycScreen(),
-          '/technician-status': (context) => const TechnicianStatusScreen(),
-          '/technician-home': (context) => TechnicianJobsScreen(key: TechnicianJobsScreen.globalKey),
-          '/consultation-requests': (context) => const IncomingConsultationScreen(),
-        },
-      ),
+          navigatorKey: app.navigatorKey,
+          title: 'HomeFix Live',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: ThemeMode.light,
+          locale: localeProvider.locale,
+          supportedLocales: LocaleProvider.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          // Splash decides where to go next (checks stored tokens), then navigates
+          // via these named routes — do not remove any of them or splash will crash.
+          initialRoute: '/',
+          routes: {
+            '/': (context) => const SplashScreen(),
+            '/login': (context) => const LoginScreen(),
+            '/signup': (context) => const SignupScreen(),
+            '/home': (context) => const HomeScreen(),
+            '/technician-kyc': (context) => const TechnicianKycScreen(),
+            '/technician-status': (context) => const TechnicianStatusScreen(),
+            '/technician-home': (context) => TechnicianJobsScreen(key: TechnicianJobsScreen.globalKey),
+            '/consultation-requests': (context) => const IncomingConsultationScreen(),
+          },
+        ),
       ),
     );
   }
