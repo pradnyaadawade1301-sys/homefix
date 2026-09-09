@@ -122,4 +122,11 @@ type InvoiceDetail struct {
 	IsRepeatCustomer      bool     `json:"is_repeat_customer"`
 	RepeatDiscountPercent *float64 `json:"repeat_discount_percent,omitempty"`
 	RepeatDiscountAmount  *float64 `json:"repeat_discount_amount,omitempty"`
+
+	// Warranty — set at BookingService.Complete (see 022_visit_fee.sql /
+	// booking.go). Shown on the invoice so the customer has proof of cover
+	// alongside the receipt, not just on the booking-tracking screen.
+	WarrantyEnabled   bool       `json:"warranty_enabled"`
+	WarrantyDays      *int       `json:"warranty_days,omitempty"`
+	WarrantyExpiresAt *time.Time `json:"warranty_expires_at,omitempty"`
 }
