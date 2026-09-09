@@ -87,6 +87,7 @@ func main() {
 	// references it directly, but it's no longer wired into any handler below.
 	razorpayService := service.NewRazorpayService(
 		cfg.RazorpayKeyID, cfg.RazorpayKeySecret, cfg.PlatformCommissionPercent, cfg.GSTPercent, cfg.RepeatCustomerDiscountPercent,
+		cfg.PlatformFeeAmount, cfg.VisitFeeAmount,
 		paymentRepo, bookingRepo, techRepo, walletRepo,
 	)
 
