@@ -75,7 +75,7 @@ func New(pool *pgxpool.Pool) *Server {
 		User:         handler.NewUserHandler(userService),
 		Category:     handler.NewCategoryHandler(catRepo),
 		Technician:   handler.NewTechnicianHandler(techService),
-		Booking:      handler.NewBookingHandler(bookingService),
+		Booking:      handler.NewBookingHandler(bookingService, []string{"stun:stun.l.google.com:19302"}, "", "", 3600),
 		Payment:      handler.NewPaymentHandler(razorpayService, nil),
 		Wallet:       handler.NewWalletHandler(walletService),
 		Review:       handler.NewReviewHandler(reviewService),
