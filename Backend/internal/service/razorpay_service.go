@@ -100,25 +100,19 @@ func (s *RazorpayService) CreateOrder(ctx context.Context, bookingID, userID str
 		}
 	}
 
-	// Repeat-customer discount — identical logic to the old UPI flow.
+	// Repeat-customer discount — disabled per product decision (see
+	// invoice_screen.dart, which dropped the "Repeat customer discount" line
+	// from what customers see). Since hiding a discount from the invoice
+	// while still silently applying it would mean the displayed total no
+	// longer matches what was actually calculated, the discount itself is
+	// switched off here too rather than just hidden — pricing must match
+	// what's shown. IsRepeatCustomer/RepeatDiscount* fields are kept on the
+	// Payment model (and left unset below) purely so old rows/API consumers
+	// that still read them don't break; no new discount is ever applied.
 	var isRepeat bool
 	var repeatDiscountPercent *float64
 	var repeatDiscountAmount *float64
 	effectiveBase := baseAmountRupees
-	if booking.TechnicianID != nil && s.repeatDiscountPct > 0 {
-		priorCount, err := s.bookingRepo.CountPriorBookings(ctx, booking.CustomerID, *booking.TechnicianID)
-		if err != nil {
-			return nil, err
-		}
-		if priorCount > 0 {
-			isRepeat = true
-			pct := s.repeatDiscountPct
-			amt := baseAmountRupees * pct / 100
-			repeatDiscountPercent = &pct
-			repeatDiscountAmount = &amt
-			effectiveBase = baseAmountRupees - amt
-		}
-	}
 
 	ref, err := generateTransactionRef()
 	if err != nil {
