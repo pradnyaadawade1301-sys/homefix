@@ -150,7 +150,7 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
   }
 
   Widget _buildDiagnosisCard(BuildContext context, Map<String, dynamic> data) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final fault = data['possible_fault']?.toString();
     final causes = (data['causes'] as List?)?.map((e) => e.toString()).toList() ?? [];
     final followUps = (data['follow_up_questions'] as List?)?.map((e) => e.toString()).toList() ?? [];
@@ -233,7 +233,7 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
   /// three clear next steps, colour-coded (green/orange/blue) to match the
   /// product spec.
   Widget _buildOptionsCard(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
       child: Container(
@@ -279,7 +279,7 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
   Widget _buildTechnicianSuggestions() {
     return Consumer<TechnicianProvider>(
       builder: (context, provider, _) {
-        final l10n = AppLocalizations.of(context)!;
+        final l10n = AppLocalizations.of(context);
         if (provider.isLoading && provider.technicians.isEmpty) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
@@ -323,7 +323,7 @@ class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(title: Text(l10n.aiDiagnosisTitle)),
       body: SafeArea(
@@ -529,7 +529,7 @@ class _SuggestedTechCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: () {

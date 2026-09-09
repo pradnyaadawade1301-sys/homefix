@@ -229,7 +229,9 @@ class _HomeTab extends StatefulWidget {
   final GlobalKey? categoriesKey;
   final GlobalKey? notificationKey;
 
-const _HomeTab({this.searchKey, this.promoKey, this.categoriesKey, this.notificationKey});  @override
+  const _HomeTab({this.searchKey, this.promoKey, this.categoriesKey, this.notificationKey});
+
+  @override
   State<_HomeTab> createState() => _HomeTabState();
 }
 
@@ -304,7 +306,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
   }
 
   void _openCategories() {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CategoriesScreen()));
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AllCategoriesScreen()));
   }
 
   void _openNotifications() {
@@ -824,6 +826,11 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
     'RO Service': 'assets/images/RO-service.png',
     'CCTV': 'assets/images/cctv repair.png',
     'Home Cleaning': 'assets/images/home cleaning.png',
+    'Roofer': 'assets/images/Roofer.png',
+    'Civil Work': 'assets/images/civil_work.png',
+    'Fabrication': 'assets/images/fabrication.png',
+    'POP / False Ceiling': 'assets/images/pop_false_ceiling.png',
+    'General Repair': 'assets/images/general_repair.png',
   };
 
   Widget _buildCategoriesRow() {
@@ -848,7 +855,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
             ),
           );
         }
-        final shown = categories.take(9).toList();
+        final shown = categories.toList();
         return SizedBox(
           height: 230,
           child: GridView.builder(

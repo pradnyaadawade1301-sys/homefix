@@ -278,13 +278,8 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
               opacity: _fade,
               child: SlideTransition(
                 position: _slide,
-                               child: Container(
-                  // Pull the whole sheet up so its rounded top and the first
-                  // card ride onto the empty bottom strip of the header banner
-                  // (reference design). A transform, not a margin, so it never
-                  // asserts — and the header content is top-aligned so nothing
-                  // important sits where the card lands.
-                  transform: Matrix4.translationValues(0, -26, 0),                  decoration: const BoxDecoration(
+                child: Container(
+                  decoration: const BoxDecoration(
                     color: Color(0xFFF7F8FA),
                     borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
                   ),

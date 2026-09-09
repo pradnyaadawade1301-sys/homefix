@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../models/consultation_model.dart';
 import '../../providers/consultation_provider.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Technician-side "Upcoming Consultations" screen — lists scheduled slot
 /// requests (status 'scheduled', awaiting the technician's confirmation) and
@@ -33,16 +34,17 @@ class _UpcomingConsultationsScreenState extends State<UpcomingConsultationsScree
   Future<void> _load() => context.read<ConsultationProvider>().loadUpcoming();
 
   Future<void> _confirm(Consultation c) async {
+    final l10n = AppLocalizations.of(context)!;
     try {
       await context.read<ConsultationProvider>().confirmScheduled(c.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Slot confirmed'), backgroundColor: AppTheme.successColor),
+        SnackBar(content: Text(l10n.consultUpcomingSlotConfirmed), backgroundColor: AppTheme.successColor),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not confirm: $e'), backgroundColor: AppTheme.errorColor),
+        SnackBar(content: Text(l10n.consultUpcomingCouldNotConfirm('$e')), backgroundColor: AppTheme.errorColor),
       );
     }
   }
@@ -53,17 +55,18 @@ class _UpcomingConsultationsScreenState extends State<UpcomingConsultationsScree
   /// The reason is optional — a technician who's in a hurry can still just
   /// tap Decline — but giving one is encouraged via the hint text.
   Future<void> _decline(Consultation c) async {
+    final l10n = AppLocalizations.of(context)!;
     final reasonController = TextEditingController();
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Decline this slot?'),
+        title: Text(l10n.consultUpcomingDeclineTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'The customer will be notified that you can\'t make ${_formatSlot(c.scheduledAt)} and asked to pick another time.',
+              l10n.consultUpcomingDeclineContent(_formatSlot(c.scheduledAt)),
             ),
             const SizedBox(height: 14),
             TextField(
@@ -71,19 +74,19 @@ class _UpcomingConsultationsScreenState extends State<UpcomingConsultationsScree
               autofocus: true,
               maxLength: 150,
               maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Reason (optional)',
-                hintText: 'e.g. Not available at that time',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.consultUpcomingReasonOptional,
+                hintText: l10n.consultUpcomingReasonHint,
+                border: const OutlineInputBorder(),
               ),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.consultUpcomingCancel)),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Decline', style: TextStyle(color: AppTheme.errorColor)),
+            child: Text(l10n.consultUpcomingDecline, style: const TextStyle(color: AppTheme.errorColor)),
           ),
         ],
       ),
@@ -93,11 +96,11 @@ class _UpcomingConsultationsScreenState extends State<UpcomingConsultationsScree
     try {
       await context.read<ConsultationProvider>().declineScheduled(c.id, reason: reason.isEmpty ? null : reason);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Slot declined')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.consultUpcomingSlotDeclined)));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not decline: $e'), backgroundColor: AppTheme.errorColor),
+        SnackBar(content: Text(l10n.consultUpcomingCouldNotDecline('$e')), backgroundColor: AppTheme.errorColor),
       );
     }
   }
@@ -119,6 +122,7 @@ class _UpcomingConsultationsScreenState extends State<UpcomingConsultationsScree
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final body = RefreshIndicator(
       onRefresh: _load,
       child: Consumer<ConsultationProvider>(
@@ -136,14 +140,14 @@ class _UpcomingConsultationsScreenState extends State<UpcomingConsultationsScree
                 const SizedBox(height: 16),
                 Center(
                   child: Text(
-                    'No upcoming consultations',
+                    l10n.consultUpcomingNoUpcoming,
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey[600]),
                   ),
                 ),
                 const SizedBox(height: 6),
                 Center(
                   child: Text(
-                    'Scheduled requests from customers will show up here',
+                    l10n.consultUpcomingScheduledHint,
                     style: TextStyle(fontSize: 13, color: Colors.grey[500]),
                     textAlign: TextAlign.center,
                   ),
@@ -169,7 +173,7 @@ class _UpcomingConsultationsScreenState extends State<UpcomingConsultationsScree
     if (widget.embedded) return body;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Upcoming Consultations')),
+      appBar: AppBar(title: Text(l10n.consultUpcomingTitle)),
       body: body,
     );
   }
@@ -192,6 +196,7 @@ class _UpcomingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
@@ -208,7 +213,7 @@ class _UpcomingCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  consultation.categoryName.isNotEmpty ? consultation.categoryName : 'Consultation',
+                  consultation.categoryName.isNotEmpty ? consultation.categoryName : l10n.consultUpcomingFallback,
                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
                 ),
               ),
@@ -219,7 +224,7 @@ class _UpcomingCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  _isAwaitingConfirmation ? 'Needs confirmation' : 'Confirmed',
+                  _isAwaitingConfirmation ? l10n.consultUpcomingNeedsConfirmation : l10n.consultUpcomingConfirmedLabel,
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -251,7 +256,7 @@ class _UpcomingCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(consultation.customerName ?? 'Customer',
+                      Text(consultation.customerName ?? l10n.consultUpcomingCustomerFallback,
                           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                       const SizedBox(height: 2),
                       Row(
@@ -281,14 +286,14 @@ class _UpcomingCard extends StatelessWidget {
                       foregroundColor: AppTheme.errorColor,
                       side: const BorderSide(color: AppTheme.errorColor),
                     ),
-                    child: const Text('Decline'),
+                    child: Text(l10n.consultUpcomingDecline),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: onConfirm,
-                    child: const Text('Confirm'),
+                    child: Text(l10n.consultUpcomingConfirm),
                   ),
                 ),
               ],
@@ -300,7 +305,7 @@ class _UpcomingCard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'Waiting for slot time — you\'ll be notified when it starts',
+                    l10n.consultUpcomingWaitingSlot,
                     style: TextStyle(fontSize: 11.5, color: Colors.grey[600]),
                   ),
                 ),

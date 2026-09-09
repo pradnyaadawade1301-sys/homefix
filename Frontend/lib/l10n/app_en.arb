@@ -1,355 +1,716 @@
 {
-    "@@locale": "en",
-    "appName": "HomeFix",
-    "@appName": {
-        "description": "App name shown on splash/login."
-    },
-    "navHome": "Home",
-    "navBooking": "Booking",
-    "navAI": "AI",
-    "navChat": "Chat",
-    "navProfile": "Profile",
-    "commonSave": "Save",
-    "commonCancel": "Cancel",
-    "commonConfirm": "Confirm",
-    "commonYes": "Yes",
-    "commonNo": "No",
-    "commonDone": "Done",
-    "commonRetry": "Retry",
-    "commonLoading": "Loading...",
-    "homeGreeting": "Hi, {name}",
-    "@homeGreeting": {
-        "description": "Greeting on the home screen header.",
-        "placeholders": {
-            "name": {
-                "type": "String"
-            }
-        }
-    },
-    "homeDetectingLocation": "Detecting location...",
-    "homeSetLocation": "Set your location",
-    "homeSearchHint": "Search service...",
-    "homeMostBooked": "Most Booked Services",
-    "homeViewAll": "View all",
-    "homeMyTechnicians": "My Technicians",
-    "homeTopPicks": "Top Picks for you",
-    "profileTitle": "Profile",
-    "profileSectionAccount": "Account",
-    "profileSectionAppSettings": "App Settings",
-    "profileSectionSupport": "Support",
-    "profilePersonalInfo": "Personal Information",
-    "profileSavedAddresses": "Saved Addresses",
-    "profileServiceHistory": "Service History",
-    "profileBookings": "Bookings",
-    "profilePaymentMethods": "Payment Methods",
-    "profileTransactionHistory": "Transaction History",
-    "profileNotifications": "Notifications",
-    "profileReplayTour": "Replay Guided Tour",
-    "profileHelpCenter": "Help Center",
-    "profileContactSupport": "Contact Support",
-    "profileTerms": "Terms & Conditions",
-    "profilePrivacyPolicy": "Privacy Policy",
-    "profileLanguage": "Language",
-    "profileLogout": "Logout",
-    "profileDeleteAccount": "Delete Account",
-    "profileTechnicianRole": "Technician",
-    "profileCustomerRole": "Customer",
-    "languageSheetTitle": "Choose your language",
-    "languageSheetSubtitle": "The app will switch to this language everywhere",
-    "languageEnglish": "English",
-    "languageHindi": "हिंदी (Hindi)",
-    "languageMarathi": "मराठी (Marathi)",
-    "languageChangedMessage": "Language updated",
-    "loginWelcomeBack": "Welcome back",
-    "loginSubtitle": "Sign in to book trusted home services",
-    "loginIdentifierHint": "Email or phone number",
-    "loginIdentifierRequired": "Email or phone number required",
-    "loginPasswordHint": "Password",
-    "loginPasswordRequired": "Password is required",
-    "loginForgotPassword": "Forgot password?",
-    "loginForgotPasswordComingSoon": "Forgot password flow coming soon",
-    "loginSignIn": "Sign In",
-    "loginOr": "OR",
-    "loginContinueWithGoogle": "Continue with Google",
-    "loginGoogleSignInFailed": "Google sign-in failed: {error}",
-    "@loginGoogleSignInFailed": {
-        "description": "Error shown when Google sign-in fails.",
-        "placeholders": {
-            "error": {
-                "type": "String"
-            }
-        }
-    },
-    "loginTrustedBanner": "Trusted by thousands of users",
-    "loginTrustedSubtitle": "Verified professionals • Secure bookings • 24/7 Support",
-    "loginNoAccount": "Don't have an account? ",
-    "loginSignUp": "Sign Up",
-    "signupPasswordRequiredValidator": "Password is required",
-    "signupPasswordTooShort": "Password must be at least 8 characters",
-    "signupPasswordNeedsLetterSpecial": "Add a letter and a special character (not just numbers)",
-    "signupCreateYourAccount": "Create your account",
-    "signupJoinSubtitle": "Join HomeFix Live as a customer or technician",
-    "signupIAmA": "I am a",
-    "signupRoleCustomer": "Customer",
-    "signupRoleTechnician": "Technician",
-    "signupNameHint": "Full name",
-    "signupNameRequired": "Name is required",
-    "signupEmailHint": "Email address",
-    "signupEmailRequired": "Email is required",
-    "signupEmailInvalid": "Enter a valid email",
-    "signupPhoneHint": "Phone number",
-    "signupPhoneRequired": "Phone number is required",
-    "signupPhoneInvalid": "Enter a valid phone number",
-    "signupPasswordHint": "Password",
-    "signupPasswordHelper": "Min 8 chars, with a letter and a special character",
-    "signupDataSafeBanner": "Your data is safe with us",
-    "signupDataSafeSubtitle": "We never share your information",
-    "signupCreateAccount": "Create Account",
-    "signupHaveAccount": "Already have an account? ",
-    "signupSignIn": "Sign In",
-    "bookingsTitle": "My Bookings",
-    "bookingsCancelDialogTitle": "Cancel this booking?",
-    "bookingsCancelDialogBody": "This will cancel your booking and notify the technician, if one has been assigned.",
-    "bookingsCancelReasonLabel": "Reason (optional)",
-    "bookingsKeepBooking": "Keep Booking",
-    "bookingsYesCancel": "Yes, Cancel",
-    "bookingsCancelledMsg": "Booking cancelled",
-    "bookingsCouldNotCancel": "Could not cancel booking",
-    "bookingsStatusFinding": "Finding technician",
-    "bookingsStatusWaiting": "Waiting for technician",
-    "bookingsStatusAssigned": "Technician assigned",
-    "bookingsStatusInProgress": "In progress",
-    "bookingsStatusCompleted": "Completed",
-    "bookingsStatusCancelled": "Cancelled",
-    "bookingsEmptyTitle": "No bookings yet",
-    "bookingsEmptySubtitle": "Book a service from the Home tab to see it here",
-    "bookingsServiceBookingFallback": "Service booking",
-    "bookingsBookedOn": "Booked {date}",
-    "@bookingsBookedOn": {
-        "description": "Fallback date label when no scheduled date is set.",
-        "placeholders": {
-            "date": {
-                "type": "String"
-            }
-        }
-    },
-    "bookingsTechnicianFallback": "Technician",
-    "bookingsChatTooltip": "Chat",
-    "homePressBackExit": "Press back again to exit",
-    "homeGreetingShort": "Hi, {name}",
-    "@homeGreetingShort": {
-        "description": "Header greeting on home screen.",
-        "placeholders": {
-            "name": {
-                "type": "String"
-            }
-        }
-    },
-    "homeSetLocationShort": "Set your location",
-    "homeSearchServiceHint": "Search service...",
-    "homeMostBookedServices": "Most Booked Services",
-    "homeMyTechniciansShort": "My Technicians",
-    "homeCouldNotLoadRepeatTechnicians": "Could not load repeat technicians: {error}",
-    "@homeCouldNotLoadRepeatTechnicians": {
-        "description": "Error loading repeat technicians.",
-        "placeholders": {
-            "error": {
-                "type": "String"
-            }
-        }
-    },
-    "homeTopPicksForYou": "Top Picks for you",
-    "homeViewAllShort": "View all",
-    "homeCouldNotLoadServices": "Could not load services",
-    "homeNoServicesYet": "No services available yet",
-    "homeCouldNotLoadTechnicians": "Could not load technicians",
-    "homeNoVerifiedTechnicians": "No verified technicians yet — check back soon",
-    "homeTechnicianFallback": "Technician",
-    "homeYearsExp": "{years} yrs exp",
-    "@homeYearsExp": {
-        "description": "Years of experience label.",
-        "placeholders": {
-            "years": {
-                "type": "String"
-            }
-        }
-    },
-    "homeBannerHeading1": "Professional\nHelp for\n",
-    "homeBannerHeading2": "Your Home",
-    "homeTrustedExperts": "Trusted\nExperts",
-    "homeOnTimeService": "On-Time\nService",
-    "homeQualityGuaranteed": "Quality\nGuaranteed",
-    "guidedTourWelcomeTitle": "Welcome to HomeFix!",
-    "guidedTourWelcomeDesc": "Start your home service right here — electrician, plumber, AC repair, and much more.",
-    "guidedTourBookingsTitle": "Bookings",
-    "guidedTourBookingsDesc": "Track your upcoming and past bookings here.",
-    "guidedTourAiTitle": "AI Assessment",
-    "guidedTourAiDesc": "Describe your problem and get an instant AI-powered quick assessment — before the technician even arrives.",
-    "guidedTourConsultTitle": "Consult",
-    "guidedTourConsultDesc": "Chat with a technician or hop on a live video call to show them your problem instantly.",
-    "guidedTourProfileTitle": "Profile",
-    "guidedTourProfileDesc": "Manage your account, addresses, payments, and settings here.",
-    "aiDiagnosisTitle": "AI Diagnosis",
-    "aiDiagnosisFoundTitle": "Here's what we found",
-    "aiDiagnosisWhatIssueIs": "What the issue is",
-    "aiDiagnosisQuickQuestions": "A couple of quick questions",
-    "aiDiagnosisFixableRemotely": "This may be fixable remotely",
-    "aiDiagnosisRecommendOnsite": "Recommended: onsite technician visit",
-    "aiDiagnosisPossibleOptions": "Possible Options",
-    "aiDiagnosisInstantGuidanceTitle": "Get Instant AI Guidance",
-    "aiDiagnosisInstantGuidanceSubtitle": "Keep chatting with AI to try fixing it yourself",
-    "aiDiagnosisBookDirectTitle": "Book Technician Directly",
-    "aiDiagnosisBookDirectSubtitle": "Schedule a visit at a time that works for you",
-    "aiDiagnosisFlexibilityNote": "This gives you the flexibility to choose what works best.",
-    "aiDiagnosisSuggestedTechnicians": "Suggested technicians",
-    "aiDiagnosisViewAll": "View all",
-    "aiDiagnosisBookDirectlyBtn": "Book Directly",
-    "aiDiagnosisAskFollowUp": "Ask a follow-up question...",
-    "aiDiagnosisUnavailable": "AI diagnosis is unavailable right now.\n{error}",
-    "@aiDiagnosisUnavailable": {
-        "description": "Error shown when AI diagnosis service is unreachable.",
-        "placeholders": {
-            "error": {
-                "type": "String"
-            }
-        }
-    },
-    "aiDiagnosisStillBookDirectly": "You can still book a technician directly.",
-    "aiDiagnosisBookTechnicianVisit": "Book Technician Visit",
-    "aiDiagnosisTechnicianFallback": "Technician",
-    "aiDiagnosisYearsExp": "{years} yrs exp",
-    "@aiDiagnosisYearsExp": {
-        "description": "Years of experience label for suggested technician cards.",
-        "placeholders": {
-            "years": {
-                "type": "String"
-            }
-        }
-    },
-    "chatTitle": "Chat",
-    "chatRetry": "Retry",
-    "chatEmptyState": "No messages yet. Say hello!",
-    "chatMessageHint": "Message {peerName}",
-    "@chatMessageHint": {
-        "description": "Composer hint text with the chat partner's name.",
-        "placeholders": {
-            "peerName": {
-                "type": "String"
-            }
-        }
-    },
-    "consultTitle": "Consult",
-    "@consultTitle": {
-        "description": "consultTitle label."
-    },
-    "consultTabChat": "Chat",
-    "@consultTabChat": {
-        "description": "consultTabChat label."
-    },
-    "consultTabVideo": "Video",
-    "@consultTabVideo": {
-        "description": "consultTabVideo label."
-    },
-    "consultNoChatsTitle": "No chats yet",
-    "@consultNoChatsTitle": {
-        "description": "consultNoChatsTitle label."
-    },
-    "consultNoChatsSubtitle": "Once a technician is assigned to your booking, you can chat with them here.",
-    "@consultNoChatsSubtitle": {
-        "description": "consultNoChatsSubtitle label."
-    },
-    "consultServiceBookingFallback": "Service booking",
-    "@consultServiceBookingFallback": {
-        "description": "consultServiceBookingFallback label."
-    },
-    "consultNoVideoCallsTitle": "No video calls yet",
-    "@consultNoVideoCallsTitle": {
-        "description": "consultNoVideoCallsTitle label."
-    },
-    "consultNoVideoCallsSubtitle": "Your live video consultations with technicians will show up here.",
-    "@consultNoVideoCallsSubtitle": {
-        "description": "consultNoVideoCallsSubtitle label."
-    },
-    "consultStatusCompleted": "Completed",
-    "@consultStatusCompleted": {
-        "description": "consultStatusCompleted label."
-    },
-    "consultStatusCancelled": "Cancelled",
-    "@consultStatusCancelled": {
-        "description": "consultStatusCancelled label."
-    },
-    "consultStatusTechnicianUnavailable": "Technician unavailable",
-    "@consultStatusTechnicianUnavailable": {
-        "description": "consultStatusTechnicianUnavailable label."
-    },
-    "consultStatusDeclined": "Declined",
-    "@consultStatusDeclined": {
-        "description": "consultStatusDeclined label."
-    },
-    "consultStatusNoExpertFound": "No expert found",
-    "@consultStatusNoExpertFound": {
-        "description": "consultStatusNoExpertFound label."
-    },
-    "consultStatusInCall": "In call",
-    "@consultStatusInCall": {
-        "description": "consultStatusInCall label."
-    },
-    "consultStatusConfirmed": "Confirmed",
-    "@consultStatusConfirmed": {
-        "description": "consultStatusConfirmed label."
-    },
-    "consultStatusAwaitingConfirmation": "Awaiting confirmation",
-    "@consultStatusAwaitingConfirmation": {
-        "description": "consultStatusAwaitingConfirmation label."
-    },
-    "consultStatusUpcoming": "Upcoming",
-    "@consultStatusUpcoming": {
-        "description": "consultStatusUpcoming label."
-    },
-    "consultHelperRejectedScheduled": "The technician couldn't hold this slot. Please choose a new time.",
-    "@consultHelperRejectedScheduled": {
-        "description": "consultHelperRejectedScheduled label."
-    },
-    "consultHelperRejectedInstant": "The technician was unable to take this call.",
-    "@consultHelperRejectedInstant": {
-        "description": "consultHelperRejectedInstant label."
-    },
-    "consultHelperScheduled": "Waiting for the technician to confirm this slot.",
-    "@consultHelperScheduled": {
-        "description": "consultHelperScheduled label."
-    },
-    "consultHelperConfirmed": "Confirmed — the call will start automatically at the scheduled time.",
-    "@consultHelperConfirmed": {
-        "description": "consultHelperConfirmed label."
-    },
-    "consultHelperNoTechnician": "No technician was available to take this call.",
-    "@consultHelperNoTechnician": {
-        "description": "consultHelperNoTechnician label."
-    },
-    "consultTechnicianFallback": "Technician",
-    "@consultTechnicianFallback": {
-        "description": "consultTechnicianFallback label."
-    },
-    "consultVideoConsultationFallback": "Video consultation",
-    "@consultVideoConsultationFallback": {
-        "description": "consultVideoConsultationFallback label."
-    },
-    "consultMinutesShort": "{minutes} min",
-    "@consultMinutesShort": {
-        "description": "consultMinutesShort label.",
-        "placeholders": {
-            "minutes": {
-                "type": "String"
-            }
-        }
-    },
-    "consultNewRecommendation": "New recommendation from technician",
-    "@consultNewRecommendation": {
-        "description": "consultNewRecommendation label."
-    },
-    "consultNewBadge": "NEW",
-    "@consultNewBadge": {
-        "description": "consultNewBadge label."
+  "@@locale": "en",
+  "appName": "HomeFix",
+  "@appName": {
+    "description": "App name shown on splash/login."
+  },
+  "navHome": "Home",
+  "navBooking": "Booking",
+  "navAI": "AI",
+  "navChat": "Chat",
+  "navProfile": "Profile",
+  "commonSave": "Save",
+  "commonCancel": "Cancel",
+  "commonConfirm": "Confirm",
+  "commonYes": "Yes",
+  "commonNo": "No",
+  "commonDone": "Done",
+  "commonRetry": "Retry",
+  "commonLoading": "Loading...",
+  "homeGreeting": "Hi, {name}",
+  "@homeGreeting": {
+    "description": "Greeting on the home screen header.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
     }
+  },
+  "homeDetectingLocation": "Detecting location...",
+  "homeSetLocation": "Set your location",
+  "homeSearchHint": "Search service...",
+  "homeMostBooked": "Most Booked Services",
+  "homeViewAll": "View all",
+  "homeMyTechnicians": "My Technicians",
+  "homeTopPicks": "Top Picks for you",
+  "profileTitle": "Profile",
+  "profileSectionAccount": "Account",
+  "profileSectionAppSettings": "App Settings",
+  "profileSectionSupport": "Support",
+  "profilePersonalInfo": "Personal Information",
+  "profileSavedAddresses": "Saved Addresses",
+  "profileServiceHistory": "Service History",
+  "profileBookings": "Bookings",
+  "profilePaymentMethods": "Payment Methods",
+  "profileTransactionHistory": "Transaction History",
+  "profileNotifications": "Notifications",
+  "profileReplayTour": "Replay Guided Tour",
+  "profileHelpCenter": "Help Center",
+  "profileContactSupport": "Contact Support",
+  "profileTerms": "Terms & Conditions",
+  "profilePrivacyPolicy": "Privacy Policy",
+  "profileLanguage": "Language",
+  "profileLogout": "Logout",
+  "profileDeleteAccount": "Delete Account",
+  "profileTechnicianRole": "Technician",
+  "profileCustomerRole": "Customer",
+  "languageSheetTitle": "Choose your language",
+  "languageSheetSubtitle": "The app will switch to this language everywhere",
+  "languageEnglish": "English",
+  "languageHindi": "हिंदी (Hindi)",
+  "languageMarathi": "मराठी (Marathi)",
+  "languageChangedMessage": "Language updated",
+  "loginWelcomeBack": "Welcome back",
+  "loginSubtitle": "Sign in to book trusted home services",
+  "loginIdentifierHint": "Email or phone number",
+  "loginIdentifierRequired": "Email or phone number required",
+  "loginPasswordHint": "Password",
+  "loginPasswordRequired": "Password is required",
+  "loginForgotPassword": "Forgot password?",
+  "loginForgotPasswordComingSoon": "Forgot password flow coming soon",
+  "loginSignIn": "Sign In",
+  "loginOr": "OR",
+  "loginContinueWithGoogle": "Continue with Google",
+  "loginGoogleSignInFailed": "Google sign-in failed: {error}",
+  "@loginGoogleSignInFailed": {
+    "description": "Error shown when Google sign-in fails.",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "loginTrustedBanner": "Trusted by thousands of users",
+  "loginTrustedSubtitle": "Verified professionals • Secure bookings • 24/7 Support",
+  "loginNoAccount": "Don't have an account? ",
+  "loginSignUp": "Sign Up",
+  "signupPasswordRequiredValidator": "Password is required",
+  "signupPasswordTooShort": "Password must be at least 8 characters",
+  "signupPasswordNeedsLetterSpecial": "Add a letter and a special character (not just numbers)",
+  "signupCreateYourAccount": "Create your account",
+  "signupJoinSubtitle": "Join HomeFix Live as a customer or technician",
+  "signupIAmA": "I am a",
+  "signupRoleCustomer": "Customer",
+  "signupRoleTechnician": "Technician",
+  "signupNameHint": "Full name",
+  "signupNameRequired": "Name is required",
+  "signupEmailHint": "Email address",
+  "signupEmailRequired": "Email is required",
+  "signupEmailInvalid": "Enter a valid email",
+  "signupPhoneHint": "Phone number",
+  "signupPhoneRequired": "Phone number is required",
+  "signupPhoneInvalid": "Enter a valid phone number",
+  "signupPasswordHint": "Password",
+  "signupPasswordHelper": "Min 8 chars, with a letter and a special character",
+  "signupDataSafeBanner": "Your data is safe with us",
+  "signupDataSafeSubtitle": "We never share your information",
+  "signupCreateAccount": "Create Account",
+  "signupHaveAccount": "Already have an account? ",
+  "signupSignIn": "Sign In",
+  "bookingsTitle": "My Bookings",
+  "bookingsCancelDialogTitle": "Cancel this booking?",
+  "bookingsCancelDialogBody": "This will cancel your booking and notify the technician, if one has been assigned.",
+  "bookingsCancelReasonLabel": "Reason (optional)",
+  "bookingsKeepBooking": "Keep Booking",
+  "bookingsYesCancel": "Yes, Cancel",
+  "bookingsCancelledMsg": "Booking cancelled",
+  "bookingsCouldNotCancel": "Could not cancel booking",
+  "bookingsStatusFinding": "Finding technician",
+  "bookingsStatusWaiting": "Waiting for technician",
+  "bookingsStatusAssigned": "Technician assigned",
+  "bookingsStatusInProgress": "In progress",
+  "bookingsStatusCompleted": "Completed",
+  "bookingsStatusCancelled": "Cancelled",
+  "bookingsEmptyTitle": "No bookings yet",
+  "bookingsEmptySubtitle": "Book a service from the Home tab to see it here",
+  "bookingsServiceBookingFallback": "Service booking",
+  "bookingsBookedOn": "Booked {date}",
+  "@bookingsBookedOn": {
+    "description": "Fallback date label when no scheduled date is set.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "bookingsTechnicianFallback": "Technician",
+  "bookingsChatTooltip": "Chat",
+  "homePressBackExit": "Press back again to exit",
+  "homeGreetingShort": "Hi, {name}",
+  "@homeGreetingShort": {
+    "description": "Header greeting on home screen.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "homeSetLocationShort": "Set your location",
+  "homeSearchServiceHint": "Search service...",
+  "homeMostBookedServices": "Most Booked Services",
+  "homeMyTechniciansShort": "My Technicians",
+  "homeCouldNotLoadRepeatTechnicians": "Could not load repeat technicians: {error}",
+  "@homeCouldNotLoadRepeatTechnicians": {
+    "description": "Error loading repeat technicians.",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "homeTopPicksForYou": "Top Picks for you",
+  "homeViewAllShort": "View all",
+  "homeCouldNotLoadServices": "Could not load services",
+  "homeNoServicesYet": "No services available yet",
+  "homeCouldNotLoadTechnicians": "Could not load technicians",
+  "homeNoVerifiedTechnicians": "No verified technicians yet — check back soon",
+  "homeTechnicianFallback": "Technician",
+  "homeYearsExp": "{years} yrs exp",
+  "@homeYearsExp": {
+    "description": "Years of experience label.",
+    "placeholders": {
+      "years": {
+        "type": "String"
+      }
+    }
+  },
+  "homeBannerHeading1": "Professional\nHelp for\n",
+  "homeBannerHeading2": "Your Home",
+  "homeTrustedExperts": "Trusted\nExperts",
+  "homeOnTimeService": "On-Time\nService",
+  "homeQualityGuaranteed": "Quality\nGuaranteed",
+  "guidedTourWelcomeTitle": "Welcome to HomeFix!",
+  "guidedTourWelcomeDesc": "Start your home service right here — electrician, plumber, AC repair, and much more.",
+  "guidedTourBookingsTitle": "Bookings",
+  "guidedTourBookingsDesc": "Track your upcoming and past bookings here.",
+  "guidedTourAiTitle": "AI Assessment",
+  "guidedTourAiDesc": "Describe your problem and get an instant AI-powered quick assessment — before the technician even arrives.",
+  "guidedTourConsultTitle": "Consult",
+  "guidedTourConsultDesc": "Chat with a technician or hop on a live video call to show them your problem instantly.",
+  "guidedTourProfileTitle": "Profile",
+  "guidedTourProfileDesc": "Manage your account, addresses, payments, and settings here.",
+  "aiDiagnosisTitle": "AI Diagnosis",
+  "aiDiagnosisFoundTitle": "Here's what we found",
+  "aiDiagnosisWhatIssueIs": "What the issue is",
+  "aiDiagnosisQuickQuestions": "A couple of quick questions",
+  "aiDiagnosisFixableRemotely": "This may be fixable remotely",
+  "aiDiagnosisRecommendOnsite": "Recommended: onsite technician visit",
+  "aiDiagnosisPossibleOptions": "Possible Options",
+  "aiDiagnosisInstantGuidanceTitle": "Get Instant AI Guidance",
+  "aiDiagnosisInstantGuidanceSubtitle": "Keep chatting with AI to try fixing it yourself",
+  "aiDiagnosisBookDirectTitle": "Book Technician Directly",
+  "aiDiagnosisBookDirectSubtitle": "Schedule a visit at a time that works for you",
+  "aiDiagnosisFlexibilityNote": "This gives you the flexibility to choose what works best.",
+  "aiDiagnosisSuggestedTechnicians": "Suggested technicians",
+  "aiDiagnosisViewAll": "View all",
+  "aiDiagnosisBookDirectlyBtn": "Book Directly",
+  "aiDiagnosisAskFollowUp": "Ask a follow-up question...",
+  "aiDiagnosisUnavailable": "AI diagnosis is unavailable right now.\n{error}",
+  "@aiDiagnosisUnavailable": {
+    "description": "Error shown when AI diagnosis service is unreachable.",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "aiDiagnosisStillBookDirectly": "You can still book a technician directly.",
+  "aiDiagnosisBookTechnicianVisit": "Book Technician Visit",
+  "aiDiagnosisTechnicianFallback": "Technician",
+  "aiDiagnosisYearsExp": "{years} yrs exp",
+  "@aiDiagnosisYearsExp": {
+    "description": "Years of experience label for suggested technician cards.",
+    "placeholders": {
+      "years": {
+        "type": "String"
+      }
+    }
+  },
+  "chatTitle": "Chat",
+  "chatRetry": "Retry",
+  "chatEmptyState": "No messages yet. Say hello!",
+  "chatMessageHint": "Message {peerName}",
+  "@chatMessageHint": {
+    "description": "Composer hint text with the chat partner's name.",
+    "placeholders": {
+      "peerName": {
+        "type": "String"
+      }
+    }
+  },
+  "techJobsLogoutTitle": "Log out?",
+  "techJobsLogoutContent": "You will need to sign in again to see your jobs.",
+  "techJobsCancel": "Cancel",
+  "techJobsLogout": "Log out",
+  "techJobsNavTitleJobs": "My Jobs",
+  "techJobsNavTitleConsultations": "Consultations",
+  "techJobsNavTitleSettlement": "Settlement",
+  "techJobsNavTitleHistory": "History",
+  "techJobsMyCustomersTooltip": "My Customers",
+  "techJobsLogoutTooltip": "Log out",
+  "techJobsBottomNavJobs": "Jobs",
+  "techJobsBottomNavUpcoming": "Upcoming",
+  "techJobsBottomNavSettlement": "Settlement",
+  "techJobsBottomNavHistory": "History",
+  "techJobsWelcomeBack": "Welcome back 👋",
+  "techJobsWorkOverview": "Here's your work overview",
+  "techJobsActive": "Active",
+  "techJobsCompleted": "Completed",
+  "techJobsFilterAll": "All",
+  "techJobsCouldNotLoad": "Couldn't load your jobs: {error}",
+  "@techJobsCouldNotLoad": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "techJobsRetry": "Retry",
+  "techJobsNoActiveJobs": "No active jobs right now",
+  "techJobsNoJobsYet": "No jobs yet",
+  "techJobsNewRequestsHint": "New customer requests will show up here",
+  "techJobsLiveConsultationRequest": "1 live consultation request",
+  "techJobsLiveConsultationRequests": "{count} live consultation requests",
+  "@techJobsLiveConsultationRequests": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "techJobsTapAcceptReject": "Tap to accept or reject",
+  "techJobsScheduledConsultation": "1 scheduled consultation",
+  "techJobsScheduledConsultations": "{count} scheduled consultations",
+  "@techJobsScheduledConsultations": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "techJobsTapConfirmDecline": "Tap to confirm or decline slots",
+  "techJobsServiceRequestFallback": "Service request",
+  "techJobsCustomerFallback": "Customer",
+  "techJobsChatTooltip": "Chat with customer",
+  "techJobsDecline": "Decline",
+  "techJobsAcceptJob": "Accept job",
+  "techJobsOnMyWay": "I'm on my way",
+  "techJobsArrived": "I've arrived",
+  "techJobsGenerateInvoiceComplete": "Generate invoice & complete",
+  "techJobsDeclineTitle": "Decline this job?",
+  "techJobsDeclineContent": "We'll find another technician for this booking. This can't be undone.",
+  "techJobsGenerateInvoiceTitle": "Generate invoice",
+  "techJobsInvoiceHint": "Enter the final amount the customer should pay. This is sent to them immediately as the amount due.",
+  "techJobsFinalAmount": "Final amount",
+  "techJobsOfferWarranty": "Offer a warranty",
+  "techJobsWarrantySubtitle": "Customer can raise a free revisit within this window",
+  "techJobsDuration": "Duration",
+  "techJobsDurationHint": "e.g. 6",
+  "techJobsDays": "Days",
+  "techJobsMonths": "Months",
+  "techJobsYears": "Years",
+  "techJobsEnterValidAmount": "Enter a valid amount",
+  "techJobsEnterValidWarranty": "Enter a valid warranty duration",
+  "techJobsSendInvoice": "Send invoice",
+  "techJobsAskOtp": "Ask the customer for their OTP to start the service",
+  "techJobsEnterOtp": "Enter the 4-digit OTP",
+  "techJobsIncorrectOtp": "Incorrect OTP, try again",
+  "techJobsVerify": "Verify",
+  "techSettlementVisitHistory": "Visit History",
+  "techSettlementPaymentHistory": "Payment History",
+  "techSettlementNoCompletedVisits": "No completed visits yet",
+  "techSettlementNoPayments": "No payments yet",
+  "techSettlementTotalEarned": "Total Earned",
+  "techSettlementJobsCompleted": "Jobs Completed",
+  "techSettlementYourShare": "Your share: ₹{amount}",
+  "@techSettlementYourShare": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "techSettlementCustomerFallback": "Customer",
+  "consultUpcomingSlotConfirmed": "Slot confirmed",
+  "consultUpcomingCouldNotConfirm": "Could not confirm: {error}",
+  "@consultUpcomingCouldNotConfirm": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "consultUpcomingDeclineTitle": "Decline this slot?",
+  "consultUpcomingDeclineContent": "The customer will be notified that you can't make {slot} and asked to pick another time.",
+  "@consultUpcomingDeclineContent": {
+    "placeholders": {
+      "slot": {
+        "type": "String"
+      }
+    }
+  },
+  "consultUpcomingReasonOptional": "Reason (optional)",
+  "consultUpcomingReasonHint": "e.g. Not available at that time",
+  "consultUpcomingCancel": "Cancel",
+  "consultUpcomingDecline": "Decline",
+  "consultUpcomingSlotDeclined": "Slot declined",
+  "consultUpcomingCouldNotDecline": "Could not decline: {error}",
+  "@consultUpcomingCouldNotDecline": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "consultUpcomingThisSlot": "this slot",
+  "consultUpcomingNoUpcoming": "No upcoming consultations",
+  "consultUpcomingScheduledHint": "Scheduled requests from customers will show up here",
+  "consultUpcomingTitle": "Upcoming Consultations",
+  "consultUpcomingFallback": "Consultation",
+  "consultUpcomingNeedsConfirmation": "Needs confirmation",
+  "consultUpcomingConfirmedLabel": "Confirmed",
+  "consultUpcomingCustomerFallback": "Customer",
+  "consultUpcomingConfirm": "Confirm",
+  "consultUpcomingWaitingSlot": "Waiting for slot time — you'll be notified when it starts",
+  "consultMyTitle": "My Consultations",
+  "consultMyNoneYet": "No consultations yet",
+  "consultMyFallback": "Consultation",
+  "consultMyWith": "with {name}",
+  "@consultMyWith": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "consultMyRequestAgain": "Request again",
+  "consultMyAwaitingConfirmation": "Awaiting confirmation",
+  "consultMyAwaitingConfirmationMsg": "Waiting for the technician to confirm your requested slot.",
+  "consultMyConfirmed": "Confirmed",
+  "consultMyConfirmedMsg": "Your technician confirmed. The call will start automatically at your scheduled time.",
+  "consultMySearching": "Searching",
+  "consultMySearchingMsg": "Looking for an available technician...",
+  "consultMyRinging": "Ringing",
+  "consultMyRingingMsg": "Ringing the technician now...",
+  "consultMyAccepted": "Accepted",
+  "consultMyAcceptedMsg": "Technician accepted — connecting your call.",
+  "consultMyTechUnavailable": "Technician unavailable",
+  "consultMyNotAnswered": "Not answered",
+  "consultMyRejectedScheduledMsg": "The technician was busy and couldn't make this slot. Please request a new time.",
+  "consultMyRejectedInstantMsg": "The technician couldn't take your call. You can try again.",
+  "consultMyReasonPrefix": "Reason: {reason}",
+  "@consultMyReasonPrefix": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "consultMyNoTechAvailable": "No technician available",
+  "consultMyNoTechAvailableMsg": "No technician was available for this request. Please try again later.",
+  "consultMyInCall": "In call",
+  "consultMyInCallMsg": "Call in progress.",
+  "consultMyCompleted": "Completed",
+  "consultMyCompletedMsg": "This consultation has ended.",
+  "consultMyCancelled": "Cancelled",
+  "consultMyCancelledMsg": "You cancelled this request.",
+  "consultTitle": "Consult",
+  "@consultTitle": {
+    "description": "Text for consultTitle on the Consult screen."
+  },
+  "consultTabChat": "Chat",
+  "@consultTabChat": {
+    "description": "Text for consultTabChat on the Consult screen."
+  },
+  "consultTabVideo": "Video",
+  "@consultTabVideo": {
+    "description": "Text for consultTabVideo on the Consult screen."
+  },
+  "consultNoChatsTitle": "No chats yet",
+  "@consultNoChatsTitle": {
+    "description": "Text for consultNoChatsTitle on the Consult screen."
+  },
+  "consultNoChatsSubtitle": "Once a technician is assigned to your booking, you'll be able to chat with them here.",
+  "@consultNoChatsSubtitle": {
+    "description": "Text for consultNoChatsSubtitle on the Consult screen."
+  },
+  "consultServiceBookingFallback": "Service booking",
+  "@consultServiceBookingFallback": {
+    "description": "Text for consultServiceBookingFallback on the Consult screen."
+  },
+  "consultNoVideoCallsTitle": "No video consultations yet",
+  "@consultNoVideoCallsTitle": {
+    "description": "Text for consultNoVideoCallsTitle on the Consult screen."
+  },
+  "consultNoVideoCallsSubtitle": "Your live video consultations with technicians will show up here.",
+  "@consultNoVideoCallsSubtitle": {
+    "description": "Text for consultNoVideoCallsSubtitle on the Consult screen."
+  },
+  "consultStatusCompleted": "Completed",
+  "@consultStatusCompleted": {
+    "description": "Text for consultStatusCompleted on the Consult screen."
+  },
+  "consultStatusCancelled": "Cancelled",
+  "@consultStatusCancelled": {
+    "description": "Text for consultStatusCancelled on the Consult screen."
+  },
+  "consultStatusTechnicianUnavailable": "Technician unavailable",
+  "@consultStatusTechnicianUnavailable": {
+    "description": "Text for consultStatusTechnicianUnavailable on the Consult screen."
+  },
+  "consultStatusDeclined": "Declined",
+  "@consultStatusDeclined": {
+    "description": "Text for consultStatusDeclined on the Consult screen."
+  },
+  "consultStatusNoExpertFound": "No expert found",
+  "@consultStatusNoExpertFound": {
+    "description": "Text for consultStatusNoExpertFound on the Consult screen."
+  },
+  "consultStatusInCall": "In call",
+  "@consultStatusInCall": {
+    "description": "Text for consultStatusInCall on the Consult screen."
+  },
+  "consultStatusConfirmed": "Confirmed",
+  "@consultStatusConfirmed": {
+    "description": "Text for consultStatusConfirmed on the Consult screen."
+  },
+  "consultStatusAwaitingConfirmation": "Awaiting confirmation",
+  "@consultStatusAwaitingConfirmation": {
+    "description": "Text for consultStatusAwaitingConfirmation on the Consult screen."
+  },
+  "consultStatusUpcoming": "Upcoming",
+  "@consultStatusUpcoming": {
+    "description": "Text for consultStatusUpcoming on the Consult screen."
+  },
+  "consultHelperRejectedScheduled": "The technician couldn't hold this slot. Please schedule a new time.",
+  "@consultHelperRejectedScheduled": {
+    "description": "Text for consultHelperRejectedScheduled on the Consult screen."
+  },
+  "consultHelperRejectedInstant": "The technician was unavailable to take this call.",
+  "@consultHelperRejectedInstant": {
+    "description": "Text for consultHelperRejectedInstant on the Consult screen."
+  },
+  "consultHelperScheduled": "Waiting for the technician to confirm this slot.",
+  "@consultHelperScheduled": {
+    "description": "Text for consultHelperScheduled on the Consult screen."
+  },
+  "consultHelperConfirmed": "The technician has confirmed this slot.",
+  "@consultHelperConfirmed": {
+    "description": "Text for consultHelperConfirmed on the Consult screen."
+  },
+  "consultHelperNoTechnician": "No technician was available for this consultation.",
+  "@consultHelperNoTechnician": {
+    "description": "Text for consultHelperNoTechnician on the Consult screen."
+  },
+  "consultTechnicianFallback": "Technician",
+  "@consultTechnicianFallback": {
+    "description": "Text for consultTechnicianFallback on the Consult screen."
+  },
+  "consultVideoConsultationFallback": "Video consultation",
+  "@consultVideoConsultationFallback": {
+    "description": "Text for consultVideoConsultationFallback on the Consult screen."
+  },
+  "consultNewRecommendation": "New recommendation from your technician",
+  "@consultNewRecommendation": {
+    "description": "Text for consultNewRecommendation on the Consult screen."
+  },
+  "consultNewBadge": "NEW",
+  "@consultNewBadge": {
+    "description": "Text for consultNewBadge on the Consult screen."
+  },
+  "consultMinutesShort": "{minutes} min",
+  "@consultMinutesShort": {
+    "description": "Short duration label, e.g. '5 min', shown after a completed video consultation.",
+    "placeholders": {
+      "minutes": {
+        "type": "String"
+      }
+    }
+  },
+  "profileLogoutDialogTitle": "Log out?",
+  "@profileLogoutDialogTitle": {
+    "description": "Text for profileLogoutDialogTitle on the Profile screen."
+  },
+  "profileLogoutDialogContent": "Are you sure you want to log out of your account?",
+  "@profileLogoutDialogContent": {
+    "description": "Text for profileLogoutDialogContent on the Profile screen."
+  },
+  "profileLogoutConfirm": "Log Out",
+  "@profileLogoutConfirm": {
+    "description": "Text for profileLogoutConfirm on the Profile screen."
+  },
+  "profileDeleteDialogTitle": "Delete account?",
+  "@profileDeleteDialogTitle": {
+    "description": "Text for profileDeleteDialogTitle on the Profile screen."
+  },
+  "profileDeleteDialogContent": "This will permanently delete your account and all associated data. This action cannot be undone.",
+  "@profileDeleteDialogContent": {
+    "description": "Text for profileDeleteDialogContent on the Profile screen."
+  },
+  "profileDeleteConfirm": "Delete",
+  "@profileDeleteConfirm": {
+    "description": "Text for profileDeleteConfirm on the Profile screen."
+  },
+  "profileLogInButton": "Log In",
+  "@profileLogInButton": {
+    "description": "Text for profileLogInButton on the Profile screen."
+  },
+  "profileTechnicianDefaultName": "Technician",
+  "@profileTechnicianDefaultName": {
+    "description": "Text for profileTechnicianDefaultName on the Profile screen."
+  },
+  "profileRegistrationIncompleteMsg": "Your technician registration is incomplete. Complete it to start receiving jobs.",
+  "@profileRegistrationIncompleteMsg": {
+    "description": "Text for profileRegistrationIncompleteMsg on the Profile screen."
+  },
+  "profileCompleteRegistration": "Complete Registration",
+  "@profileCompleteRegistration": {
+    "description": "Text for profileCompleteRegistration on the Profile screen."
+  },
+  "profileLogOutButton": "Log Out",
+  "@profileLogOutButton": {
+    "description": "Text for profileLogOutButton on the Profile screen."
+  },
+  "profileNoRatingsYet": "No ratings yet",
+  "@profileNoRatingsYet": {
+    "description": "Text for profileNoRatingsYet on the Profile screen."
+  },
+  "profileOnlineStatus": "Online",
+  "@profileOnlineStatus": {
+    "description": "Text for profileOnlineStatus on the Profile screen."
+  },
+  "profileOfflineStatus": "Offline",
+  "@profileOfflineStatus": {
+    "description": "Text for profileOfflineStatus on the Profile screen."
+  },
+  "profileCanBookNow": "Customers can book you now",
+  "@profileCanBookNow": {
+    "description": "Text for profileCanBookNow on the Profile screen."
+  },
+  "profileNoNewRequests": "You won't receive new requests",
+  "@profileNoNewRequests": {
+    "description": "Text for profileNoNewRequests on the Profile screen."
+  },
+  "profileNeedKycApproval": "Complete KYC approval to go online",
+  "@profileNeedKycApproval": {
+    "description": "Text for profileNeedKycApproval on the Profile screen."
+  },
+  "profileSectionProfessionalDetails": "Professional Details",
+  "@profileSectionProfessionalDetails": {
+    "description": "Text for profileSectionProfessionalDetails on the Profile screen."
+  },
+  "profilePrimaryService": "Primary Service",
+  "@profilePrimaryService": {
+    "description": "Text for profilePrimaryService on the Profile screen."
+  },
+  "profileYearsExperienceLabel": "Years of Experience",
+  "@profileYearsExperienceLabel": {
+    "description": "Text for profileYearsExperienceLabel on the Profile screen."
+  },
+  "profileAddressLabel": "Address",
+  "@profileAddressLabel": {
+    "description": "Text for profileAddressLabel on the Profile screen."
+  },
+  "profileServiceRadius": "Service Radius",
+  "@profileServiceRadius": {
+    "description": "Text for profileServiceRadius on the Profile screen."
+  },
+  "profileSectionTrustVerification": "Trust & Verification",
+  "@profileSectionTrustVerification": {
+    "description": "Text for profileSectionTrustVerification on the Profile screen."
+  },
+  "profilePhoneVerified": "Phone Verified",
+  "@profilePhoneVerified": {
+    "description": "Text for profilePhoneVerified on the Profile screen."
+  },
+  "profileProfileVerified": "Profile Verified",
+  "@profileProfileVerified": {
+    "description": "Text for profileProfileVerified on the Profile screen."
+  },
+  "profileGovIdUploaded": "Government ID Uploaded",
+  "@profileGovIdUploaded": {
+    "description": "Text for profileGovIdUploaded on the Profile screen."
+  },
+  "profileSectionDocuments": "Documents",
+  "@profileSectionDocuments": {
+    "description": "Text for profileSectionDocuments on the Profile screen."
+  },
+  "profileGovId": "Government ID",
+  "@profileGovId": {
+    "description": "Text for profileGovId on the Profile screen."
+  },
+  "profileBankUpiDetails": "Bank / UPI Details",
+  "@profileBankUpiDetails": {
+    "description": "Text for profileBankUpiDetails on the Profile screen."
+  },
+  "profileSectionWork": "Work",
+  "@profileSectionWork": {
+    "description": "Text for profileSectionWork on the Profile screen."
+  },
+  "profileLiveConsultationRequestsLabel": "Live Consultation Requests",
+  "@profileLiveConsultationRequestsLabel": {
+    "description": "Text for profileLiveConsultationRequestsLabel on the Profile screen."
+  },
+  "profileNotificationSettings": "Notification Settings",
+  "@profileNotificationSettings": {
+    "description": "Text for profileNotificationSettings on the Profile screen."
+  },
+  "profilePaymentSettings": "Payment Settings",
+  "@profilePaymentSettings": {
+    "description": "Text for profilePaymentSettings on the Profile screen."
+  },
+  "profilePrivacySecurity": "Privacy & Security",
+  "@profilePrivacySecurity": {
+    "description": "Text for profilePrivacySecurity on the Profile screen."
+  },
+  "profileChangePasswordPin": "Change Password / PIN",
+  "@profileChangePasswordPin": {
+    "description": "Text for profileChangePasswordPin on the Profile screen."
+  },
+  "profileVerifiedStatus": "Verified",
+  "@profileVerifiedStatus": {
+    "description": "Text for profileVerifiedStatus on the Profile screen."
+  },
+  "profilePendingStatus": "Pending",
+  "@profilePendingStatus": {
+    "description": "Text for profilePendingStatus on the Profile screen."
+  },
+  "profileApprovalApproved": "Approved",
+  "@profileApprovalApproved": {
+    "description": "Text for profileApprovalApproved on the Profile screen."
+  },
+  "profileApprovalRejected": "Rejected",
+  "@profileApprovalRejected": {
+    "description": "Text for profileApprovalRejected on the Profile screen."
+  },
+  "profileApprovalPending": "Pending Approval",
+  "@profileApprovalPending": {
+    "description": "Text for profileApprovalPending on the Profile screen."
+  },
+  "profileComingSoonMessage": "This feature is coming soon. We're working hard to bring it to you.",
+  "@profileComingSoonMessage": {
+    "description": "Text for profileComingSoonMessage on the Profile screen."
+  },
+  "profileGoBackButton": "Go Back",
+  "@profileGoBackButton": {
+    "description": "Text for profileGoBackButton on the Profile screen."
+  },
+  "profileYearsValue": "{years} years",
+  "profileRejectionReason": "Reason: {reason}",
+  "@profileYearsValue": {
+    "description": "Years of experience value, e.g. '5 years', on the technician profile.",
+    "placeholders": {
+      "years": {
+        "type": "String"
+      }
+    }
+  },
+  "@profileRejectionReason": {
+    "description": "Reason shown when a technician's KYC was rejected.",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  }
 }
-

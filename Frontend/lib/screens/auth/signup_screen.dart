@@ -33,7 +33,7 @@ class _SignupScreenState extends State<SignupScreen> {
   /// Strong password rule: at least 8 chars, must contain a letter AND a
   /// special character — plain numeric strings like "123456" are rejected.
   String? _validatePassword(String? v) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     if (v == null || v.isEmpty) return l10n.signupPasswordRequiredValidator;
     if (v.length < 8) return l10n.signupPasswordTooShort;
     final hasLetter = RegExp(r'[A-Za-z]').hasMatch(v);
@@ -79,7 +79,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(

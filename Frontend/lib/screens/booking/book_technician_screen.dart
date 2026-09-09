@@ -395,7 +395,7 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
           newImageUrls.add(await uploadService.uploadFile(img));
         }
       }
-      final allImages = [...?pendingImages, ...newImageUrls];
+      final allImages = [...pendingImages, ...newImageUrls];
 
       // Video isn't a Booking field (only `images` is), so it rides along on
       // the Job Brief instead — same as the AI Assessment flow — so
@@ -666,7 +666,7 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
               // If the user picked a custom time via the clock picker, its
               // label (e.g. "6:45 PM") won't match any of the fixed slots,
               // so it's injected into the items list below on the fly.
-              value: _selectedSlot?.label,
+              initialValue: _selectedSlot?.label,
               isExpanded: true,
               decoration: InputDecoration(
                 hintText: 'Select a time slot',
@@ -692,11 +692,11 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
                       ],
                     ),
                   ),
-                DropdownMenuItem(
+                const DropdownMenuItem(
                   value: _customTimeSentinel,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: const [
+                    children: [
                       Icon(Icons.access_time, size: 16, color: Colors.teal),
                       SizedBox(width: 6),
                       Text('Choose your own time', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.w600)),
@@ -733,7 +733,7 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
                       Text(q.question, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
-                        value: _categoryDropdownSelection[q.question],
+                        initialValue: _categoryDropdownSelection[q.question],
                         isExpanded: true,
                         decoration: InputDecoration(
                           hintText: 'Select an option',

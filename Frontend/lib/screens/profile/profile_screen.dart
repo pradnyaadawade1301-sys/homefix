@@ -34,7 +34,7 @@ import '../../widgets/guided_tour.dart';
 /// screens below.
 void _showLanguagePicker(BuildContext context) {
   final localeProvider = context.read<LocaleProvider>();
-  final l10n = AppLocalizations.of(context)!;
+  final l10n = AppLocalizations.of(context);
   showModalBottomSheet(
     context: context,
     backgroundColor: Colors.white,
@@ -119,16 +119,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Log out?'),
-        content: const Text('You will need to sign in again to book services.'),
+        title: Text(l10n.profileLogoutDialogTitle),
+        content: Text(l10n.profileLogoutDialogContent),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.commonCancel)),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Log out', style: TextStyle(color: AppTheme.errorColor)),
+            child: Text(l10n.profileLogoutConfirm, style: const TextStyle(color: AppTheme.errorColor)),
           ),
         ],
       ),
@@ -141,23 +142,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _confirmDeleteAccount(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete account?'),
-        content: const Text(
-            'This will permanently delete your account and all associated data. This action cannot be undone.'),
+        title: Text(l10n.profileDeleteDialogTitle),
+        content: Text(l10n.profileDeleteDialogContent),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.commonCancel)),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete', style: TextStyle(color: AppTheme.errorColor)),
+            child: Text(l10n.profileDeleteConfirm, style: const TextStyle(color: AppTheme.errorColor)),
           ),
         ],
       ),
     );
     if (confirm != true || !context.mounted) return;
-    _openPlaceholder(context, 'Delete Account', Icons.delete_outline_rounded);
+    _openPlaceholder(context, l10n.profileDeleteAccount, Icons.delete_outline_rounded);
   }
 
   void _openPlaceholder(BuildContext context, String title, IconData icon) {
@@ -217,9 +218,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
-      appBar: AppBar(title: Text('Profile', key: widget.tourKey)),
+      appBar: AppBar(title: Text(l10n.guidedTourProfileTitle, key: widget.tourKey)),
       body: Consumer<UserProvider>(
         builder: (context, userProvider, _) {
           final user = userProvider.user;
@@ -235,7 +237,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onPressed: () =>
                       Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false),
                   icon: const Icon(Icons.login_rounded),
-                  label: const Text('Log In'),
+                  label: Text(l10n.profileLogInButton),
                 ),
               ),
             );
@@ -296,7 +298,7 @@ class _CustomerProfileBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
       children: [
@@ -472,7 +474,7 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
     return Consumer2<TechnicianKycProvider, CategoryProvider>(
       builder: (context, kycProvider, categoryProvider, _) {
         final profile = kycProvider.profile;
-        final l10n = AppLocalizations.of(context)!;
+        final l10n = AppLocalizations.of(context);
 
         if (kycProvider.isLoading && profile == null) {
           return const Center(child: CircularProgressIndicator());
@@ -483,7 +485,7 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
             padding: const EdgeInsets.all(20),
             children: [
               _ProfileHeader(
-                name: widget.user.name.isNotEmpty ? widget.user.name : 'Technician',
+                name: widget.user.name.isNotEmpty ? widget.user.name : l10n.profileTechnicianDefaultName,
                 subtitle: widget.user.phone,
                 roleLabel: l10n.profileTechnicianRole,
                 photoUrl: (widget.user.photoUrl != null && widget.user.photoUrl!.isNotEmpty) ? widget.user.photoUrl : null,
@@ -500,15 +502,15 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                   children: [
                     const Icon(Icons.badge_outlined, size: 40, color: Colors.grey),
                     const SizedBox(height: 12),
-                    const Text(
-                      'You haven\'t completed technician registration yet.',
+                    Text(
+                      l10n.profileRegistrationIncompleteMsg,
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.w600),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () => Navigator.of(context).pushNamed('/technician-kyc'),
-                      child: const Text('Complete Registration'),
+                      child: Text(l10n.profileCompleteRegistration),
                     ),
                   ],
                 ),
@@ -520,7 +522,7 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                 child: OutlinedButton.icon(
                   onPressed: widget.onLogout,
                   icon: const Icon(Icons.logout_rounded, color: AppTheme.errorColor),
-                  label: const Text('Log Out', style: TextStyle(color: AppTheme.errorColor)),
+                  label: Text(l10n.profileLogOutButton, style: const TextStyle(color: AppTheme.errorColor)),
                   style: OutlinedButton.styleFrom(side: const BorderSide(color: AppTheme.errorColor)),
                 ),
               ),
@@ -543,7 +545,7 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
           children: [
             _ProfileHeader(
-              name: widget.user.name.isNotEmpty ? widget.user.name : 'Technician',
+              name: widget.user.name.isNotEmpty ? widget.user.name : l10n.profileTechnicianDefaultName,
               subtitle: widget.user.phone,
               roleLabel: categoryName,
               photoUrl: profile.profilePhotoUrl.isNotEmpty ? profile.profilePhotoUrl : null,
@@ -557,7 +559,7 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                     icon: Icons.star_rounded,
                     label: profile.ratingCount > 0
                         ? '${profile.ratingAvg.toStringAsFixed(1)} (${profile.ratingCount})'
-                        : 'No ratings yet',
+                        : l10n.profileNoRatingsYet,
                     color: Colors.amber[700]!,
                   ),
                   _ApprovalBadge(status: profile.approvalStatus),
@@ -590,13 +592,13 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(isOnline ? 'You are Online' : 'You are Offline',
+                        Text(isOnline ? l10n.profileOnlineStatus : l10n.profileOfflineStatus,
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
                         const SizedBox(height: 2),
                         Text(
                           canGoOnline
-                              ? (isOnline ? 'Customers can book you right now' : "You won't receive new job requests")
-                              : 'Complete KYC approval to go online',
+                              ? (isOnline ? l10n.profileCanBookNow : l10n.profileNoNewRequests)
+                              : l10n.profileNeedKycApproval,
                           style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                         ),
                       ],
@@ -615,33 +617,33 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
             ),
             const SizedBox(height: 16),
             _SectionCard(
-              title: 'Professional Details',
+              title: l10n.profileSectionProfessionalDetails,
               children: [
-                _InfoRow(label: 'Primary Service', value: categoryName),
-                _InfoRow(label: 'Years of Experience', value: '${profile.experienceYears} yrs'),
-                _InfoRow(label: 'Address', value: profile.address.isNotEmpty ? profile.address : '-'),
+                _InfoRow(label: l10n.profilePrimaryService, value: categoryName),
+                _InfoRow(label: l10n.profileYearsExperienceLabel, value: l10n.profileYearsValue('${profile.experienceYears}')),
+                _InfoRow(label: l10n.profileAddressLabel, value: profile.address.isNotEmpty ? profile.address : '-'),
                 _ActionTile(
                   icon: Icons.map_outlined,
-                  label: 'Service Radius',
+                  label: l10n.profileServiceRadius,
                   onTap: () => widget.openScreen(const ServiceRadiusScreen()),
                 ),
               ],
             ),
             const SizedBox(height: 16),
             _SectionCard(
-              title: 'Trust & Verification',
+              title: l10n.profileSectionTrustVerification,
               children: [
-                _VerificationRow(label: 'Phone Verified', verified: widget.user.phoneVerified),
-                _VerificationRow(label: 'Profile Verified', verified: profile.isVerified),
+                _VerificationRow(label: l10n.profilePhoneVerified, verified: widget.user.phoneVerified),
+                _VerificationRow(label: l10n.profileProfileVerified, verified: profile.isVerified),
                 _VerificationRow(
-                  label: 'Government ID Uploaded',
+                  label: l10n.profileGovIdUploaded,
                   verified: profile.governmentIdUrl.isNotEmpty,
                 ),
                 if (profile.isRejected && profile.rejectionReason != null)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Text(
-                      'Rejection reason: ${profile.rejectionReason}',
+                      l10n.profileRejectionReason(profile.rejectionReason!),
                       style: const TextStyle(color: AppTheme.errorColor, fontSize: 13),
                     ),
                   ),
@@ -649,40 +651,40 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
             ),
             const SizedBox(height: 16),
             _SectionCard(
-              title: 'Documents',
+              title: l10n.profileSectionDocuments,
               children: [
                 _VerificationRow(
-                  label: 'Government ID',
+                  label: l10n.profileGovId,
                   verified: profile.governmentIdUrl.isNotEmpty,
                 ),
                 _ActionTile(
                   icon: Icons.account_balance_outlined,
-                  label: 'Bank / UPI Details',
+                  label: l10n.profileBankUpiDetails,
                   onTap: () => widget.openScreen(const BankDetailsScreen()),
                 ),
               ],
             ),
             const SizedBox(height: 16),
             _SectionCard(
-              title: 'Work',
+              title: l10n.profileSectionWork,
               children: [
                 _ActionTile(
                   icon: Icons.work_outline_rounded,
-                  label: 'My Jobs',
+                  label: l10n.techJobsNavTitleJobs,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const TechnicianJobsScreen()),
                   ),
                 ),
                 _ActionTile(
                   icon: Icons.people_alt_outlined,
-                  label: 'My Customers',
+                  label: l10n.techJobsMyCustomersTooltip,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const RepeatCustomersScreen()),
                   ),
                 ),
                 _ActionTile(
                   icon: Icons.videocam_rounded,
-                  label: 'Live Consultation Requests',
+                  label: l10n.profileLiveConsultationRequestsLabel,
                   onTap: () => Navigator.of(context).pushNamed('/consultation-requests'),
                 ),
               ],
@@ -693,17 +695,17 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
               children: [
                 _ActionTile(
                   icon: Icons.notifications_outlined,
-                  label: 'Notification Settings',
-                  onTap: () => widget.openPlaceholder('Notification Settings', Icons.notifications_outlined),
+                  label: l10n.profileNotificationSettings,
+                  onTap: () => widget.openPlaceholder(l10n.profileNotificationSettings, Icons.notifications_outlined),
                 ),
                 _ActionTile(
                   icon: Icons.payment_outlined,
-                  label: 'Payment Settings',
-                  onTap: () => widget.openPlaceholder('Payment Settings', Icons.payment_outlined),
+                  label: l10n.profilePaymentSettings,
+                  onTap: () => widget.openPlaceholder(l10n.profilePaymentSettings, Icons.payment_outlined),
                 ),
                 _ActionTile(
                   icon: Icons.privacy_tip_outlined,
-                  label: 'Privacy & Security',
+                  label: l10n.profilePrivacySecurity,
                   onTap: () => widget.openScreen(const PrivacySecurityScreen()),
                 ),
                 _ActionTile(
@@ -718,7 +720,7 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                 ),
                 _ActionTile(
                   icon: Icons.lock_outline_rounded,
-                  label: 'Change Password / PIN',
+                  label: l10n.profileChangePasswordPin,
                   onTap: widget.openChangePassword,
                 ),
               ],
@@ -954,6 +956,7 @@ class _VerificationRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return ListTile(
       leading: Icon(
         verified ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
@@ -962,8 +965,8 @@ class _VerificationRow extends StatelessWidget {
       ),
       title: Text(label, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
       trailing: verified
-          ? const Text('Verified', style: TextStyle(color: AppTheme.successColor, fontSize: 12.5))
-          : const Text('Pending', style: TextStyle(color: Colors.grey, fontSize: 12.5)),
+          ? Text(l10n.profileVerifiedStatus, style: const TextStyle(color: AppTheme.successColor, fontSize: 12.5))
+          : Text(l10n.profilePendingStatus, style: const TextStyle(color: Colors.grey, fontSize: 12.5)),
     );
   }
 }
@@ -1002,20 +1005,21 @@ class _ApprovalBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     Color color;
     String label;
     switch (status) {
       case 'approved':
         color = AppTheme.successColor;
-        label = 'Approved';
+        label = l10n.profileApprovalApproved;
         break;
       case 'rejected':
         color = AppTheme.errorColor;
-        label = 'Rejected';
+        label = l10n.profileApprovalRejected;
         break;
       default:
         color = Colors.orange;
-        label = 'Pending Approval';
+        label = l10n.profileApprovalPending;
     }
     return _StatChip(icon: Icons.verified_user_outlined, label: label, color: color);
   }
@@ -1033,6 +1037,7 @@ class _PlaceholderScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       appBar: AppBar(title: Text(title)),
@@ -1058,14 +1063,14 @@ class _PlaceholderScreen extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                'We\'re working on this feature. It will be available in an upcoming update.',
+                l10n.profileComingSoonMessage,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey[600], fontSize: 14, height: 1.4),
               ),
               const SizedBox(height: 28),
               OutlinedButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Go Back'),
+                child: Text(l10n.profileGoBackButton),
               ),
             ],
           ),

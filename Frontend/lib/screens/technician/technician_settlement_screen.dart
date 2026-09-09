@@ -5,6 +5,7 @@ import '../../models/booking_model.dart';
 import '../../models/payment_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/payment_provider.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Technician-facing settlement/history screen.
 ///
@@ -43,6 +44,7 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return RefreshIndicator(
       onRefresh: _load,
       child: Consumer2<BookingProvider, PaymentProvider>(
@@ -77,7 +79,7 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
                       Expanded(
                         child: _tabChip(
                           icon: Icons.route_outlined,
-                          label: 'Visit History',
+                          label: l10n.techSettlementVisitHistory,
                           index: 0,
                         ),
                       ),
@@ -85,7 +87,7 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
                       Expanded(
                         child: _tabChip(
                           icon: Icons.receipt_long_outlined,
-                          label: 'Payment History',
+                          label: l10n.techSettlementPaymentHistory,
                           index: 1,
                         ),
                       ),
@@ -94,9 +96,9 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
                 ),
               ),
               if (_tab == 0)
-                _buildVisitSliver(completedJobs)
+                _buildVisitSliver(completedJobs, l10n)
               else
-                _buildPaymentSliver(payments, isLoadingPayments),
+                _buildPaymentSliver(payments, isLoadingPayments, l10n),
               const SliverToBoxAdapter(child: SizedBox(height: 24)),
             ],
           );
@@ -139,9 +141,9 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
     );
   }
 
-  Widget _buildVisitSliver(List<Booking> completedJobs) {
+  Widget _buildVisitSliver(List<Booking> completedJobs, AppLocalizations l10n) {
     if (completedJobs.isEmpty) {
-      return SliverToBoxAdapter(child: _emptyState(Icons.route_outlined, 'No completed visits yet'));
+      return SliverToBoxAdapter(child: _emptyState(Icons.route_outlined, l10n.techSettlementNoCompletedVisits));
     }
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
@@ -153,7 +155,7 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
     );
   }
 
-  Widget _buildPaymentSliver(List<Payment> payments, bool isLoading) {
+  Widget _buildPaymentSliver(List<Payment> payments, bool isLoading, AppLocalizations l10n) {
     if (isLoading) {
       return const SliverToBoxAdapter(
         child: Padding(
@@ -163,7 +165,7 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
       );
     }
     if (payments.isEmpty) {
-      return SliverToBoxAdapter(child: _emptyState(Icons.receipt_long_outlined, 'No payments yet'));
+      return SliverToBoxAdapter(child: _emptyState(Icons.receipt_long_outlined, l10n.techSettlementNoPayments));
     }
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
@@ -213,7 +215,7 @@ class _SummaryCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Total Earned', style: TextStyle(color: Colors.white70, fontSize: 12.5)),
+                Text(AppLocalizations.of(context)!.techSettlementTotalEarned, style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
                 const SizedBox(height: 6),
                 Text(
                   '₹${totalEarned.toStringAsFixed(0)}',
@@ -227,7 +229,7 @@ class _SummaryCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Jobs Completed', style: TextStyle(color: Colors.white70, fontSize: 12.5)),
+              Text(AppLocalizations.of(context)!.techSettlementJobsCompleted, style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
               const SizedBox(height: 6),
               Text(
                 '$jobsCompleted',
@@ -247,7 +249,7 @@ class _VisitTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final customerName = booking.customer?.name ?? 'Customer';
+    final customerName = booking.customer?.name ?? AppLocalizations.of(context)!.techSettlementCustomerFallback;
     final date = booking.updatedAt;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -352,7 +354,7 @@ class _PaymentTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 if (payment.technicianEarning != null)
-                  Text('Your share: ₹${payment.technicianEarning!.toStringAsFixed(0)}',
+                  Text(AppLocalizations.of(context)!.techSettlementYourShare(payment.technicianEarning!.toStringAsFixed(0)),
                       style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                 const SizedBox(height: 3),
                 Text(

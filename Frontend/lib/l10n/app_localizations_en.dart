@@ -535,6 +535,377 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get techJobsLogoutTitle => 'Log out?';
+
+  @override
+  String get techJobsLogoutContent =>
+      'You will need to sign in again to see your jobs.';
+
+  @override
+  String get techJobsCancel => 'Cancel';
+
+  @override
+  String get techJobsLogout => 'Log out';
+
+  @override
+  String get techJobsNavTitleJobs => 'My Jobs';
+
+  @override
+  String get techJobsNavTitleConsultations => 'Consultations';
+
+  @override
+  String get techJobsNavTitleSettlement => 'Settlement';
+
+  @override
+  String get techJobsNavTitleHistory => 'History';
+
+  @override
+  String get techJobsMyCustomersTooltip => 'My Customers';
+
+  @override
+  String get techJobsLogoutTooltip => 'Log out';
+
+  @override
+  String get techJobsBottomNavJobs => 'Jobs';
+
+  @override
+  String get techJobsBottomNavUpcoming => 'Upcoming';
+
+  @override
+  String get techJobsBottomNavSettlement => 'Settlement';
+
+  @override
+  String get techJobsBottomNavHistory => 'History';
+
+  @override
+  String get techJobsWelcomeBack => 'Welcome back 👋';
+
+  @override
+  String get techJobsWorkOverview => 'Here\'s your work overview';
+
+  @override
+  String get techJobsActive => 'Active';
+
+  @override
+  String get techJobsCompleted => 'Completed';
+
+  @override
+  String get techJobsFilterAll => 'All';
+
+  @override
+  String techJobsCouldNotLoad(String error) {
+    return 'Couldn\'t load your jobs: $error';
+  }
+
+  @override
+  String get techJobsRetry => 'Retry';
+
+  @override
+  String get techJobsNoActiveJobs => 'No active jobs right now';
+
+  @override
+  String get techJobsNoJobsYet => 'No jobs yet';
+
+  @override
+  String get techJobsNewRequestsHint =>
+      'New customer requests will show up here';
+
+  @override
+  String get techJobsLiveConsultationRequest => '1 live consultation request';
+
+  @override
+  String techJobsLiveConsultationRequests(String count) {
+    return '$count live consultation requests';
+  }
+
+  @override
+  String get techJobsTapAcceptReject => 'Tap to accept or reject';
+
+  @override
+  String get techJobsScheduledConsultation => '1 scheduled consultation';
+
+  @override
+  String techJobsScheduledConsultations(String count) {
+    return '$count scheduled consultations';
+  }
+
+  @override
+  String get techJobsTapConfirmDecline => 'Tap to confirm or decline slots';
+
+  @override
+  String get techJobsServiceRequestFallback => 'Service request';
+
+  @override
+  String get techJobsCustomerFallback => 'Customer';
+
+  @override
+  String get techJobsChatTooltip => 'Chat with customer';
+
+  @override
+  String get techJobsDecline => 'Decline';
+
+  @override
+  String get techJobsAcceptJob => 'Accept job';
+
+  @override
+  String get techJobsOnMyWay => 'I\'m on my way';
+
+  @override
+  String get techJobsArrived => 'I\'ve arrived';
+
+  @override
+  String get techJobsGenerateInvoiceComplete => 'Generate invoice & complete';
+
+  @override
+  String get techJobsDeclineTitle => 'Decline this job?';
+
+  @override
+  String get techJobsDeclineContent =>
+      'We\'ll find another technician for this booking. This can\'t be undone.';
+
+  @override
+  String get techJobsGenerateInvoiceTitle => 'Generate invoice';
+
+  @override
+  String get techJobsInvoiceHint =>
+      'Enter the final amount the customer should pay. This is sent to them immediately as the amount due.';
+
+  @override
+  String get techJobsFinalAmount => 'Final amount';
+
+  @override
+  String get techJobsOfferWarranty => 'Offer a warranty';
+
+  @override
+  String get techJobsWarrantySubtitle =>
+      'Customer can raise a free revisit within this window';
+
+  @override
+  String get techJobsDuration => 'Duration';
+
+  @override
+  String get techJobsDurationHint => 'e.g. 6';
+
+  @override
+  String get techJobsDays => 'Days';
+
+  @override
+  String get techJobsMonths => 'Months';
+
+  @override
+  String get techJobsYears => 'Years';
+
+  @override
+  String get techJobsEnterValidAmount => 'Enter a valid amount';
+
+  @override
+  String get techJobsEnterValidWarranty => 'Enter a valid warranty duration';
+
+  @override
+  String get techJobsSendInvoice => 'Send invoice';
+
+  @override
+  String get techJobsAskOtp =>
+      'Ask the customer for their OTP to start the service';
+
+  @override
+  String get techJobsEnterOtp => 'Enter the 4-digit OTP';
+
+  @override
+  String get techJobsIncorrectOtp => 'Incorrect OTP, try again';
+
+  @override
+  String get techJobsVerify => 'Verify';
+
+  @override
+  String get techSettlementVisitHistory => 'Visit History';
+
+  @override
+  String get techSettlementPaymentHistory => 'Payment History';
+
+  @override
+  String get techSettlementNoCompletedVisits => 'No completed visits yet';
+
+  @override
+  String get techSettlementNoPayments => 'No payments yet';
+
+  @override
+  String get techSettlementTotalEarned => 'Total Earned';
+
+  @override
+  String get techSettlementJobsCompleted => 'Jobs Completed';
+
+  @override
+  String techSettlementYourShare(String amount) {
+    return 'Your share: ₹$amount';
+  }
+
+  @override
+  String get techSettlementCustomerFallback => 'Customer';
+
+  @override
+  String get consultUpcomingSlotConfirmed => 'Slot confirmed';
+
+  @override
+  String consultUpcomingCouldNotConfirm(String error) {
+    return 'Could not confirm: $error';
+  }
+
+  @override
+  String get consultUpcomingDeclineTitle => 'Decline this slot?';
+
+  @override
+  String consultUpcomingDeclineContent(String slot) {
+    return 'The customer will be notified that you can\'t make $slot and asked to pick another time.';
+  }
+
+  @override
+  String get consultUpcomingReasonOptional => 'Reason (optional)';
+
+  @override
+  String get consultUpcomingReasonHint => 'e.g. Not available at that time';
+
+  @override
+  String get consultUpcomingCancel => 'Cancel';
+
+  @override
+  String get consultUpcomingDecline => 'Decline';
+
+  @override
+  String get consultUpcomingSlotDeclined => 'Slot declined';
+
+  @override
+  String consultUpcomingCouldNotDecline(String error) {
+    return 'Could not decline: $error';
+  }
+
+  @override
+  String get consultUpcomingThisSlot => 'this slot';
+
+  @override
+  String get consultUpcomingNoUpcoming => 'No upcoming consultations';
+
+  @override
+  String get consultUpcomingScheduledHint =>
+      'Scheduled requests from customers will show up here';
+
+  @override
+  String get consultUpcomingTitle => 'Upcoming Consultations';
+
+  @override
+  String get consultUpcomingFallback => 'Consultation';
+
+  @override
+  String get consultUpcomingNeedsConfirmation => 'Needs confirmation';
+
+  @override
+  String get consultUpcomingConfirmedLabel => 'Confirmed';
+
+  @override
+  String get consultUpcomingCustomerFallback => 'Customer';
+
+  @override
+  String get consultUpcomingConfirm => 'Confirm';
+
+  @override
+  String get consultUpcomingWaitingSlot =>
+      'Waiting for slot time — you\'ll be notified when it starts';
+
+  @override
+  String get consultMyTitle => 'My Consultations';
+
+  @override
+  String get consultMyNoneYet => 'No consultations yet';
+
+  @override
+  String get consultMyFallback => 'Consultation';
+
+  @override
+  String consultMyWith(String name) {
+    return 'with $name';
+  }
+
+  @override
+  String get consultMyRequestAgain => 'Request again';
+
+  @override
+  String get consultMyAwaitingConfirmation => 'Awaiting confirmation';
+
+  @override
+  String get consultMyAwaitingConfirmationMsg =>
+      'Waiting for the technician to confirm your requested slot.';
+
+  @override
+  String get consultMyConfirmed => 'Confirmed';
+
+  @override
+  String get consultMyConfirmedMsg =>
+      'Your technician confirmed. The call will start automatically at your scheduled time.';
+
+  @override
+  String get consultMySearching => 'Searching';
+
+  @override
+  String get consultMySearchingMsg => 'Looking for an available technician...';
+
+  @override
+  String get consultMyRinging => 'Ringing';
+
+  @override
+  String get consultMyRingingMsg => 'Ringing the technician now...';
+
+  @override
+  String get consultMyAccepted => 'Accepted';
+
+  @override
+  String get consultMyAcceptedMsg =>
+      'Technician accepted — connecting your call.';
+
+  @override
+  String get consultMyTechUnavailable => 'Technician unavailable';
+
+  @override
+  String get consultMyNotAnswered => 'Not answered';
+
+  @override
+  String get consultMyRejectedScheduledMsg =>
+      'The technician was busy and couldn\'t make this slot. Please request a new time.';
+
+  @override
+  String get consultMyRejectedInstantMsg =>
+      'The technician couldn\'t take your call. You can try again.';
+
+  @override
+  String consultMyReasonPrefix(String reason) {
+    return 'Reason: $reason';
+  }
+
+  @override
+  String get consultMyNoTechAvailable => 'No technician available';
+
+  @override
+  String get consultMyNoTechAvailableMsg =>
+      'No technician was available for this request. Please try again later.';
+
+  @override
+  String get consultMyInCall => 'In call';
+
+  @override
+  String get consultMyInCallMsg => 'Call in progress.';
+
+  @override
+  String get consultMyCompleted => 'Completed';
+
+  @override
+  String get consultMyCompletedMsg => 'This consultation has ended.';
+
+  @override
+  String get consultMyCancelled => 'Cancelled';
+
+  @override
+  String get consultMyCancelledMsg => 'You cancelled this request.';
+
+  @override
   String get consultTitle => 'Consult';
 
   @override
@@ -548,13 +919,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get consultNoChatsSubtitle =>
-      'Once a technician is assigned to your booking, you can chat with them here.';
+      'Once a technician is assigned to your booking, you\'ll be able to chat with them here.';
 
   @override
   String get consultServiceBookingFallback => 'Service booking';
 
   @override
-  String get consultNoVideoCallsTitle => 'No video calls yet';
+  String get consultNoVideoCallsTitle => 'No video consultations yet';
 
   @override
   String get consultNoVideoCallsSubtitle =>
@@ -589,11 +960,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get consultHelperRejectedScheduled =>
-      'The technician couldn\'t hold this slot. Please choose a new time.';
+      'The technician couldn\'t hold this slot. Please schedule a new time.';
 
   @override
   String get consultHelperRejectedInstant =>
-      'The technician was unable to take this call.';
+      'The technician was unavailable to take this call.';
 
   @override
   String get consultHelperScheduled =>
@@ -601,11 +972,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get consultHelperConfirmed =>
-      'Confirmed — the call will start automatically at the scheduled time.';
+      'The technician has confirmed this slot.';
 
   @override
   String get consultHelperNoTechnician =>
-      'No technician was available to take this call.';
+      'No technician was available for this consultation.';
 
   @override
   String get consultTechnicianFallback => 'Technician';
@@ -614,13 +985,155 @@ class AppLocalizationsEn extends AppLocalizations {
   String get consultVideoConsultationFallback => 'Video consultation';
 
   @override
+  String get consultNewRecommendation =>
+      'New recommendation from your technician';
+
+  @override
+  String get consultNewBadge => 'NEW';
+
+  @override
   String consultMinutesShort(String minutes) {
     return '$minutes min';
   }
 
   @override
-  String get consultNewRecommendation => 'New recommendation from technician';
+  String get profileLogoutDialogTitle => 'Log out?';
 
   @override
-  String get consultNewBadge => 'NEW';
+  String get profileLogoutDialogContent =>
+      'Are you sure you want to log out of your account?';
+
+  @override
+  String get profileLogoutConfirm => 'Log Out';
+
+  @override
+  String get profileDeleteDialogTitle => 'Delete account?';
+
+  @override
+  String get profileDeleteDialogContent =>
+      'This will permanently delete your account and all associated data. This action cannot be undone.';
+
+  @override
+  String get profileDeleteConfirm => 'Delete';
+
+  @override
+  String get profileLogInButton => 'Log In';
+
+  @override
+  String get profileTechnicianDefaultName => 'Technician';
+
+  @override
+  String get profileRegistrationIncompleteMsg =>
+      'Your technician registration is incomplete. Complete it to start receiving jobs.';
+
+  @override
+  String get profileCompleteRegistration => 'Complete Registration';
+
+  @override
+  String get profileLogOutButton => 'Log Out';
+
+  @override
+  String get profileNoRatingsYet => 'No ratings yet';
+
+  @override
+  String get profileOnlineStatus => 'Online';
+
+  @override
+  String get profileOfflineStatus => 'Offline';
+
+  @override
+  String get profileCanBookNow => 'Customers can book you now';
+
+  @override
+  String get profileNoNewRequests => 'You won\'t receive new requests';
+
+  @override
+  String get profileNeedKycApproval => 'Complete KYC approval to go online';
+
+  @override
+  String get profileSectionProfessionalDetails => 'Professional Details';
+
+  @override
+  String get profilePrimaryService => 'Primary Service';
+
+  @override
+  String get profileYearsExperienceLabel => 'Years of Experience';
+
+  @override
+  String get profileAddressLabel => 'Address';
+
+  @override
+  String get profileServiceRadius => 'Service Radius';
+
+  @override
+  String get profileSectionTrustVerification => 'Trust & Verification';
+
+  @override
+  String get profilePhoneVerified => 'Phone Verified';
+
+  @override
+  String get profileProfileVerified => 'Profile Verified';
+
+  @override
+  String get profileGovIdUploaded => 'Government ID Uploaded';
+
+  @override
+  String get profileSectionDocuments => 'Documents';
+
+  @override
+  String get profileGovId => 'Government ID';
+
+  @override
+  String get profileBankUpiDetails => 'Bank / UPI Details';
+
+  @override
+  String get profileSectionWork => 'Work';
+
+  @override
+  String get profileLiveConsultationRequestsLabel =>
+      'Live Consultation Requests';
+
+  @override
+  String get profileNotificationSettings => 'Notification Settings';
+
+  @override
+  String get profilePaymentSettings => 'Payment Settings';
+
+  @override
+  String get profilePrivacySecurity => 'Privacy & Security';
+
+  @override
+  String get profileChangePasswordPin => 'Change Password / PIN';
+
+  @override
+  String get profileVerifiedStatus => 'Verified';
+
+  @override
+  String get profilePendingStatus => 'Pending';
+
+  @override
+  String get profileApprovalApproved => 'Approved';
+
+  @override
+  String get profileApprovalRejected => 'Rejected';
+
+  @override
+  String get profileApprovalPending => 'Pending Approval';
+
+  @override
+  String get profileComingSoonMessage =>
+      'This feature is coming soon. We\'re working hard to bring it to you.';
+
+  @override
+  String get profileGoBackButton => 'Go Back';
+
+  @override
+  String profileYearsValue(String years) {
+    return '$years years';
+  }
+
+  @override
+  String profileRejectionReason(String reason) {
+    return 'Reason: $reason';
+  }
 }

@@ -35,7 +35,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
   }
 
   Future<void> _cancelFromList(BuildContext context, String bookingId) async {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final controller = TextEditingController();
     final reason = await showDialog<String>(
       context: context,
@@ -115,7 +115,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(title: Text(l10n.bookingsTitle, key: widget.tourKey)),
       body: RefreshIndicator(
@@ -244,7 +244,7 @@ class _TechnicianTile extends StatelessWidget {
   const _TechnicianTile({required this.technician, required this.bookingId});
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(

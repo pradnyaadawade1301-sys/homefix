@@ -1078,167 +1078,1109 @@ abstract class AppLocalizations {
   /// **'Message {peerName}'**
   String chatMessageHint(String peerName);
 
-  /// consultTitle label.
+  /// No description provided for @techJobsLogoutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Log out?'**
+  String get techJobsLogoutTitle;
+
+  /// No description provided for @techJobsLogoutContent.
+  ///
+  /// In en, this message translates to:
+  /// **'You will need to sign in again to see your jobs.'**
+  String get techJobsLogoutContent;
+
+  /// No description provided for @techJobsCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get techJobsCancel;
+
+  /// No description provided for @techJobsLogout.
+  ///
+  /// In en, this message translates to:
+  /// **'Log out'**
+  String get techJobsLogout;
+
+  /// No description provided for @techJobsNavTitleJobs.
+  ///
+  /// In en, this message translates to:
+  /// **'My Jobs'**
+  String get techJobsNavTitleJobs;
+
+  /// No description provided for @techJobsNavTitleConsultations.
+  ///
+  /// In en, this message translates to:
+  /// **'Consultations'**
+  String get techJobsNavTitleConsultations;
+
+  /// No description provided for @techJobsNavTitleSettlement.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlement'**
+  String get techJobsNavTitleSettlement;
+
+  /// No description provided for @techJobsNavTitleHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get techJobsNavTitleHistory;
+
+  /// No description provided for @techJobsMyCustomersTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'My Customers'**
+  String get techJobsMyCustomersTooltip;
+
+  /// No description provided for @techJobsLogoutTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Log out'**
+  String get techJobsLogoutTooltip;
+
+  /// No description provided for @techJobsBottomNavJobs.
+  ///
+  /// In en, this message translates to:
+  /// **'Jobs'**
+  String get techJobsBottomNavJobs;
+
+  /// No description provided for @techJobsBottomNavUpcoming.
+  ///
+  /// In en, this message translates to:
+  /// **'Upcoming'**
+  String get techJobsBottomNavUpcoming;
+
+  /// No description provided for @techJobsBottomNavSettlement.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlement'**
+  String get techJobsBottomNavSettlement;
+
+  /// No description provided for @techJobsBottomNavHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get techJobsBottomNavHistory;
+
+  /// No description provided for @techJobsWelcomeBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome back 👋'**
+  String get techJobsWelcomeBack;
+
+  /// No description provided for @techJobsWorkOverview.
+  ///
+  /// In en, this message translates to:
+  /// **'Here\'s your work overview'**
+  String get techJobsWorkOverview;
+
+  /// No description provided for @techJobsActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get techJobsActive;
+
+  /// No description provided for @techJobsCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get techJobsCompleted;
+
+  /// No description provided for @techJobsFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get techJobsFilterAll;
+
+  /// No description provided for @techJobsCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load your jobs: {error}'**
+  String techJobsCouldNotLoad(String error);
+
+  /// No description provided for @techJobsRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get techJobsRetry;
+
+  /// No description provided for @techJobsNoActiveJobs.
+  ///
+  /// In en, this message translates to:
+  /// **'No active jobs right now'**
+  String get techJobsNoActiveJobs;
+
+  /// No description provided for @techJobsNoJobsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No jobs yet'**
+  String get techJobsNoJobsYet;
+
+  /// No description provided for @techJobsNewRequestsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'New customer requests will show up here'**
+  String get techJobsNewRequestsHint;
+
+  /// No description provided for @techJobsLiveConsultationRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'1 live consultation request'**
+  String get techJobsLiveConsultationRequest;
+
+  /// No description provided for @techJobsLiveConsultationRequests.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} live consultation requests'**
+  String techJobsLiveConsultationRequests(String count);
+
+  /// No description provided for @techJobsTapAcceptReject.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to accept or reject'**
+  String get techJobsTapAcceptReject;
+
+  /// No description provided for @techJobsScheduledConsultation.
+  ///
+  /// In en, this message translates to:
+  /// **'1 scheduled consultation'**
+  String get techJobsScheduledConsultation;
+
+  /// No description provided for @techJobsScheduledConsultations.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} scheduled consultations'**
+  String techJobsScheduledConsultations(String count);
+
+  /// No description provided for @techJobsTapConfirmDecline.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to confirm or decline slots'**
+  String get techJobsTapConfirmDecline;
+
+  /// No description provided for @techJobsServiceRequestFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Service request'**
+  String get techJobsServiceRequestFallback;
+
+  /// No description provided for @techJobsCustomerFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get techJobsCustomerFallback;
+
+  /// No description provided for @techJobsChatTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat with customer'**
+  String get techJobsChatTooltip;
+
+  /// No description provided for @techJobsDecline.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline'**
+  String get techJobsDecline;
+
+  /// No description provided for @techJobsAcceptJob.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept job'**
+  String get techJobsAcceptJob;
+
+  /// No description provided for @techJobsOnMyWay.
+  ///
+  /// In en, this message translates to:
+  /// **'I\'m on my way'**
+  String get techJobsOnMyWay;
+
+  /// No description provided for @techJobsArrived.
+  ///
+  /// In en, this message translates to:
+  /// **'I\'ve arrived'**
+  String get techJobsArrived;
+
+  /// No description provided for @techJobsGenerateInvoiceComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate invoice & complete'**
+  String get techJobsGenerateInvoiceComplete;
+
+  /// No description provided for @techJobsDeclineTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline this job?'**
+  String get techJobsDeclineTitle;
+
+  /// No description provided for @techJobsDeclineContent.
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ll find another technician for this booking. This can\'t be undone.'**
+  String get techJobsDeclineContent;
+
+  /// No description provided for @techJobsGenerateInvoiceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate invoice'**
+  String get techJobsGenerateInvoiceTitle;
+
+  /// No description provided for @techJobsInvoiceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the final amount the customer should pay. This is sent to them immediately as the amount due.'**
+  String get techJobsInvoiceHint;
+
+  /// No description provided for @techJobsFinalAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Final amount'**
+  String get techJobsFinalAmount;
+
+  /// No description provided for @techJobsOfferWarranty.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer a warranty'**
+  String get techJobsOfferWarranty;
+
+  /// No description provided for @techJobsWarrantySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer can raise a free revisit within this window'**
+  String get techJobsWarrantySubtitle;
+
+  /// No description provided for @techJobsDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get techJobsDuration;
+
+  /// No description provided for @techJobsDurationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 6'**
+  String get techJobsDurationHint;
+
+  /// No description provided for @techJobsDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Days'**
+  String get techJobsDays;
+
+  /// No description provided for @techJobsMonths.
+  ///
+  /// In en, this message translates to:
+  /// **'Months'**
+  String get techJobsMonths;
+
+  /// No description provided for @techJobsYears.
+  ///
+  /// In en, this message translates to:
+  /// **'Years'**
+  String get techJobsYears;
+
+  /// No description provided for @techJobsEnterValidAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid amount'**
+  String get techJobsEnterValidAmount;
+
+  /// No description provided for @techJobsEnterValidWarranty.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid warranty duration'**
+  String get techJobsEnterValidWarranty;
+
+  /// No description provided for @techJobsSendInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Send invoice'**
+  String get techJobsSendInvoice;
+
+  /// No description provided for @techJobsAskOtp.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask the customer for their OTP to start the service'**
+  String get techJobsAskOtp;
+
+  /// No description provided for @techJobsEnterOtp.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the 4-digit OTP'**
+  String get techJobsEnterOtp;
+
+  /// No description provided for @techJobsIncorrectOtp.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect OTP, try again'**
+  String get techJobsIncorrectOtp;
+
+  /// No description provided for @techJobsVerify.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify'**
+  String get techJobsVerify;
+
+  /// No description provided for @techSettlementVisitHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit History'**
+  String get techSettlementVisitHistory;
+
+  /// No description provided for @techSettlementPaymentHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment History'**
+  String get techSettlementPaymentHistory;
+
+  /// No description provided for @techSettlementNoCompletedVisits.
+  ///
+  /// In en, this message translates to:
+  /// **'No completed visits yet'**
+  String get techSettlementNoCompletedVisits;
+
+  /// No description provided for @techSettlementNoPayments.
+  ///
+  /// In en, this message translates to:
+  /// **'No payments yet'**
+  String get techSettlementNoPayments;
+
+  /// No description provided for @techSettlementTotalEarned.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Earned'**
+  String get techSettlementTotalEarned;
+
+  /// No description provided for @techSettlementJobsCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Jobs Completed'**
+  String get techSettlementJobsCompleted;
+
+  /// No description provided for @techSettlementYourShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Your share: ₹{amount}'**
+  String techSettlementYourShare(String amount);
+
+  /// No description provided for @techSettlementCustomerFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get techSettlementCustomerFallback;
+
+  /// No description provided for @consultUpcomingSlotConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Slot confirmed'**
+  String get consultUpcomingSlotConfirmed;
+
+  /// No description provided for @consultUpcomingCouldNotConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not confirm: {error}'**
+  String consultUpcomingCouldNotConfirm(String error);
+
+  /// No description provided for @consultUpcomingDeclineTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline this slot?'**
+  String get consultUpcomingDeclineTitle;
+
+  /// No description provided for @consultUpcomingDeclineContent.
+  ///
+  /// In en, this message translates to:
+  /// **'The customer will be notified that you can\'t make {slot} and asked to pick another time.'**
+  String consultUpcomingDeclineContent(String slot);
+
+  /// No description provided for @consultUpcomingReasonOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason (optional)'**
+  String get consultUpcomingReasonOptional;
+
+  /// No description provided for @consultUpcomingReasonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Not available at that time'**
+  String get consultUpcomingReasonHint;
+
+  /// No description provided for @consultUpcomingCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get consultUpcomingCancel;
+
+  /// No description provided for @consultUpcomingDecline.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline'**
+  String get consultUpcomingDecline;
+
+  /// No description provided for @consultUpcomingSlotDeclined.
+  ///
+  /// In en, this message translates to:
+  /// **'Slot declined'**
+  String get consultUpcomingSlotDeclined;
+
+  /// No description provided for @consultUpcomingCouldNotDecline.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not decline: {error}'**
+  String consultUpcomingCouldNotDecline(String error);
+
+  /// No description provided for @consultUpcomingThisSlot.
+  ///
+  /// In en, this message translates to:
+  /// **'this slot'**
+  String get consultUpcomingThisSlot;
+
+  /// No description provided for @consultUpcomingNoUpcoming.
+  ///
+  /// In en, this message translates to:
+  /// **'No upcoming consultations'**
+  String get consultUpcomingNoUpcoming;
+
+  /// No description provided for @consultUpcomingScheduledHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled requests from customers will show up here'**
+  String get consultUpcomingScheduledHint;
+
+  /// No description provided for @consultUpcomingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upcoming Consultations'**
+  String get consultUpcomingTitle;
+
+  /// No description provided for @consultUpcomingFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Consultation'**
+  String get consultUpcomingFallback;
+
+  /// No description provided for @consultUpcomingNeedsConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs confirmation'**
+  String get consultUpcomingNeedsConfirmation;
+
+  /// No description provided for @consultUpcomingConfirmedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed'**
+  String get consultUpcomingConfirmedLabel;
+
+  /// No description provided for @consultUpcomingCustomerFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get consultUpcomingCustomerFallback;
+
+  /// No description provided for @consultUpcomingConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get consultUpcomingConfirm;
+
+  /// No description provided for @consultUpcomingWaitingSlot.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for slot time — you\'ll be notified when it starts'**
+  String get consultUpcomingWaitingSlot;
+
+  /// No description provided for @consultMyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My Consultations'**
+  String get consultMyTitle;
+
+  /// No description provided for @consultMyNoneYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No consultations yet'**
+  String get consultMyNoneYet;
+
+  /// No description provided for @consultMyFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Consultation'**
+  String get consultMyFallback;
+
+  /// No description provided for @consultMyWith.
+  ///
+  /// In en, this message translates to:
+  /// **'with {name}'**
+  String consultMyWith(String name);
+
+  /// No description provided for @consultMyRequestAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Request again'**
+  String get consultMyRequestAgain;
+
+  /// No description provided for @consultMyAwaitingConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Awaiting confirmation'**
+  String get consultMyAwaitingConfirmation;
+
+  /// No description provided for @consultMyAwaitingConfirmationMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the technician to confirm your requested slot.'**
+  String get consultMyAwaitingConfirmationMsg;
+
+  /// No description provided for @consultMyConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed'**
+  String get consultMyConfirmed;
+
+  /// No description provided for @consultMyConfirmedMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Your technician confirmed. The call will start automatically at your scheduled time.'**
+  String get consultMyConfirmedMsg;
+
+  /// No description provided for @consultMySearching.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching'**
+  String get consultMySearching;
+
+  /// No description provided for @consultMySearchingMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking for an available technician...'**
+  String get consultMySearchingMsg;
+
+  /// No description provided for @consultMyRinging.
+  ///
+  /// In en, this message translates to:
+  /// **'Ringing'**
+  String get consultMyRinging;
+
+  /// No description provided for @consultMyRingingMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Ringing the technician now...'**
+  String get consultMyRingingMsg;
+
+  /// No description provided for @consultMyAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'Accepted'**
+  String get consultMyAccepted;
+
+  /// No description provided for @consultMyAcceptedMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Technician accepted — connecting your call.'**
+  String get consultMyAcceptedMsg;
+
+  /// No description provided for @consultMyTechUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Technician unavailable'**
+  String get consultMyTechUnavailable;
+
+  /// No description provided for @consultMyNotAnswered.
+  ///
+  /// In en, this message translates to:
+  /// **'Not answered'**
+  String get consultMyNotAnswered;
+
+  /// No description provided for @consultMyRejectedScheduledMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'The technician was busy and couldn\'t make this slot. Please request a new time.'**
+  String get consultMyRejectedScheduledMsg;
+
+  /// No description provided for @consultMyRejectedInstantMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'The technician couldn\'t take your call. You can try again.'**
+  String get consultMyRejectedInstantMsg;
+
+  /// No description provided for @consultMyReasonPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason: {reason}'**
+  String consultMyReasonPrefix(String reason);
+
+  /// No description provided for @consultMyNoTechAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No technician available'**
+  String get consultMyNoTechAvailable;
+
+  /// No description provided for @consultMyNoTechAvailableMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'No technician was available for this request. Please try again later.'**
+  String get consultMyNoTechAvailableMsg;
+
+  /// No description provided for @consultMyInCall.
+  ///
+  /// In en, this message translates to:
+  /// **'In call'**
+  String get consultMyInCall;
+
+  /// No description provided for @consultMyInCallMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Call in progress.'**
+  String get consultMyInCallMsg;
+
+  /// No description provided for @consultMyCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get consultMyCompleted;
+
+  /// No description provided for @consultMyCompletedMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'This consultation has ended.'**
+  String get consultMyCompletedMsg;
+
+  /// No description provided for @consultMyCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get consultMyCancelled;
+
+  /// No description provided for @consultMyCancelledMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'You cancelled this request.'**
+  String get consultMyCancelledMsg;
+
+  /// Text for consultTitle on the Consult screen.
   ///
   /// In en, this message translates to:
   /// **'Consult'**
   String get consultTitle;
 
-  /// consultTabChat label.
+  /// Text for consultTabChat on the Consult screen.
   ///
   /// In en, this message translates to:
   /// **'Chat'**
   String get consultTabChat;
 
-  /// consultTabVideo label.
+  /// Text for consultTabVideo on the Consult screen.
   ///
   /// In en, this message translates to:
   /// **'Video'**
   String get consultTabVideo;
 
-  /// consultNoChatsTitle label.
+  /// Text for consultNoChatsTitle on the Consult screen.
   ///
   /// In en, this message translates to:
   /// **'No chats yet'**
   String get consultNoChatsTitle;
 
-  /// consultNoChatsSubtitle label.
+  /// Text for consultNoChatsSubtitle on the Consult screen.
   ///
   /// In en, this message translates to:
-  /// **'Once a technician is assigned to your booking, you can chat with them here.'**
+  /// **'Once a technician is assigned to your booking, you\'ll be able to chat with them here.'**
   String get consultNoChatsSubtitle;
 
-  /// consultServiceBookingFallback label.
+  /// Text for consultServiceBookingFallback on the Consult screen.
   ///
   /// In en, this message translates to:
   /// **'Service booking'**
   String get consultServiceBookingFallback;
 
-  /// consultNoVideoCallsTitle label.
+  /// Text for consultNoVideoCallsTitle on the Consult screen.
   ///
   /// In en, this message translates to:
-  /// **'No video calls yet'**
+  /// **'No video consultations yet'**
   String get consultNoVideoCallsTitle;
 
-  /// consultNoVideoCallsSubtitle label.
+  /// Text for consultNoVideoCallsSubtitle on the Consult screen.
   ///
   /// In en, this message translates to:
   /// **'Your live video consultations with technicians will show up here.'**
   String get consultNoVideoCallsSubtitle;
 
-  /// consultStatusCompleted label.
+  /// Text for consultStatusCompleted on the Consult screen.
   ///
   /// In en, this message translates to:
   /// **'Completed'**
   String get consultStatusCompleted;
 
-  /// consultStatusCancelled label.
+  /// Text for consultStatusCancelled on the Consult screen.
   ///
   /// In en, this message translates to:
   /// **'Cancelled'**
   String get consultStatusCancelled;
 
-  /// consultStatusTechnicianUnavailable label.
+  /// Text for consultStatusTechnicianUnavailable on the Consult screen.
   ///
   /// In en, this message translates to:
   /// **'Technician unavailable'**
   String get consultStatusTechnicianUnavailable;
 
-  /// consultStatusDeclined label.
+  /// Text for consultStatusDeclined on the Consult screen.
   ///
   /// In en, this message translates to:
   /// **'Declined'**
   String get consultStatusDeclined;
 
-  /// consultStatusNoExpertFound label.
+  /// Text for consultStatusNoExpertFound on the Consult screen.
   ///
   /// In en, this message translates to:
   /// **'No expert found'**
   String get consultStatusNoExpertFound;
 
-  /// consultStatusInCall label.
+  /// Text for consultStatusInCall on the Consult screen.
   ///
   /// In en, this message translates to:
   /// **'In call'**
   String get consultStatusInCall;
 
-  /// consultStatusConfirmed label.
+  /// Text for consultStatusConfirmed on the Consult screen.
   ///
   /// In en, this message translates to:
   /// **'Confirmed'**
   String get consultStatusConfirmed;
 
-  /// consultStatusAwaitingConfirmation label.
+  /// Text for consultStatusAwaitingConfirmation on the Consult screen.
   ///
   /// In en, this message translates to:
   /// **'Awaiting confirmation'**
   String get consultStatusAwaitingConfirmation;
 
-  /// consultStatusUpcoming label.
+  /// Text for consultStatusUpcoming on the Consult screen.
   ///
   /// In en, this message translates to:
   /// **'Upcoming'**
   String get consultStatusUpcoming;
 
-  /// consultHelperRejectedScheduled label.
+  /// Text for consultHelperRejectedScheduled on the Consult screen.
   ///
   /// In en, this message translates to:
-  /// **'The technician couldn\'t hold this slot. Please choose a new time.'**
+  /// **'The technician couldn\'t hold this slot. Please schedule a new time.'**
   String get consultHelperRejectedScheduled;
 
-  /// consultHelperRejectedInstant label.
+  /// Text for consultHelperRejectedInstant on the Consult screen.
   ///
   /// In en, this message translates to:
-  /// **'The technician was unable to take this call.'**
+  /// **'The technician was unavailable to take this call.'**
   String get consultHelperRejectedInstant;
 
-  /// consultHelperScheduled label.
+  /// Text for consultHelperScheduled on the Consult screen.
   ///
   /// In en, this message translates to:
   /// **'Waiting for the technician to confirm this slot.'**
   String get consultHelperScheduled;
 
-  /// consultHelperConfirmed label.
+  /// Text for consultHelperConfirmed on the Consult screen.
   ///
   /// In en, this message translates to:
-  /// **'Confirmed — the call will start automatically at the scheduled time.'**
+  /// **'The technician has confirmed this slot.'**
   String get consultHelperConfirmed;
 
-  /// consultHelperNoTechnician label.
+  /// Text for consultHelperNoTechnician on the Consult screen.
   ///
   /// In en, this message translates to:
-  /// **'No technician was available to take this call.'**
+  /// **'No technician was available for this consultation.'**
   String get consultHelperNoTechnician;
 
-  /// consultTechnicianFallback label.
+  /// Text for consultTechnicianFallback on the Consult screen.
   ///
   /// In en, this message translates to:
   /// **'Technician'**
   String get consultTechnicianFallback;
 
-  /// consultVideoConsultationFallback label.
+  /// Text for consultVideoConsultationFallback on the Consult screen.
   ///
   /// In en, this message translates to:
   /// **'Video consultation'**
   String get consultVideoConsultationFallback;
 
-  /// consultMinutesShort label.
+  /// Text for consultNewRecommendation on the Consult screen.
+  ///
+  /// In en, this message translates to:
+  /// **'New recommendation from your technician'**
+  String get consultNewRecommendation;
+
+  /// Text for consultNewBadge on the Consult screen.
+  ///
+  /// In en, this message translates to:
+  /// **'NEW'**
+  String get consultNewBadge;
+
+  /// Short duration label, e.g. '5 min', shown after a completed video consultation.
   ///
   /// In en, this message translates to:
   /// **'{minutes} min'**
   String consultMinutesShort(String minutes);
 
-  /// consultNewRecommendation label.
+  /// Text for profileLogoutDialogTitle on the Profile screen.
   ///
   /// In en, this message translates to:
-  /// **'New recommendation from technician'**
-  String get consultNewRecommendation;
+  /// **'Log out?'**
+  String get profileLogoutDialogTitle;
 
-  /// consultNewBadge label.
+  /// Text for profileLogoutDialogContent on the Profile screen.
   ///
   /// In en, this message translates to:
-  /// **'NEW'**
-  String get consultNewBadge;
+  /// **'Are you sure you want to log out of your account?'**
+  String get profileLogoutDialogContent;
+
+  /// Text for profileLogoutConfirm on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Log Out'**
+  String get profileLogoutConfirm;
+
+  /// Text for profileDeleteDialogTitle on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete account?'**
+  String get profileDeleteDialogTitle;
+
+  /// Text for profileDeleteDialogContent on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'This will permanently delete your account and all associated data. This action cannot be undone.'**
+  String get profileDeleteDialogContent;
+
+  /// Text for profileDeleteConfirm on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get profileDeleteConfirm;
+
+  /// Text for profileLogInButton on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Log In'**
+  String get profileLogInButton;
+
+  /// Text for profileTechnicianDefaultName on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Technician'**
+  String get profileTechnicianDefaultName;
+
+  /// Text for profileRegistrationIncompleteMsg on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Your technician registration is incomplete. Complete it to start receiving jobs.'**
+  String get profileRegistrationIncompleteMsg;
+
+  /// Text for profileCompleteRegistration on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete Registration'**
+  String get profileCompleteRegistration;
+
+  /// Text for profileLogOutButton on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Log Out'**
+  String get profileLogOutButton;
+
+  /// Text for profileNoRatingsYet on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'No ratings yet'**
+  String get profileNoRatingsYet;
+
+  /// Text for profileOnlineStatus on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Online'**
+  String get profileOnlineStatus;
+
+  /// Text for profileOfflineStatus on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline'**
+  String get profileOfflineStatus;
+
+  /// Text for profileCanBookNow on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers can book you now'**
+  String get profileCanBookNow;
+
+  /// Text for profileNoNewRequests on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'You won\'t receive new requests'**
+  String get profileNoNewRequests;
+
+  /// Text for profileNeedKycApproval on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete KYC approval to go online'**
+  String get profileNeedKycApproval;
+
+  /// Text for profileSectionProfessionalDetails on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Professional Details'**
+  String get profileSectionProfessionalDetails;
+
+  /// Text for profilePrimaryService on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Primary Service'**
+  String get profilePrimaryService;
+
+  /// Text for profileYearsExperienceLabel on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Years of Experience'**
+  String get profileYearsExperienceLabel;
+
+  /// Text for profileAddressLabel on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Address'**
+  String get profileAddressLabel;
+
+  /// Text for profileServiceRadius on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Service Radius'**
+  String get profileServiceRadius;
+
+  /// Text for profileSectionTrustVerification on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Trust & Verification'**
+  String get profileSectionTrustVerification;
+
+  /// Text for profilePhoneVerified on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone Verified'**
+  String get profilePhoneVerified;
+
+  /// Text for profileProfileVerified on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile Verified'**
+  String get profileProfileVerified;
+
+  /// Text for profileGovIdUploaded on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Government ID Uploaded'**
+  String get profileGovIdUploaded;
+
+  /// Text for profileSectionDocuments on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents'**
+  String get profileSectionDocuments;
+
+  /// Text for profileGovId on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Government ID'**
+  String get profileGovId;
+
+  /// Text for profileBankUpiDetails on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank / UPI Details'**
+  String get profileBankUpiDetails;
+
+  /// Text for profileSectionWork on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Work'**
+  String get profileSectionWork;
+
+  /// Text for profileLiveConsultationRequestsLabel on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Live Consultation Requests'**
+  String get profileLiveConsultationRequestsLabel;
+
+  /// Text for profileNotificationSettings on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification Settings'**
+  String get profileNotificationSettings;
+
+  /// Text for profilePaymentSettings on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Settings'**
+  String get profilePaymentSettings;
+
+  /// Text for profilePrivacySecurity on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy & Security'**
+  String get profilePrivacySecurity;
+
+  /// Text for profileChangePasswordPin on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Password / PIN'**
+  String get profileChangePasswordPin;
+
+  /// Text for profileVerifiedStatus on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified'**
+  String get profileVerifiedStatus;
+
+  /// Text for profilePendingStatus on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get profilePendingStatus;
+
+  /// Text for profileApprovalApproved on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get profileApprovalApproved;
+
+  /// Text for profileApprovalRejected on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected'**
+  String get profileApprovalRejected;
+
+  /// Text for profileApprovalPending on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending Approval'**
+  String get profileApprovalPending;
+
+  /// Text for profileComingSoonMessage on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'This feature is coming soon. We\'re working hard to bring it to you.'**
+  String get profileComingSoonMessage;
+
+  /// Text for profileGoBackButton on the Profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Go Back'**
+  String get profileGoBackButton;
+
+  /// Years of experience value, e.g. '5 years', on the technician profile.
+  ///
+  /// In en, this message translates to:
+  /// **'{years} years'**
+  String profileYearsValue(String years);
+
+  /// Reason shown when a technician's KYC was rejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason: {reason}'**
+  String profileRejectionReason(String reason);
 }
 
 class _AppLocalizationsDelegate

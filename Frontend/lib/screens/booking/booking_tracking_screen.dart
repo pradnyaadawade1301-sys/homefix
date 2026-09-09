@@ -263,11 +263,11 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            const Row(
                               children: [
-                                const Icon(Icons.person_off_rounded, color: AppTheme.errorColor, size: 20),
-                                const SizedBox(width: 10),
-                                const Expanded(
+                                Icon(Icons.person_off_rounded, color: AppTheme.errorColor, size: 20),
+                                SizedBox(width: 10),
+                                Expanded(
                                   child: Text(
                                     'The technician rejected this booking. Please choose another technician.',
                                     style: TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w500),

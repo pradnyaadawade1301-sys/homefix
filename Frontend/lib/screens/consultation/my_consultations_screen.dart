@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../models/consultation_model.dart';
 import '../../providers/consultation_provider.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Customer-facing consultation history / status screen. Every consultation
 /// the customer has ever requested — instant or scheduled — with a plain-
@@ -28,8 +29,9 @@ class _MyConsultationsScreenState extends State<MyConsultationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('My Consultations')),
+      appBar: AppBar(title: Text(l10n.consultMyTitle)),
       body: RefreshIndicator(
         onRefresh: _load,
         child: Consumer<ConsultationProvider>(
@@ -47,7 +49,7 @@ class _MyConsultationsScreenState extends State<MyConsultationsScreen> {
                   const SizedBox(height: 16),
                   Center(
                     child: Text(
-                      'No consultations yet',
+                      l10n.consultMyNoneYet,
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey[600]),
                     ),
                   ),
@@ -91,84 +93,84 @@ class _ConsultationCard extends StatelessWidget {
     return '$day $month, $hour12:$minute $ampm';
   }
 
-  _StatusInfo _statusInfo() {
+  _StatusInfo _statusInfo(AppLocalizations l10n) {
     final isScheduled = consultation.scheduledAt != null;
     switch (consultation.status) {
       case ConsultationStatus.scheduled:
-        return const _StatusInfo(
-          label: 'Awaiting confirmation',
+        return _StatusInfo(
+          label: l10n.consultMyAwaitingConfirmation,
           color: AppTheme.warningColor,
           icon: Icons.hourglass_top_rounded,
-          message: 'Waiting for the technician to confirm your requested slot.',
+          message: l10n.consultMyAwaitingConfirmationMsg,
         );
       case ConsultationStatus.confirmed:
-        return const _StatusInfo(
-          label: 'Confirmed',
+        return _StatusInfo(
+          label: l10n.consultMyConfirmed,
           color: AppTheme.successColor,
           icon: Icons.event_available_rounded,
-          message: 'Your technician confirmed. The call will start automatically at your scheduled time.',
+          message: l10n.consultMyConfirmedMsg,
         );
       case ConsultationStatus.searching:
-        return const _StatusInfo(
-          label: 'Searching',
+        return _StatusInfo(
+          label: l10n.consultMySearching,
           color: AppTheme.primaryColor,
           icon: Icons.search_rounded,
-          message: 'Looking for an available technician...',
+          message: l10n.consultMySearchingMsg,
         );
       case ConsultationStatus.ringing:
-        return const _StatusInfo(
-          label: 'Ringing',
+        return _StatusInfo(
+          label: l10n.consultMyRinging,
           color: AppTheme.primaryColor,
           icon: Icons.phone_in_talk_rounded,
-          message: 'Ringing the technician now...',
+          message: l10n.consultMyRingingMsg,
         );
       case ConsultationStatus.accepted:
-        return const _StatusInfo(
-          label: 'Accepted',
+        return _StatusInfo(
+          label: l10n.consultMyAccepted,
           color: AppTheme.successColor,
           icon: Icons.check_circle_rounded,
-          message: 'Technician accepted — connecting your call.',
+          message: l10n.consultMyAcceptedMsg,
         );
       case ConsultationStatus.rejected:
         // Prefer the technician's own stated reason when they gave one —
         // falls back to the generic explanation otherwise.
         final reason = (consultation.declineReason ?? '').trim();
         final defaultMessage = isScheduled
-            ? 'The technician was busy and couldn\'t make this slot. Please request a new time.'
-            : 'The technician couldn\'t take your call. You can try again.';
+            ? l10n.consultMyRejectedScheduledMsg
+            : l10n.consultMyRejectedInstantMsg;
         return _StatusInfo(
-          label: isScheduled ? 'Technician unavailable' : 'Not answered',
+          label: isScheduled ? l10n.consultMyTechUnavailable : l10n.consultMyNotAnswered,
           color: AppTheme.errorColor,
           icon: isScheduled ? Icons.event_busy_rounded : Icons.call_end_rounded,
-          message: reason.isNotEmpty ? 'Reason: $reason' : defaultMessage,
+          message: reason.isNotEmpty ? l10n.consultMyReasonPrefix(reason) : defaultMessage,
         );
       case ConsultationStatus.noTechnician:
-        return const _StatusInfo(
-          label: 'No technician available',
+        return _StatusInfo(
+          label: l10n.consultMyNoTechAvailable,
           color: AppTheme.errorColor,
           icon: Icons.person_off_rounded,
-          message: 'No technician was available for this request. Please try again later.',
+          message: l10n.consultMyNoTechAvailableMsg,
         );
       case ConsultationStatus.inCall:
-        return const _StatusInfo(
-          label: 'In call',
+        return _StatusInfo(
+          label: l10n.consultMyInCall,
           color: AppTheme.successColor,
           icon: Icons.videocam_rounded,
-          message: 'Call in progress.',
+          message: l10n.consultMyInCallMsg,
         );
       case ConsultationStatus.ended:
         return _StatusInfo(
-          label: 'Completed',
+          label: l10n.consultMyCompleted,
           color: Colors.grey[700]!,
           icon: Icons.check_circle_outline_rounded,
-          message: 'This consultation has ended.',
+          message: l10n.consultMyCompletedMsg,
         );
       case ConsultationStatus.cancelled:
         return _StatusInfo(
-          label: 'Cancelled',
+          label: l10n.consultMyCancelled,
           color: Colors.grey[600]!,
           icon: Icons.cancel_outlined,
-          message: 'You cancelled this request.',
+          message: l10n.consultMyCancelledMsg,
         );
       default:
         return _StatusInfo(
@@ -182,7 +184,8 @@ class _ConsultationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final info = _statusInfo();
+    final l10n = AppLocalizations.of(context)!;
+    final info = _statusInfo(l10n);
     final slotText = _formatSlot(consultation.scheduledAt);
 
     return Container(
@@ -201,7 +204,7 @@ class _ConsultationCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  consultation.categoryName.isNotEmpty ? consultation.categoryName : 'Consultation',
+                  consultation.categoryName.isNotEmpty ? consultation.categoryName : l10n.consultMyFallback,
                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
                 ),
               ),
@@ -234,7 +237,7 @@ class _ConsultationCard extends StatelessWidget {
           ],
           if (consultation.technicianName != null && consultation.technicianName!.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text('with ${consultation.technicianName}', style: TextStyle(fontSize: 12.5, color: Colors.grey[700])),
+            Text(l10n.consultMyWith(consultation.technicianName!), style: TextStyle(fontSize: 12.5, color: Colors.grey[700])),
           ],
           if (info.message.isNotEmpty) ...[
             const SizedBox(height: 10),
@@ -254,7 +257,7 @@ class _ConsultationCard extends StatelessWidget {
               width: double.infinity,
               child: OutlinedButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Request again'),
+                child: Text(l10n.consultMyRequestAgain),
               ),
             ),
           ],

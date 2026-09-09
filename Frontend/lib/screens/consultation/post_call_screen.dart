@@ -76,7 +76,7 @@ class _PostCallScreenState extends State<PostCallScreen> {
       // Still nothing decisive (no pending recommendation, not declined)?
       // Technician might still be sending one — check again shortly instead
       // of leaving the customer stuck on a stale "waiting" screen.
-      if (consultation?.hasPendingRecommendation != true && consultation?.recommendationStatus != 'declined') {
+      if (consultation.hasPendingRecommendation != true && consultation.recommendationStatus != 'declined') {
         _pollTimer?.cancel();
         _pollTimer = Timer(const Duration(seconds: 5), _loadRecommendation);
       }
@@ -333,15 +333,15 @@ class _PostCallScreenState extends State<PostCallScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    const Row(
                       children: [
-                        const SizedBox(
+                        SizedBox(
                           height: 16,
                           width: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         ),
-                        const SizedBox(width: 10),
-                        const Expanded(
+                        SizedBox(width: 10),
+                        Expanded(
                           child: Text('Waiting for the technician\'s recommendation…',
                               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
                         ),

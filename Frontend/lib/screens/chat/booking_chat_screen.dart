@@ -122,7 +122,7 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
   }
 
   Widget _body(String? myId) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     if (_isLoading && _messages.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -193,7 +193,7 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
   }
 
   Widget _composer() {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return SafeArea(
       child: Container(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),

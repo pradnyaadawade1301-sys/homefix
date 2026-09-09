@@ -63,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       setState(() => _isGoogleLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.loginGoogleSignInFailed(e.toString().replaceFirst('Exception: ', ''))), backgroundColor: AppTheme.errorColor),
+        SnackBar(content: Text(AppLocalizations.of(context).loginGoogleSignInFailed(e.toString().replaceFirst('Exception: ', ''))), backgroundColor: AppTheme.errorColor),
       );
       return;
     }
@@ -113,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -200,7 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: TextButton(
                               onPressed: () {
                                 Navigator.of(context).push(
-MaterialPageRoute(builder: (_) => ForgotPasswordScreen()),                                );
+MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),                                );
                               },
                               child: Text(l10n.loginForgotPassword),
                             ),
