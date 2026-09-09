@@ -59,8 +59,6 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		auth.POST("/google", middleware.RateLimit(rdb, "google-login", 10, time.Minute), h.Auth.LoginWithGoogle)
 		auth.POST("/request-email-otp", middleware.RateLimit(rdb, "email-otp", 5, time.Minute), h.Auth.RequestEmailOTP)
 		auth.POST("/verify-email-otp", middleware.RateLimit(rdb, "email-otp-verify", 10, time.Minute), h.Auth.VerifyEmailOTP)
-		auth.POST("/forgot-password", middleware.RateLimit(rdb, "forgot-password", 5, time.Minute), h.Auth.ForgotPassword)
-		auth.POST("/reset-password", middleware.RateLimit(rdb, "reset-password", 10, time.Minute), h.Auth.ResetPassword)
 		auth.POST("/refresh", h.Auth.Refresh)
 	}
 	api.GET("/categories", h.Category.List)
@@ -105,7 +103,6 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.GET("/technicians/available", h.Technician.FindAvailable)
 		authed.GET("/technicians/:id/reviews", h.Technician.Reviews)
 		authed.PATCH("/technicians/:id/availability", middleware.RequireRole("technician"), h.Technician.SetAvailability)
-		authed.PATCH("/technicians/:id/working-hours", middleware.RequireRole("technician"), h.Technician.SetWorkingHours)
 		authed.PATCH("/technicians/:id/location", middleware.RequireRole("technician"), h.Technician.UpdateLocation)
 		authed.PATCH("/technicians/:id/verify", middleware.RequireRole("admin"), h.Technician.Verify)
 		authed.GET("/technicians/:id/bookings", middleware.RequireRole("technician", "admin"), h.Booking.TechnicianBookings)
@@ -119,7 +116,6 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.GET("/bookings/:id", h.Booking.Get)
 		authed.GET("/bookings/:id/history", h.Booking.History)
 		authed.POST("/bookings/:id/accept", middleware.RequireRole("technician"), h.Booking.Accept)
-		authed.POST("/bookings/:id/decline", middleware.RequireRole("technician"), h.Booking.Decline)
 		authed.PATCH("/bookings/:id/status", middleware.RequireRole("technician", "admin"), h.Booking.UpdateStatus)
 		authed.POST("/bookings/:id/complete", middleware.RequireRole("technician", "admin"), h.Booking.Complete)
 		authed.POST("/bookings/:id/warranty-claim", h.Booking.RaiseWarrantyClaim)
@@ -135,6 +131,11 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.POST("/bookings/:id/verify-otp", middleware.RequireRole("technician"), h.Booking.VerifyOTP)
 		// Live technician location for the customer's tracking map.
 		authed.GET("/bookings/:id/technician-location", h.Booking.GetTechnicianLocation)
+		// Technician-initiated audio call for an active booking (see
+		// BookingService.InitiateCall) — reuses the same /ws/call/:id relay
+		// as Live Video Consultations.
+		authed.GET("/bookings/:id/call", h.Booking.CallInfo)
+		authed.POST("/bookings/:id/call/initiate", middleware.RequireRole("technician"), h.Booking.InitiateCall)
 		// Service estimate: technician raises/revises it, customer approves or declines.
 		authed.POST("/bookings/:id/estimate", middleware.RequireRole("technician"), h.Booking.SubmitEstimate)
 		authed.GET("/bookings/:id/estimate", h.Booking.GetEstimate)
@@ -148,7 +149,6 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		// or a consultation id — see call_handler.go).
 		authed.POST("/consultations/request", h.Consultation.Request)
 		authed.GET("/consultations/pending", middleware.RequireRole("technician"), h.Consultation.Pending)
-		authed.GET("/consultations/mine", h.Consultation.Mine)
 		authed.GET("/consultations/:id", h.Consultation.Get)
 		authed.GET("/consultations/:id/call", h.Consultation.CallInfo)
 		authed.POST("/consultations/:id/cancel", h.Consultation.Cancel)

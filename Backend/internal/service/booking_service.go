@@ -24,11 +24,9 @@ func NewBookingService(bookingRepo *repository.BookingRepository, catRepo *repos
 
 // Create makes a new booking. If preferredTechnicianID is non-empty (customer
 // picked a specific technician via "Book Now" on their profile), the booking
-// is created and routed to that technician, but it is NOT auto-confirmed —
-// status goes to "pending_technician" and the customer sees "waiting for
-// technician response" until the technician explicitly accepts (Accept) or
-// rejects (Decline) it. A reject sends the booking back to "requested" so
-// another technician can be found, instead of leaving the customer stuck.
+// is created and then immediately assigned to that technician (status jumps
+// straight to "accepted") instead of sitting as "requested" waiting for any
+// technician to accept it.
 func (s *BookingService) Create(ctx context.Context, b *models.Booking, preferredTechnicianID string) (*models.Booking, error) {
 	cat, err := s.catRepo.GetByID(ctx, b.CategoryID)
 	if err != nil {
@@ -55,19 +53,19 @@ func (s *BookingService) Create(ctx context.Context, b *models.Booking, preferre
 		if tech == nil {
 			return nil, errors.New("selected technician not found")
 		}
-		if err := s.bookingRepo.AssignPendingTechnician(ctx, created.ID, preferredTechnicianID); err != nil {
+		if err := s.bookingRepo.AssignTechnician(ctx, created.ID, preferredTechnicianID); err != nil {
 			if errors.Is(err, repository.ErrBookingAlreadyAssigned) {
 				return nil, errors.New("this booking has already been assigned")
 			}
 			return nil, err
 		}
 		created.TechnicianID = &preferredTechnicianID
-		created.Status = models.BookingPendingTechnician
+		created.Status = models.BookingAccepted
 
 		if s.fcm != nil {
 			_ = s.fcm.SendToUser(ctx, tech.UserID, "New booking request",
-				"You have a new booking request. Please accept or reject it.",
-				map[string]string{"booking_id": created.ID, "type": "booking_pending_response"})
+				"You have a new booking request.",
+				map[string]string{"booking_id": created.ID, "type": "booking_assigned"})
 		}
 	}
 
@@ -116,13 +114,7 @@ func (s *BookingService) ListForTechnicianDetailed(ctx context.Context, technici
 	return s.bookingRepo.ListByTechnicianDetailed(ctx, technicianID)
 }
 
-// Accept covers two cases:
-//  1. A "requested" (open marketplace) booking with no technician yet — the
-//     technician self-assigns and it's confirmed immediately.
-//  2. A "pending_technician" booking that was routed specifically to this
-//     technician (e.g. via "Book Now") — they're just confirming the job
-//     already sitting with them.
-// Either way the customer gets a real FCM push once it's actually accepted.
+// Accept assigns a technician to a booking and notifies the customer via real FCM push.
 func (s *BookingService) Accept(ctx context.Context, bookingID, technicianID string) error {
 	b, err := s.bookingRepo.GetByID(ctx, bookingID)
 	if err != nil {
@@ -131,66 +123,25 @@ func (s *BookingService) Accept(ctx context.Context, bookingID, technicianID str
 	if b == nil {
 		return errors.New("booking not found")
 	}
+	if b.Status != models.BookingRequested {
+		return errors.New("booking is not in a requested state")
+	}
 
-	switch b.Status {
-	case models.BookingRequested:
-		// AssignTechnician re-checks status='requested' atomically inside its own
-		// UPDATE, so even if two technicians pass the check above at the same
-		// instant, only one of them can actually win here — the other gets
-		// ErrBookingAlreadyAssigned instead of silently overwriting the first.
-		if err := s.bookingRepo.AssignTechnician(ctx, bookingID, technicianID); err != nil {
-			if errors.Is(err, repository.ErrBookingAlreadyAssigned) {
-				return errors.New("this booking has already been accepted by another technician")
-			}
-			return err
+	// AssignTechnician re-checks status='requested' atomically inside its own
+	// UPDATE, so even if two technicians pass the check above at the same
+	// instant, only one of them can actually win here — the other gets
+	// ErrBookingAlreadyAssigned instead of silently overwriting the first.
+	if err := s.bookingRepo.AssignTechnician(ctx, bookingID, technicianID); err != nil {
+		if errors.Is(err, repository.ErrBookingAlreadyAssigned) {
+			return errors.New("this booking has already been accepted by another technician")
 		}
-	case models.BookingPendingTechnician:
-		if b.TechnicianID == nil || *b.TechnicianID != technicianID {
-			return errors.New("this booking is not assigned to you")
-		}
-		if err := s.bookingRepo.ConfirmAssignment(ctx, bookingID, technicianID); err != nil {
-			if errors.Is(err, repository.ErrBookingAlreadyAssigned) {
-				return errors.New("this booking is no longer assigned to you")
-			}
-			return err
-		}
-	default:
-		return errors.New("booking is not in a state that can be accepted")
+		return err
 	}
 
 	if s.fcm != nil {
 		_ = s.fcm.SendToUser(ctx, b.CustomerID, "Technician assigned",
 			"A technician has accepted your booking and is on the way.",
 			map[string]string{"booking_id": bookingID, "type": "booking_accepted"})
-	}
-	return nil
-}
-
-// Decline is the technician-side counterpart of Accept — a technician turning
-// down a booking that was routed to them while it's still 'requested' or
-// 'pending_technician'. bookingRepo.Decline atomically clears technician_id
-// and puts the booking back to 'requested' only if it was still assigned to
-// this exact technician, so a stale/duplicate decline can't clobber a
-// booking someone else already accepted in the meantime. The customer is
-// notified so the app can bounce them back to the technician-selection
-// screen to pick/find another technician instead of sitting on a dead card.
-func (s *BookingService) Decline(ctx context.Context, bookingID, technicianID string) error {
-	b, err := s.bookingRepo.GetByID(ctx, bookingID)
-	if err != nil {
-		return err
-	}
-
-	if err := s.bookingRepo.Decline(ctx, bookingID, technicianID); err != nil {
-		if errors.Is(err, repository.ErrBookingAlreadyAssigned) {
-			return errors.New("this booking is no longer assigned to you")
-		}
-		return err
-	}
-
-	if s.fcm != nil && b != nil {
-		_ = s.fcm.SendToUser(ctx, b.CustomerID, "Technician unavailable",
-			"The technician rejected your booking. We're finding another technician for you.",
-			map[string]string{"booking_id": bookingID, "type": "booking_technician_rejected"})
 	}
 	return nil
 }
@@ -246,16 +197,26 @@ func (s *BookingService) Complete(ctx context.Context, bookingID string, finalPr
 		return errors.New("booking not found")
 	}
 
-	const maxWarrantyDays = 3650 // 10 years — sanity ceiling only
 	if warrantyEnabled {
 		if warrantyDays == nil {
 			return errors.New("warranty duration is required when warranty is enabled")
 		}
-		if *warrantyDays <= 0 {
-			return errors.New("warranty duration must be a positive number of days")
+		cat, err := s.catRepo.GetByID(ctx, b.CategoryID)
+		if err != nil {
+			return err
 		}
-		if *warrantyDays > maxWarrantyDays {
-			return fmt.Errorf("warranty duration must be %d days or fewer", maxWarrantyDays)
+		if cat == nil {
+			return errors.New("category not found")
+		}
+		allowed := false
+		for _, d := range cat.WarrantyOptions {
+			if int(d) == *warrantyDays {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return fmt.Errorf("warranty duration must be one of the allowed options for this category: %v days", cat.WarrantyOptions)
 		}
 	} else {
 		warrantyDays = nil
@@ -280,6 +241,87 @@ func (s *BookingService) Complete(ctx context.Context, bookingID string, finalPr
 			map[string]string{"booking_id": bookingID, "type": "invoice_ready", "final_price": fmt.Sprintf("%.2f", finalPrice)})
 	}
 	return nil
+}
+
+// AuthorizeCallParticipant checks that userID is either this booking's
+// customer or its currently-assigned technician (by resolving their user
+// account), and returns the booking detail if so. Used by both CallInfo and
+// InitiateCall so an audio call's ICE-server credentials are never handed to
+// someone who isn't actually part of that booking — mirrors the same check
+// CallHandler.authorize applies at the WebSocket layer, just reachable from
+// the plain HTTP handlers too.
+func (s *BookingService) AuthorizeCallParticipant(ctx context.Context, userID, bookingID string) (*models.BookingDetail, error) {
+	b, err := s.GetDetail(ctx, bookingID)
+	if err != nil {
+		return nil, err
+	}
+	if b == nil {
+		return nil, errors.New("booking not found")
+	}
+	if userID == b.CustomerID {
+		return b, nil
+	}
+	if b.TechnicianID != nil {
+		tech, err := s.techRepo.GetByUserID(ctx, userID)
+		if err == nil && tech != nil && tech.ID == *b.TechnicianID {
+			return b, nil
+		}
+	}
+	return nil, errors.New("not a participant of this booking")
+}
+
+// InitiateCall is the technician tapping "Audio Call" on their job card — it
+// doesn't touch WebRTC/signaling at all, it just validates the technician is
+// actually the one assigned to this booking and it's in an active state
+// (not e.g. a "requested" job they haven't accepted, or an already-completed
+// one), then pushes an FCM notification so the customer's app rings and
+// jumps straight into the call screen (see FcmNotificationService's
+// onIncomingBookingCall on the frontend). The actual media/signaling setup
+// happens client-side afterwards over the existing /ws/call/:id relay,
+// reusing the booking's own id as the room id — same as a booking's video
+// consultation would.
+func (s *BookingService) InitiateCall(ctx context.Context, technicianUserID, bookingID string) (*models.Booking, error) {
+	tech, err := s.techRepo.GetByUserID(ctx, technicianUserID)
+	if err != nil {
+		return nil, err
+	}
+	if tech == nil {
+		return nil, errors.New("technician profile not found")
+	}
+
+	detail, err := s.GetDetail(ctx, bookingID)
+	if err != nil {
+		return nil, err
+	}
+	if detail == nil {
+		return nil, errors.New("booking not found")
+	}
+	b := &detail.Booking
+	if b.TechnicianID == nil || *b.TechnicianID != tech.ID {
+		return nil, errors.New("you are not assigned to this booking")
+	}
+	switch b.Status {
+	case models.BookingAccepted, models.BookingOnTheWay, models.BookingArrived, models.BookingInspecting, models.BookingInProgress:
+		// ok — an active, ongoing booking
+	default:
+		return nil, errors.New("a call can only be started while the job is active")
+	}
+
+	if s.fcm != nil {
+		technicianName := "Your technician"
+		if detail.Technician != nil && detail.Technician.Name != "" {
+			technicianName = detail.Technician.Name
+		}
+		_ = s.fcm.SendToUser(ctx, b.CustomerID, "Incoming call",
+			technicianName+" is calling you about your booking.",
+			map[string]string{
+				"type":            "booking_call_incoming",
+				"booking_id":      bookingID,
+				"technician_name": technicianName,
+				"call_type":       "audio",
+			})
+	}
+	return b, nil
 }
 
 // RaiseWarrantyClaim is the customer tapping "Claim Warranty" on a completed,
@@ -526,18 +568,10 @@ func (s *BookingService) TechnicianLocation(ctx context.Context, bookingID strin
 	return s.bookingRepo.TechnicianLocationForBooking(ctx, bookingID)
 }
 
-// SubmitEstimate is called by the technician after inspecting the problem
-// (or right after Accept, in the "accept -> price -> customer decides"
-// flow). Calling it again (e.g. after the customer chose "Discuss") simply
+// SubmitEstimate is called by the technician after inspecting the problem.
+// Calling it again (e.g. after the customer chose "Discuss") simply
 // replaces the items/total and resets status to pending for a fresh
 // decision — see BookingRepository.UpsertEstimate.
-//
-// The booking itself is moved to "awaiting_estimate_approval" the moment an
-// estimate goes out — that's what makes the customer's tracking screen
-// swap in the Approve / Discuss / Decline card (see
-// BookingTrackingScreen.isAwaitingEstimateApproval on the Flutter side).
-// Without this the estimate would sit there but the customer would never
-// see anything asking them to act on it.
 func (s *BookingService) SubmitEstimate(ctx context.Context, bookingID string, items []models.BookingEstimateItem, note string) (*models.BookingEstimate, error) {
 	if len(items) == 0 {
 		return nil, errors.New("estimate must have at least one line item")
@@ -546,18 +580,9 @@ func (s *BookingService) SubmitEstimate(ctx context.Context, bookingID string, i
 	if err != nil {
 		return nil, err
 	}
-	b, err := s.bookingRepo.GetByID(ctx, bookingID)
-	if err != nil {
-		return nil, err
-	}
-	if b != nil && b.Status != models.BookingAwaitingEstimateApproval {
-		if err := s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingAwaitingEstimateApproval, "Technician sent an estimate"); err != nil {
-			return nil, err
-		}
-	}
-	if b != nil && s.fcm != nil {
+	if b, _ := s.bookingRepo.GetByID(ctx, bookingID); b != nil && s.fcm != nil {
 		_ = s.fcm.SendToUser(ctx, b.CustomerID, "Service estimate ready",
-			fmt.Sprintf("Your technician has sent an estimate of \u20b9%.0f. Please review and approve.", est.Total),
+			fmt.Sprintf("Your technician has sent an estimate of \u20b9%.0f", est.Total),
 			map[string]string{"booking_id": bookingID, "type": "booking_estimate"})
 	}
 	return est, nil
@@ -570,16 +595,8 @@ func (s *BookingService) GetEstimate(ctx context.Context, bookingID string) (*mo
 // RespondToEstimate records the customer's Approve/Decline decision.
 // "Discuss" isn't a persisted status here — it's just the customer opening
 // chat with the technician, who then calls SubmitEstimate again with
-// revised numbers.
-//
-//   - Approve -> booking moves to "on_the_way": the price is agreed, so the
-//     technician now heads to the customer's location (see the technician
-//     app's "I'm on my way" / "I've arrived" -> OTP -> repair steps that
-//     follow from there).
-//   - Decline -> booking moves straight to "cancelled". There's no
-//     automatic re-quoting; if the technician wants to try a different
-//     price they and the customer sort that out over chat and the
-//     customer books again.
+// revised numbers. Approving moves the booking into "repair_in_progress" so
+// the technician is unambiguously authorised to start paid work.
 func (s *BookingService) RespondToEstimate(ctx context.Context, bookingID, decision string) error {
 	var status string
 	switch decision {
@@ -593,37 +610,10 @@ func (s *BookingService) RespondToEstimate(ctx context.Context, bookingID, decis
 	if err := s.bookingRepo.SetEstimateStatus(ctx, bookingID, status); err != nil {
 		return err
 	}
-
-	b, err := s.bookingRepo.GetByID(ctx, bookingID)
-	if err != nil {
-		return err
-	}
-
 	if status == models.EstimateApproved {
-		if err := s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingOnTheWay, "Customer approved the estimate"); err != nil {
-			return err
-		}
-		if b != nil && b.TechnicianID != nil && s.fcm != nil {
-			if tech, _ := s.techRepo.GetByID(ctx, *b.TechnicianID); tech != nil {
-				_ = s.fcm.SendToUser(ctx, tech.UserID, "Estimate approved",
-					"The customer approved your estimate. You're good to head over.",
-					map[string]string{"booking_id": bookingID, "type": "estimate_approved"})
-			}
-		}
-		return nil
+		return s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingRepairInProgress, "Customer approved estimate")
 	}
-
-	if err := s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingCancelled, "Customer declined the estimate"); err != nil {
-		return err
-	}
-	if b != nil && b.TechnicianID != nil && s.fcm != nil {
-		if tech, _ := s.techRepo.GetByID(ctx, *b.TechnicianID); tech != nil {
-			_ = s.fcm.SendToUser(ctx, tech.UserID, "Booking cancelled",
-				"The customer declined your estimate and the booking has been cancelled.",
-				map[string]string{"booking_id": bookingID, "type": "estimate_declined"})
-		}
-	}
-	return nil
+	return s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingCancelled, "Customer declined estimate")
 }
 
 func (s *BookingService) AddServicePhoto(ctx context.Context, bookingID, photoURL, photoType string) (*models.BookingServicePhoto, error) {

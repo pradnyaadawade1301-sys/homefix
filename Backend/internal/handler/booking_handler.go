@@ -13,10 +13,25 @@ import (
 
 type BookingHandler struct {
 	bookingService *service.BookingService
+	stunURLs       []string
+	turnURL        string
+	turnSecret     string
+	turnTTL        time.Duration
 }
 
-func NewBookingHandler(bookingService *service.BookingService) *BookingHandler {
-	return &BookingHandler{bookingService: bookingService}
+// NewBookingHandler wires up the same STUN/TURN config as
+// NewConsultationHandler — booking calls (audio call from the technician,
+// or any future booking video call) reuse the exact same /ws/call/:id
+// signaling relay and ICE server setup as Live Video Consultations, just
+// keyed by booking id instead of consultation id.
+func NewBookingHandler(bookingService *service.BookingService, stunURLs []string, turnURL, turnSecret string, turnTTLSeconds int) *BookingHandler {
+	return &BookingHandler{
+		bookingService: bookingService,
+		stunURLs:       stunURLs,
+		turnURL:        turnURL,
+		turnSecret:     turnSecret,
+		turnTTL:        time.Duration(turnTTLSeconds) * time.Second,
+	}
 }
 
 type createBookingBody struct {
@@ -193,22 +208,6 @@ func (h *BookingHandler) Accept(c *gin.Context) {
 		return
 	}
 	utils.Success(c, http.StatusOK, gin.H{"message": "booking accepted"})
-}
-
-// Decline lets a technician turn down a booking that's been routed to them
-// while it's still 'requested'. Mirrors Accept's request shape.
-func (h *BookingHandler) Decline(c *gin.Context) {
-	bookingID := c.Param("id")
-	var body acceptBody
-	if err := c.ShouldBindJSON(&body); err != nil {
-		utils.Error(c, http.StatusBadRequest, err.Error())
-		return
-	}
-	if err := h.bookingService.Decline(c.Request.Context(), bookingID, body.TechnicianID); err != nil {
-		utils.Error(c, http.StatusBadRequest, err.Error())
-		return
-	}
-	utils.Success(c, http.StatusOK, gin.H{"message": "booking declined"})
 }
 
 type statusBody struct {
@@ -455,6 +454,64 @@ func (h *BookingHandler) GetTechnicianLocation(c *gin.Context) {
 		"longitude":  lng,
 		"updated_at": updatedAt,
 	})
+}
+
+// CallInfo - GET /bookings/:id/call. Returns the booking (so the UI knows
+// who it's calling) plus ICE servers, so either the customer (after
+// receiving the "Incoming call" push) or the technician can join the same
+// /ws/call/:id room used for the audio call. Only the booking's own
+// customer or assigned technician may fetch this (see
+// BookingService.AuthorizeCallParticipant).
+func (h *BookingHandler) CallInfo(c *gin.Context) {
+	userID := c.GetString("user_id")
+	bookingID := c.Param("id")
+
+	b, err := h.bookingService.AuthorizeCallParticipant(c.Request.Context(), userID, bookingID)
+	if err != nil {
+		utils.Error(c, http.StatusForbidden, err.Error())
+		return
+	}
+
+	utils.Success(c, http.StatusOK, gin.H{
+		"booking":     b,
+		"room_id":     b.ID,
+		"ice_servers": h.iceServers(userID),
+	})
+}
+
+// InitiateCall - POST /bookings/:id/call/initiate (technician only). Notifies
+// the customer via FCM that their technician is calling — see
+// BookingService.InitiateCall for the validation (must be the assigned
+// technician, booking must be active) — and returns the same
+// booking+ice_servers+room_id shape as CallInfo so the technician's app can
+// immediately join the call room without a second round trip.
+func (h *BookingHandler) InitiateCall(c *gin.Context) {
+	userID := c.GetString("user_id")
+	bookingID := c.Param("id")
+
+	b, err := h.bookingService.InitiateCall(c.Request.Context(), userID, bookingID)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	utils.Success(c, http.StatusOK, gin.H{
+		"booking":     b,
+		"room_id":     b.ID,
+		"ice_servers": h.iceServers(userID),
+	})
+}
+
+func (h *BookingHandler) iceServers(userID string) []utils.IceServer {
+	servers := []utils.IceServer{}
+	if len(h.stunURLs) > 0 {
+		servers = append(servers, utils.IceServer{URLs: h.stunURLs})
+	}
+	if h.turnURL != "" && h.turnSecret != "" {
+		username, credential, _ := utils.GenerateTurnCredentials(h.turnSecret, userID, h.turnTTL)
+		servers = append(servers, utils.IceServer{URLs: []string{h.turnURL}, Username: username, Credential: credential})
+	}
+	return servers
 }
 
 // --- Service estimate ---

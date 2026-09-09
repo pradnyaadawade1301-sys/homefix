@@ -31,15 +31,7 @@ func main() {
 	if _, err := pool.Exec(context.Background(),
 		`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS otp_code VARCHAR(6);
 		 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS otp_verified_at TIMESTAMP NULL;
-		 ALTER TABLE consultations ADD COLUMN IF NOT EXISTS decline_reason TEXT;
-		 ALTER TABLE consultations ADD COLUMN IF NOT EXISTS note TEXT;
-		 ALTER TABLE consultations ADD COLUMN IF NOT EXISTS area VARCHAR(120);
-		 ALTER TABLE consultations ADD COLUMN IF NOT EXISTS ai_diagnosis_session_id UUID REFERENCES ai_diagnosis_sessions(id);
-		 CREATE INDEX IF NOT EXISTS idx_consultations_ai_diagnosis ON consultations(ai_diagnosis_session_id);
-		 ALTER TABLE technicians ADD COLUMN IF NOT EXISTS working_hours JSONB NOT NULL DEFAULT '{"mon":{"open":"09:00","close":"18:00"},"tue":{"open":"09:00","close":"18:00"},"wed":{"open":"09:00","close":"18:00"},"thu":{"open":"09:00","close":"18:00"},"fri":{"open":"09:00","close":"18:00"},"sat":{"open":"09:00","close":"18:00"},"sun":null}'::jsonb;
-		 ALTER TABLE payments ADD COLUMN IF NOT EXISTS platform_fee_amount NUMERIC(10,2);
-		 ALTER TABLE payments ADD COLUMN IF NOT EXISTS visit_charge_amount NUMERIC(10,2);
-		 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS visit_fee_charged BOOLEAN NOT NULL DEFAULT false;`); err != nil {
+		 ALTER TABLE consultations ADD COLUMN IF NOT EXISTS decline_reason TEXT;`); err != nil {
 		log.Fatalf("startup: failed to ensure otp columns exist: %v", err)
 	}
 
@@ -80,7 +72,6 @@ func main() {
 	// references it directly, but it's no longer wired into any handler below.
 	razorpayService := service.NewRazorpayService(
 		cfg.RazorpayKeyID, cfg.RazorpayKeySecret, cfg.PlatformCommissionPercent, cfg.GSTPercent, cfg.RepeatCustomerDiscountPercent,
-		cfg.PlatformFeeAmount, cfg.VisitFeeAmount,
 		paymentRepo, bookingRepo, techRepo, walletRepo,
 	)
 
@@ -96,16 +87,11 @@ func main() {
 	authService := service.NewAuthService(userRepo, mailService, cfg.JWTAccessSecret, cfg.JWTRefreshSecret, cfg.JWTAccessTTLMin, cfg.JWTRefreshTTLHrs, cfg.GoogleClientID)
 	userService := service.NewUserService(userRepo)
 	techService := service.NewTechnicianService(techRepo, catRepo, reviewRepo)
-	// NOTE: BookingService only takes fcm (5 params) — it does NOT take
-	// razorpayService. Payment/refund flows for bookings go through
-	// RazorpayService directly (see PaymentHandler), not through
-	// BookingService, so passing razorpayService here was a leftover extra
-	// argument that doesn't match NewBookingService's actual signature.
 	bookingService := service.NewBookingService(bookingRepo, catRepo, techRepo, paymentRepo, fcmService)
-	consultService := service.NewConsultationService(consultRepo, techRepo, bookingService, reviewRepo, aiRepo, fcmService)
+	consultService := service.NewConsultationService(consultRepo, techRepo, bookingService, reviewRepo, fcmService)
 	walletService := service.NewWalletService(walletRepo)
 	reviewService := service.NewReviewService(reviewRepo, bookingRepo)
-	disputeService := service.NewDisputeService(disputeRepo, bookingRepo, consultRepo, techRepo, razorpayService, paymentRepo)
+	disputeService := service.NewDisputeService(disputeRepo, bookingRepo, razorpayService, paymentRepo)
 	inventoryService := service.NewInventoryService(inventoryRepo)
 	cmsService := service.NewCmsService(cmsRepo)
 	analyticsService := service.NewAnalyticsService(analyticsRepo)
@@ -113,14 +99,14 @@ func main() {
 
 	// ---- Handlers ----
 	financeHandler := handler.NewFinanceHandler(paymentRepo, walletRepo, upiService)
-	adminAPIHandler := handler.NewAdminAPIHandler(userRepo, bookingRepo, techRepo, paymentRepo, disputeService)
+	adminAPIHandler := handler.NewAdminAPIHandler(userRepo, bookingRepo, techRepo, paymentRepo)
 
 	handlers := &router.Handlers{
 		Auth:         handler.NewAuthHandler(authService, cfg.Env),
 		User:         handler.NewUserHandler(userService),
 		Category:     handler.NewCategoryHandler(catRepo),
 		Technician:   handler.NewTechnicianHandler(techService),
-		Booking:      handler.NewBookingHandler(bookingService),
+		Booking:      handler.NewBookingHandler(bookingService, cfg.StunURLs, cfg.TurnURL, cfg.TurnSecret, cfg.TurnTTLSecond),
 		Payment:      handler.NewPaymentHandler(razorpayService, fcmService),
 		Wallet:       handler.NewWalletHandler(walletService),
 		Review:       handler.NewReviewHandler(reviewService),
