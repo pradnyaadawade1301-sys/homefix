@@ -453,7 +453,9 @@ const detailedSelect = `
 	       a.label, a.line1, COALESCE(a.line2,''), a.city, a.state, a.pincode,
 	       cu.name AS customer_name, cu.phone AS customer_phone,
 	       t.id, COALESCE(tu.name,''), COALESCE(tu.phone,''),
-	       t.experience_years, t.rating_avg, t.rating_count, t.is_verified
+	       t.experience_years, t.rating_avg, t.rating_count, t.is_verified,
+	       b.warranty_enabled, b.warranty_days, b.warranty_expires_at,
+	       b.is_warranty_claim, b.warranty_claim_of
 	FROM bookings b
 	JOIN categories c ON c.id = b.category_id
 	JOIN addresses a ON a.id = b.address_id
@@ -482,6 +484,8 @@ func scanBookingDetail(row pgx.Row) (*models.BookingDetail, error) {
 		&custName, &custPhone,
 		&techID, &techName, &techPhone,
 		&techExp, &techRating, &techRatingCount, &techVerified,
+		&d.WarrantyEnabled, &d.WarrantyDays, &d.WarrantyExpiresAt,
+		&d.IsWarrantyClaim, &d.WarrantyClaimOf,
 	)
 	if err != nil {
 		return nil, err
