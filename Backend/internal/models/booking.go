@@ -98,6 +98,11 @@ type Booking struct {
 	WarrantyEnabled   bool       `json:"warranty_enabled"`
 	WarrantyDays      *int       `json:"warranty_days,omitempty"`
 	WarrantyExpiresAt *time.Time `json:"warranty_expires_at,omitempty"`
+	// WarrantyDescription is the technician's free-text note on what's
+	// actually covered (e.g. "Compressor and gas refill only") — optional,
+	// set alongside WarrantyDays at completion. See migration
+	// 031_warranty_description.sql.
+	WarrantyDescription *string `json:"warranty_description,omitempty"`
 	// IsWarrantyClaim/WarrantyClaimOf mark this booking as itself a warranty
 	// claim raised against an earlier, completed booking (see
 	// BookingService.RaiseWarrantyClaim) — otherwise both are zero-valued.

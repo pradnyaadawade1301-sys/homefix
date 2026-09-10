@@ -50,6 +50,15 @@ func main() {
 		log.Fatalf("startup: failed to seed new categories: %v", err)
 	}
 
+	// Self-healing startup migration: 031_warranty_description.sql — same
+	// "Render never applies migrations/ files" issue as above. Adds the
+	// technician's free-text "what does this warranty cover" note. Safe
+	// no-op once the column already exists.
+	if _, err := pool.Exec(context.Background(),
+		`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS warranty_description TEXT NULL;`); err != nil {
+		log.Fatalf("startup: failed to ensure warranty_description column exists: %v", err)
+	}
+
 	rdb := cache.New(cfg.RedisURL) // no-op now — Redis removed, see internal/cache
 	mailService := service.NewMailService(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPass, cfg.SMTPFrom)
 	if mailService.Enabled() {
