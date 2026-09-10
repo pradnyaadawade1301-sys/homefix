@@ -4,6 +4,8 @@ import (
 	"context"
 	"log"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"homefix-backend/internal/admin"
 	"homefix-backend/internal/cache"
 	"homefix-backend/internal/config"
@@ -24,40 +26,15 @@ func main() {
 	defer pool.Close()
 	log.Println("connected to Postgres")
 
-	// Self-healing startup migration: the 016_arrival_otp migration file was
-	// missing its .sql extension so it never got picked up by earlier deploys,
-	// leaving bookings.otp_code / otp_verified_at missing in production. This
-	// runs on every boot and is a safe no-op once the columns already exist.
-	if _, err := pool.Exec(context.Background(),
-		`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS otp_code VARCHAR(6);
-		 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS otp_verified_at TIMESTAMP NULL;
-		 ALTER TABLE consultations ADD COLUMN IF NOT EXISTS decline_reason TEXT;`); err != nil {
-		log.Fatalf("startup: failed to ensure otp columns exist: %v", err)
-	}
-
-	// Self-healing startup migration: 030_seed_more_categories_2.sql only ever
-	// runs via `make migrate` against the local Docker Postgres container —
-	// Render's deploy just runs the compiled binary and never applies files
-	// under migrations/, so these 4 categories never reached production.
-	// This is a safe no-op once the rows already exist.
-	if _, err := pool.Exec(context.Background(),
-		`INSERT INTO categories (name, description, is_active) VALUES
-			('Civil Work',          'Masonry, tiling, and construction work', true),
-			('Fabrication',         'Metal fabrication and welding work',     true),
-			('POP / False Ceiling', 'POP work and false ceiling installation', true),
-			('General Repair',      'General home repair and maintenance',    true)
-		 ON CONFLICT (name) DO NOTHING;`); err != nil {
-		log.Fatalf("startup: failed to seed new categories: %v", err)
-	}
-
-	// Self-healing startup migration: 031_warranty_description.sql — same
-	// "Render never applies migrations/ files" issue as above. Adds the
-	// technician's free-text "what does this warranty cover" note. Safe
-	// no-op once the column already exists.
-	if _, err := pool.Exec(context.Background(),
-		`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS warranty_description TEXT NULL;`); err != nil {
-		log.Fatalf("startup: failed to ensure warranty_description column exists: %v", err)
-	}
+	// Self-healing startup migrations run in the background, AFTER the HTTP
+	// server has already bound its port (see bottom of main). Render's port
+	// scanner has a ~50s timeout; running these ALTER/INSERT statements
+	// before r.Run() risked pushing "Listening on :PORT" past that window
+	// on a slow/cold-started free-tier Postgres instance, which made Render
+	// mark otherwise-healthy deploys as Failed. Each statement is still a
+	// safe no-op once already applied, so running it a few seconds after
+	// boot instead of before is harmless.
+	go runStartupMigrations(pool)
 
 	rdb := cache.New(cfg.RedisURL) // no-op now — Redis removed, see internal/cache
 	mailService := service.NewMailService(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPass, cfg.SMTPFrom)
@@ -168,4 +145,47 @@ func main() {
 	if err := r.Run(":" + cfg.Port); err != nil {
 		log.Fatalf("server failed: %v", err)
 	}
+}
+
+// runStartupMigrations applies the self-healing schema fixes described above.
+// It runs in a goroutine after the server starts listening, so a slow DB
+// never delays port binding / Render's health check. Failures here are
+// logged, not fatal — the server keeps serving traffic either way, and the
+// statements are safe to retry on the next boot.
+func runStartupMigrations(pool *pgxpool.Pool) {
+	ctx := context.Background()
+
+	// 016_arrival_otp — file was missing its .sql extension so it never got
+	// picked up by earlier deploys, leaving bookings.otp_code /
+	// otp_verified_at missing in production. Safe no-op once columns exist.
+	if _, err := pool.Exec(ctx,
+		`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS otp_code VARCHAR(6);
+		 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS otp_verified_at TIMESTAMP NULL;
+		 ALTER TABLE consultations ADD COLUMN IF NOT EXISTS decline_reason TEXT;`); err != nil {
+		log.Printf("startup migration: failed to ensure otp columns exist: %v", err)
+	}
+
+	// 030_seed_more_categories_2 — only ever ran via `make migrate` against
+	// the local Docker Postgres container; Render's deploy just runs the
+	// compiled binary and never applies files under migrations/. Safe no-op
+	// once the rows already exist.
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO categories (name, description, is_active) VALUES
+			('Civil Work',          'Masonry, tiling, and construction work', true),
+			('Fabrication',         'Metal fabrication and welding work',     true),
+			('POP / False Ceiling', 'POP work and false ceiling installation', true),
+			('General Repair',      'General home repair and maintenance',    true)
+		 ON CONFLICT (name) DO NOTHING;`); err != nil {
+		log.Printf("startup migration: failed to seed new categories: %v", err)
+	}
+
+	// 031_warranty_description — same "Render never applies migrations/
+	// files" issue as above. Adds the technician's free-text "what does
+	// this warranty cover" note. Safe no-op once the column already exists.
+	if _, err := pool.Exec(ctx,
+		`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS warranty_description TEXT NULL;`); err != nil {
+		log.Printf("startup migration: failed to ensure warranty_description column exists: %v", err)
+	}
+
+	log.Println("startup migrations: done")
 }
