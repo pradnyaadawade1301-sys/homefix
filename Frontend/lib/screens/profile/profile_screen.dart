@@ -20,8 +20,6 @@ import '../payment/transaction_history_screen.dart';
 import '../privacy_security_screen.dart';
 import '../help_center_screen.dart';
 import '../contact_support_screen.dart';
-import '../service_radius_screen.dart';
-import '../bank_details_screen.dart';
 import '../home/home_screen.dart';
 import '../../widgets/guided_tour.dart';
 
@@ -32,7 +30,7 @@ import '../../widgets/guided_tour.dart';
 /// using AppLocalizations.of(context)) switch language immediately, with no
 /// restart needed. Shared by both the customer and technician profile
 /// screens below.
-void _showLanguagePicker(BuildContext context) {
+void showLanguagePicker(BuildContext context) {
   final localeProvider = context.read<LocaleProvider>();
   final l10n = AppLocalizations.of(context);
   showModalBottomSheet(
@@ -370,7 +368,7 @@ class _CustomerProfileBody extends StatelessWidget {
             _ActionTile(
               icon: Icons.language_rounded,
               label: l10n.profileLanguage,
-              onTap: () => _showLanguagePicker(context),
+              onTap: () => showLanguagePicker(context),
             ),
           ],
         ),
@@ -617,52 +615,13 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
             ),
             const SizedBox(height: 16),
             _SectionCard(
-              title: l10n.profileSectionProfessionalDetails,
-              children: [
-                _InfoRow(label: l10n.profilePrimaryService, value: categoryName),
-                _InfoRow(label: l10n.profileYearsExperienceLabel, value: l10n.profileYearsValue('${profile.experienceYears}')),
-                _InfoRow(label: l10n.profileAddressLabel, value: profile.address.isNotEmpty ? profile.address : '-'),
-                _ActionTile(
-                  icon: Icons.map_outlined,
-                  label: l10n.profileServiceRadius,
-                  onTap: () => widget.openScreen(const ServiceRadiusScreen()),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _SectionCard(
-              title: l10n.profileSectionTrustVerification,
-              children: [
-                _VerificationRow(label: l10n.profilePhoneVerified, verified: widget.user.phoneVerified),
-                _VerificationRow(label: l10n.profileProfileVerified, verified: profile.isVerified),
-                _VerificationRow(
-                  label: l10n.profileGovIdUploaded,
-                  verified: profile.governmentIdUrl.isNotEmpty,
-                ),
-                if (profile.isRejected && profile.rejectionReason != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Text(
-                      l10n.profileRejectionReason(profile.rejectionReason!),
-                      style: const TextStyle(color: AppTheme.errorColor, fontSize: 13),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _SectionCard(
               title: l10n.profileSectionDocuments,
               children: [
                 _VerificationRow(
                   label: l10n.profileGovId,
                   verified: profile.governmentIdUrl.isNotEmpty,
                 ),
-                _ActionTile(
-                  icon: Icons.account_balance_outlined,
-                  label: l10n.profileBankUpiDetails,
-                  onTap: () => widget.openScreen(const BankDetailsScreen()),
-                ),
-              ],
+              ]
             ),
             const SizedBox(height: 16),
             _SectionCard(
@@ -698,11 +657,7 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                   label: l10n.profileNotificationSettings,
                   onTap: () => widget.openPlaceholder(l10n.profileNotificationSettings, Icons.notifications_outlined),
                 ),
-                _ActionTile(
-                  icon: Icons.payment_outlined,
-                  label: l10n.profilePaymentSettings,
-                  onTap: () => widget.openPlaceholder(l10n.profilePaymentSettings, Icons.payment_outlined),
-                ),
+             
                 _ActionTile(
                   icon: Icons.privacy_tip_outlined,
                   label: l10n.profilePrivacySecurity,
@@ -716,7 +671,7 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                 _ActionTile(
                   icon: Icons.language_rounded,
                   label: l10n.profileLanguage,
-                  onTap: () => _showLanguagePicker(context),
+                  onTap: () => showLanguagePicker(context),
                 ),
                 _ActionTile(
                   icon: Icons.lock_outline_rounded,

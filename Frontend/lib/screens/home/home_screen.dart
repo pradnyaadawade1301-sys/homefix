@@ -546,6 +546,19 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
               ),
             ),
             Container(
+  margin: const EdgeInsets.only(right: 8),
+  decoration: BoxDecoration(
+    color: Colors.white,
+    shape: BoxShape.circle,
+    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
+  ),
+  child: IconButton(
+icon: const Icon(Icons.language_rounded),
+    tooltip: l10n.profileLanguage,
+    onPressed: () => showLanguagePicker(context),
+  ),
+),
+            Container(
               decoration: BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,

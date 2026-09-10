@@ -19,6 +19,7 @@ import '../chat/booking_chat_screen.dart';
 import 'technician_job_detail_screen.dart';
 import '../../providers/category_provider.dart';
 import 'job_brief_card.dart';
+import '../notifications/notifications_screen.dart';
 
 class TechnicianJobsScreen extends StatefulWidget {
   const TechnicianJobsScreen({Key? key}) : super(key: key);
@@ -203,6 +204,11 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
       appBar: AppBar(
         title: Text(_navTitle(l10n)),
         actions: [
+           IconButton(
+icon: const Icon(Icons.language_rounded),
+    tooltip: l10n.profileLanguage,
+    onPressed: () => showLanguagePicker(context),
+  ),
           IconButton(
             icon: const Icon(Icons.people_alt_outlined),
             key: _customersNavKey,
@@ -219,10 +225,12 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.logout_rounded, color: AppTheme.errorColor),
-            tooltip: l10n.techJobsLogoutTooltip,
-            onPressed: _confirmLogout,
-          ),
+  icon: const Icon(Icons.notifications_none_rounded),
+  tooltip: l10n.profileNotifications,
+  onPressed: () => Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+  ),
+),
         ],
       ),
       body: IndexedStack(
