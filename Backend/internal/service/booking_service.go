@@ -211,8 +211,19 @@ func (s *BookingService) UpdateStatus(ctx context.Context, bookingID, status, no
 		}
 	}
 	if s.fcm != nil {
-		_ = s.fcm.SendToUser(ctx, b.CustomerID, "Booking update",
-			"Your booking status changed to "+status, map[string]string{"booking_id": bookingID, "type": "booking_status"})
+		techName := ""
+		if b.TechnicianID != nil {
+			if n, err := s.techRepo.GetNameByID(ctx, *b.TechnicianID); err == nil {
+				techName = n
+			}
+		}
+		body := "Your booking status changed to " + status
+		data := map[string]string{"booking_id": bookingID, "type": "booking_status"}
+		if techName != "" {
+			body = techName + ": your booking status changed to " + status
+			data["sender_name"] = techName
+		}
+		_ = s.fcm.SendToUser(ctx, b.CustomerID, "Booking update", body, data)
 	}
 	return nil
 }

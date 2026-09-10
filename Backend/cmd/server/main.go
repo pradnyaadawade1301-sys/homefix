@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"context"
@@ -67,6 +67,16 @@ func main() {
 		cfg.UpiPayeeVPA, cfg.UpiPayeeName, cfg.PlatformCommissionPercent, cfg.GSTPercent, cfg.RepeatCustomerDiscountPercent,
 		paymentRepo, bookingRepo, techRepo, walletRepo,
 	)
+	// fcmService is never nil: in-app notification rows must always be written even
+	// when Firebase/push isn't configured. When push isn't available, SendToUser
+	// simply skips the actual FCM send and records the in-app notification only.
+	// Created before razorpayService (below) since payment confirmation notifies
+	// both customer and technician once a payment is verified.
+	fcmService := service.NewFirebaseServiceOrDegraded(context.Background(), cfg.FirebaseCredentialsPath, cfg.FirebaseProjectID, notifRepo, userRepo)
+	if cfg.FirebaseCredentialsPath == "" || cfg.FirebaseProjectID == "" {
+		log.Println("warning: FIREBASE_CREDENTIALS_PATH/FIREBASE_PROJECT_ID not set, push notifications disabled (in-app notifications still work)")
+	}
+
 	// Razorpay replaces the UpiService above for the customer-facing payment flow
 	// (order creation / confirm / refund / dispute-refund / admin refund).
 	// upiService itself is kept around only in case anything elsewhere still
@@ -74,16 +84,8 @@ func main() {
 	razorpayService := service.NewRazorpayService(
 		cfg.RazorpayKeyID, cfg.RazorpayKeySecret, cfg.PlatformCommissionPercent, cfg.GSTPercent, cfg.RepeatCustomerDiscountPercent,
 		cfg.PlatformFeeAmount, cfg.VisitFeeAmount,
-		paymentRepo, bookingRepo, techRepo, walletRepo,
+		paymentRepo, bookingRepo, techRepo, walletRepo, fcmService,
 	)
-
-	// fcmService is never nil: in-app notification rows must always be written even
-	// when Firebase/push isn't configured. When push isn't available, SendToUser
-	// simply skips the actual FCM send and records the in-app notification only.
-	fcmService := service.NewFirebaseServiceOrDegraded(context.Background(), cfg.FirebaseCredentialsPath, cfg.FirebaseProjectID, notifRepo, userRepo)
-	if cfg.FirebaseCredentialsPath == "" || cfg.FirebaseProjectID == "" {
-		log.Println("warning: FIREBASE_CREDENTIALS_PATH/FIREBASE_PROJECT_ID not set, push notifications disabled (in-app notifications still work)")
-	}
 
 	// ---- Domain services ----
 	authService := service.NewAuthService(userRepo, mailService, cfg.JWTAccessSecret, cfg.JWTRefreshSecret, cfg.JWTAccessTTLMin, cfg.JWTRefreshTTLHrs, cfg.GoogleClientID)

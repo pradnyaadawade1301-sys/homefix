@@ -84,6 +84,7 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 	authed.Use(middleware.JWTAuth(accessSecret))
 	{
 		authed.POST("/auth/set-password", h.Auth.SetPassword)
+		authed.POST("/auth/change-password", h.Auth.ChangePassword)
 		authed.POST("/auth/logout", h.Auth.Logout)
 
 		authed.POST("/uploads", h.Upload.Upload)

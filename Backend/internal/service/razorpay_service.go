@@ -38,6 +38,7 @@ type RazorpayService struct {
 	bookingRepo       *repository.BookingRepository
 	technicianRepo    *repository.TechnicianRepository
 	walletRepo        *repository.WalletRepository
+	fcm               *FirebaseService
 }
 
 func NewRazorpayService(
@@ -51,6 +52,7 @@ func NewRazorpayService(
 	bookingRepo *repository.BookingRepository,
 	technicianRepo *repository.TechnicianRepository,
 	walletRepo *repository.WalletRepository,
+	fcm *FirebaseService,
 ) *RazorpayService {
 	return &RazorpayService{
 		client:            razorpay.NewClient(keyID, keySecret),
@@ -65,6 +67,7 @@ func NewRazorpayService(
 		bookingRepo:       bookingRepo,
 		technicianRepo:    technicianRepo,
 		walletRepo:        walletRepo,
+		fcm:               fcm,
 	}
 }
 
@@ -267,6 +270,11 @@ func (s *RazorpayService) VerifyAndCapture(ctx context.Context, razorpayOrderID,
 		if err := s.bookingRepo.SetVisitFeeStatus(ctx, booking.ID, models.VisitFeePaid); err != nil {
 			return nil, err
 		}
+		if s.fcm != nil {
+			_ = s.fcm.SendToUser(ctx, booking.CustomerID, "Payment successful",
+				"Your visit fee payment was received successfully.",
+				map[string]string{"booking_id": booking.ID, "type": "payment_success"})
+		}
 		return s.paymentRepo.GetByRazorpayOrderID(ctx, razorpayOrderID)
 	}
 
@@ -314,10 +322,23 @@ func (s *RazorpayService) VerifyAndCapture(ctx context.Context, razorpayOrderID,
 	// Credit the assigned technician's wallet with their net earning (amount
 	// minus platform commission). If no technician is assigned yet, the payment
 	// still succeeds — settlement can be reconciled manually.
+	var techUserID string
 	if booking.TechnicianID != nil {
 		tech, err := s.technicianRepo.GetByID(ctx, *booking.TechnicianID)
 		if err == nil && tech != nil {
+			techUserID = tech.UserID
 			_, _ = s.walletRepo.Credit(ctx, tech.UserID, technicianEarning, "booking_earning", &p.ID)
+		}
+	}
+
+	if s.fcm != nil {
+		_ = s.fcm.SendToUser(ctx, booking.CustomerID, "Payment successful",
+			fmt.Sprintf("Your payment of \u20B9%.2f was received. Invoice %s is ready.", p.Amount, invoiceNumber),
+			map[string]string{"booking_id": booking.ID, "type": "payment_success"})
+		if techUserID != "" {
+			_ = s.fcm.SendToUser(ctx, techUserID, "Payment received",
+				fmt.Sprintf("Customer paid \u20B9%.2f for booking %s. Your earning: \u20B9%.2f.", p.Amount, booking.ID, technicianEarning),
+				map[string]string{"booking_id": booking.ID, "type": "payment_success"})
 		}
 	}
 

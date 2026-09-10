@@ -55,7 +55,7 @@ func (r *UserRepository) CreateFull(ctx context.Context, name, email, phone, pas
 func (r *UserRepository) GetByIdentifier(ctx context.Context, identifier string) (*models.User, error) {
 	var u models.User
 	err := r.db.QueryRow(ctx, `
-		SELECT id, phone, COALESCE(name,''), email, COALESCE(password_hash,''), role,
+		SELECT id, COALESCE(phone,''), COALESCE(name,''), email, COALESCE(password_hash,''), role,
 		       otp_code, otp_expires_at, phone_verified, photo_url, fcm_token, is_active, created_at, updated_at
 		FROM users WHERE email = $1 OR phone = $1
 	`, identifier).Scan(&u.ID, &u.Phone, &u.Name, &u.Email, &u.PasswordHash, &u.Role,
@@ -82,7 +82,7 @@ func (r *UserRepository) ExistsByEmailOrPhone(ctx context.Context, email, phone 
 func (r *UserRepository) GetByPhone(ctx context.Context, phone string) (*models.User, error) {
 	var u models.User
 	err := r.db.QueryRow(ctx, `
-		SELECT id, phone, COALESCE(name,''), email, COALESCE(password_hash,''), role,
+		SELECT id, COALESCE(phone,''), COALESCE(name,''), email, COALESCE(password_hash,''), role,
 		       otp_code, otp_expires_at, phone_verified, photo_url, fcm_token, is_active, created_at, updated_at
 		FROM users WHERE phone = $1
 	`, phone).Scan(&u.ID, &u.Phone, &u.Name, &u.Email, &u.PasswordHash, &u.Role,
@@ -99,7 +99,7 @@ func (r *UserRepository) GetByPhone(ctx context.Context, phone string) (*models.
 func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, error) {
 	var u models.User
 	err := r.db.QueryRow(ctx, `
-		SELECT id, phone, COALESCE(name,''), email, COALESCE(password_hash,''), role,
+		SELECT id, COALESCE(phone,''), COALESCE(name,''), email, COALESCE(password_hash,''), role,
 		       phone_verified, email_verified, photo_url, fcm_token, is_active, created_at, updated_at
 		FROM users WHERE id = $1
 	`, id).Scan(&u.ID, &u.Phone, &u.Name, &u.Email, &u.PasswordHash, &u.Role,
@@ -120,7 +120,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, 
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	var u models.User
 	err := r.db.QueryRow(ctx, `
-		SELECT id, phone, COALESCE(name,''), email, COALESCE(password_hash,''), role,
+		SELECT id, COALESCE(phone,''), COALESCE(name,''), email, COALESCE(password_hash,''), role,
 		       email_otp_code, email_otp_expires_at, phone_verified, email_verified, photo_url, fcm_token, is_active, created_at, updated_at
 		FROM users WHERE email = $1
 	`, email).Scan(&u.ID, &u.Phone, &u.Name, &u.Email, &u.PasswordHash, &u.Role,
@@ -201,7 +201,7 @@ func (r *UserRepository) SetFCMToken(ctx context.Context, userID, token string) 
 
 // ListAll powers the admin panel's User Management screen. role == "" lists every role.
 func (r *UserRepository) ListAll(ctx context.Context, role string) ([]models.User, error) {
-	query := `SELECT id, phone, COALESCE(name,''), email, '', role, phone_verified, photo_url, fcm_token, is_active, created_at, updated_at FROM users`
+	query := `SELECT id, COALESCE(phone,''), COALESCE(name,''), email, '', role, phone_verified, photo_url, fcm_token, is_active, created_at, updated_at FROM users`
 	args := []interface{}{}
 	if role != "" {
 		query += ` WHERE role = $1`
@@ -283,7 +283,7 @@ func (r *UserRepository) ListAddresses(ctx context.Context, userID string) ([]mo
 func (r *UserRepository) GetByGoogleID(ctx context.Context, googleID string) (*models.User, error) {
 	var u models.User
 	err := r.db.QueryRow(ctx, `
-		SELECT id, phone, COALESCE(name,''), email, COALESCE(password_hash,''), role,
+		SELECT id, COALESCE(phone,''), COALESCE(name,''), email, COALESCE(password_hash,''), role,
 		       phone_verified, email_verified, photo_url, fcm_token, is_active, created_at, updated_at
 		FROM users WHERE google_id = $1
 	`, googleID).Scan(&u.ID, &u.Phone, &u.Name, &u.Email, &u.PasswordHash, &u.Role,
