@@ -103,6 +103,15 @@ func (s *TechnicianService) Verify(ctx context.Context, technicianID, status, re
 	return s.techRepo.SetApprovalStatus(ctx, technicianID, status, reason)
 }
 
+// SetVerifiedBadge is the separate, deliberate "give this technician the
+// blue tick" admin action — independent of KYC approval (see
+// TechnicianRepository.SetVerified). An admin typically only does this for
+// technicians that are already approved, but nothing here enforces that
+// ordering; it's just a flag flip.
+func (s *TechnicianService) SetVerifiedBadge(ctx context.Context, technicianID string, verified bool) error {
+	return s.techRepo.SetVerified(ctx, technicianID, verified)
+}
+
 func (s *TechnicianService) Reviews(ctx context.Context, technicianID string) ([]models.Review, error) {
 	return s.revRepo.ListByTechnician(ctx, technicianID)
 }

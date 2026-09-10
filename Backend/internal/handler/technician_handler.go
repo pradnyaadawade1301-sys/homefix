@@ -227,6 +227,29 @@ func (h *TechnicianHandler) Verify(c *gin.Context) {
 	utils.Success(c, http.StatusOK, gin.H{"message": "approval status updated", "status": body.Status})
 }
 
+type setVerifiedBadgeBody struct {
+	Verified bool `json:"verified"`
+}
+
+// SetVerifiedBadge is the "blue tick" toggle — separate from Verify (which
+// handles KYC approval/rejection). An admin uses this after reviewing a
+// technician's documents to explicitly grant/revoke the verified badge shown
+// on their profile and control whether they appear in the public "browse
+// technicians" listing.
+func (h *TechnicianHandler) SetVerifiedBadge(c *gin.Context) {
+	technicianID := c.Param("id")
+	var body setVerifiedBadgeBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.techService.SetVerifiedBadge(c.Request.Context(), technicianID, body.Verified); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"message": "verified badge updated", "verified": body.Verified})
+}
+
 func (h *TechnicianHandler) Reviews(c *gin.Context) {
 	technicianID := c.Param("id")
 	reviews, err := h.techService.Reviews(c.Request.Context(), technicianID)
