@@ -211,13 +211,24 @@ func (s *BookingService) UpdateStatus(ctx context.Context, bookingID, status, no
 		}
 	}
 	if s.fcm != nil {
-		_ = s.fcm.SendToUser(ctx, b.CustomerID, "Booking update",
-			"Your booking status changed to "+status, map[string]string{"booking_id": bookingID, "type": "booking_status"})
+		techName := ""
+		if b.TechnicianID != nil {
+			if n, err := s.techRepo.GetNameByID(ctx, *b.TechnicianID); err == nil {
+				techName = n
+			}
+		}
+		body := "Your booking status changed to " + status
+		data := map[string]string{"booking_id": bookingID, "type": "booking_status"}
+		if techName != "" {
+			body = techName + ": your booking status changed to " + status
+			data["sender_name"] = techName
+		}
+		_ = s.fcm.SendToUser(ctx, b.CustomerID, "Booking update", body, data)
 	}
 	return nil
 }
 
-func (s *BookingService) Complete(ctx context.Context, bookingID string, finalPrice float64, warrantyEnabled bool, warrantyDays *int) error {
+func (s *BookingService) Complete(ctx context.Context, bookingID string, finalPrice float64, warrantyEnabled bool, warrantyDays *int, warrantyDescription *string) error {
 	b, err := s.bookingRepo.GetByID(ctx, bookingID)
 	if err != nil {
 		return err
@@ -230,31 +241,23 @@ func (s *BookingService) Complete(ctx context.Context, bookingID string, finalPr
 		if warrantyDays == nil {
 			return errors.New("warranty duration is required when warranty is enabled")
 		}
-		cat, err := s.catRepo.GetByID(ctx, b.CategoryID)
-		if err != nil {
-			return err
-		}
-		if cat == nil {
-			return errors.New("category not found")
-		}
-		allowed := false
-		for _, d := range cat.WarrantyOptions {
-			if int(d) == *warrantyDays {
-				allowed = true
-				break
-			}
-		}
-		if !allowed {
-			return fmt.Errorf("warranty duration must be one of the allowed options for this category: %v days", cat.WarrantyOptions)
+		// Previously restricted to whatever the category's admin-configured
+		// warranty_options whitelist allowed (e.g. only 7/15/30/90 days) —
+		// removed per product decision so the technician can offer any
+		// duration that makes sense for the job. Only guard left: it has to
+		// be a real, positive number of days.
+		if *warrantyDays <= 0 {
+			return errors.New("warranty duration must be a positive number of days")
 		}
 	} else {
 		warrantyDays = nil
+		warrantyDescription = nil
 	}
 
 	if err := s.bookingRepo.SetFinalPrice(ctx, bookingID, finalPrice); err != nil {
 		return err
 	}
-	if err := s.bookingRepo.SetWarranty(ctx, bookingID, warrantyEnabled, warrantyDays); err != nil {
+	if err := s.bookingRepo.SetWarranty(ctx, bookingID, warrantyEnabled, warrantyDays, warrantyDescription); err != nil {
 		return err
 	}
 	if err := s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingCompleted, "Job completed"); err != nil {

@@ -58,10 +58,12 @@ func (r *BookingRepository) GetByID(ctx context.Context, id string) (*models.Boo
 	var b models.Booking
 	err := r.db.QueryRow(ctx, `
 		SELECT id, customer_id, technician_id, category_id, address_id, status, payment_status,
-		       COALESCE(problem_description,''), notes, COALESCE(images, '{}'), scheduled_at, estimated_price, final_price, otp_code, otp_verified_at, created_at, updated_at
+		       COALESCE(problem_description,''), notes, COALESCE(images, '{}'), scheduled_at, estimated_price, final_price, otp_code, otp_verified_at, created_at, updated_at,
+		       warranty_enabled, warranty_days, warranty_expires_at, warranty_description, is_warranty_claim, warranty_claim_of
 		FROM bookings WHERE id = $1
 	`, id).Scan(&b.ID, &b.CustomerID, &b.TechnicianID, &b.CategoryID, &b.AddressID, &b.Status, &b.PaymentStatus,
-		&b.ProblemDescription, &b.Notes, &b.Images, &b.ScheduledAt, &b.EstimatedPrice, &b.FinalPrice, &b.OTPCode, &b.OTPVerifiedAt, &b.CreatedAt, &b.UpdatedAt)
+		&b.ProblemDescription, &b.Notes, &b.Images, &b.ScheduledAt, &b.EstimatedPrice, &b.FinalPrice, &b.OTPCode, &b.OTPVerifiedAt, &b.CreatedAt, &b.UpdatedAt,
+		&b.WarrantyEnabled, &b.WarrantyDays, &b.WarrantyExpiresAt, &b.WarrantyDescription, &b.IsWarrantyClaim, &b.WarrantyClaimOf)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -251,11 +253,11 @@ func (r *BookingRepository) SetFinalPrice(ctx context.Context, bookingID string,
 // lives. enabled=false always clears days/expiry, even if stale values were
 // somehow passed, so a booking can never end up "enabled but no expiry" or
 // vice versa.
-func (r *BookingRepository) SetWarranty(ctx context.Context, bookingID string, enabled bool, days *int) error {
+func (r *BookingRepository) SetWarranty(ctx context.Context, bookingID string, enabled bool, days *int, description *string) error {
 	if !enabled || days == nil {
 		_, err := r.db.Exec(ctx, `
 			UPDATE bookings
-			SET warranty_enabled = false, warranty_days = NULL, warranty_expires_at = NULL, updated_at = now()
+			SET warranty_enabled = false, warranty_days = NULL, warranty_expires_at = NULL, warranty_description = NULL, updated_at = now()
 			WHERE id = $1
 		`, bookingID)
 		return err
@@ -264,9 +266,10 @@ func (r *BookingRepository) SetWarranty(ctx context.Context, bookingID string, e
 		UPDATE bookings
 		SET warranty_enabled = true, warranty_days = $2,
 		    warranty_expires_at = now() + make_interval(days => $2),
+		    warranty_description = $3,
 		    updated_at = now()
 		WHERE id = $1
-	`, bookingID, *days)
+	`, bookingID, *days, description)
 	return err
 }
 
@@ -454,7 +457,7 @@ const detailedSelect = `
 	       cu.name AS customer_name, cu.phone AS customer_phone,
 	       t.id, COALESCE(tu.name,''), COALESCE(tu.phone,''),
 	       t.experience_years, t.rating_avg, t.rating_count, t.is_verified,
-	       b.warranty_enabled, b.warranty_days, b.warranty_expires_at,
+	       b.warranty_enabled, b.warranty_days, b.warranty_expires_at, b.warranty_description,
 	       b.is_warranty_claim, b.warranty_claim_of
 	FROM bookings b
 	JOIN categories c ON c.id = b.category_id
@@ -484,7 +487,7 @@ func scanBookingDetail(row pgx.Row) (*models.BookingDetail, error) {
 		&custName, &custPhone,
 		&techID, &techName, &techPhone,
 		&techExp, &techRating, &techRatingCount, &techVerified,
-		&d.WarrantyEnabled, &d.WarrantyDays, &d.WarrantyExpiresAt,
+		&d.WarrantyEnabled, &d.WarrantyDays, &d.WarrantyExpiresAt, &d.WarrantyDescription,
 		&d.IsWarrantyClaim, &d.WarrantyClaimOf,
 	)
 	if err != nil {

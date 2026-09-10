@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -163,9 +165,20 @@ func (s *AuthService) LoginWithPassword(ctx context.Context, identifier, passwor
 
 // SignupWithPassword creates a new account (customer or technician) with name/email/phone/password.
 // Role is restricted to "customer" or "technician" — admin accounts are never self-service.
+// Phone is optional now that the signup screen no longer collects it; if blank, a unique
+// internal placeholder is generated since the phone column is still NOT NULL UNIQUE. That
+// placeholder is not a real number — anything that dials it (call-technician/call-customer
+// buttons) won't work until the person sets a real phone number some other way.
 func (s *AuthService) SignupWithPassword(ctx context.Context, name, email, phone, password, role string) (*models.User, string, string, error) {
 	if role != "customer" && role != "technician" {
 		role = "customer"
+	}
+	if phone == "" {
+		p, err := generatePlaceholderPhone()
+		if err != nil {
+			return nil, "", "", err
+		}
+		phone = p
 	}
 	exists, err := s.userRepo.ExistsByEmailOrPhone(ctx, email, phone)
 	if err != nil {
@@ -187,6 +200,18 @@ func (s *AuthService) SignupWithPassword(ctx context.Context, name, email, phone
 		return nil, "", "", err
 	}
 	return u, access, refresh, nil
+}
+
+// generatePlaceholderPhone produces a unique, obviously-not-real number
+// (leading "0", which no real Indian mobile number uses) for accounts
+// created without a phone number — see SignupWithPassword.
+func generatePlaceholderPhone() (string, error) {
+	b := make([]byte, 4)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	n := uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
+	return fmt.Sprintf("0%09d", n%1_000_000_000), nil
 }
 
 // LoginWithGoogle verifies a Google ID token (the token the frontend gets
@@ -254,6 +279,27 @@ func (s *AuthService) LoginWithGoogle(ctx context.Context, googleIDToken, role s
 
 func (s *AuthService) SetPassword(ctx context.Context, userID, password string) error {
 	hash, err := utils.HashPassword(password)
+	if err != nil {
+		return err
+	}
+	return s.userRepo.SetPasswordHash(ctx, userID, hash)
+}
+
+// ChangePassword is used by the "current password -> new password" flow on the
+// Personal Information screen. Unlike SetPassword (OTP flow, no verification),
+// this checks the caller's current password before writing the new one.
+func (s *AuthService) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
+	u, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if u == nil || u.PasswordHash == "" {
+		return errors.New("invalid current password")
+	}
+	if !utils.CheckPassword(currentPassword, u.PasswordHash) {
+		return errors.New("invalid current password")
+	}
+	hash, err := utils.HashPassword(newPassword)
 	if err != nil {
 		return err
 	}

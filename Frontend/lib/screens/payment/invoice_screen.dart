@@ -12,7 +12,7 @@ import '../../models/payment_model.dart';
 import '../../providers/payment_provider.dart';
 
 /// Shows the full GST-compliant invoice for a paid booking — service ID,
-/// base amount, CGST, SGST, platform fee, total — and lets the customer
+/// base amount, GST (18%), platform fee, total — and lets the customer
 /// download/share it as a PDF. Opened automatically right after a
 /// successful payment (see PaymentScreen._buildSuccess), reachable again
 /// later from Payment History for any past paid booking, and from
@@ -218,18 +218,9 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                     _pdfCell(inv.categoryName.isNotEmpty ? inv.categoryName : 'Service charge'),
                     _pdfCell('Rs. ${inv.baseAmount.toStringAsFixed(2)}', alignRight: true),
                   ]),
-                  if (inv.isRepeatCustomer && inv.repeatDiscountAmount != null)
-                    pw.TableRow(children: [
-                      _pdfCell('Repeat customer discount (${inv.repeatDiscountPercent?.toStringAsFixed(0) ?? ''}%)'),
-                      _pdfCell('-Rs. ${inv.repeatDiscountAmount!.toStringAsFixed(2)}', alignRight: true),
-                    ]),
                   pw.TableRow(children: [
-                    _pdfCell('CGST (${inv.cgstPercent.toStringAsFixed(1)}%)'),
-                    _pdfCell('Rs. ${inv.cgstAmount.toStringAsFixed(2)}', alignRight: true),
-                  ]),
-                  pw.TableRow(children: [
-                    _pdfCell('SGST (${inv.sgstPercent.toStringAsFixed(1)}%)'),
-                    _pdfCell('Rs. ${inv.sgstAmount.toStringAsFixed(2)}', alignRight: true),
+                    _pdfCell('GST (${(inv.cgstPercent + inv.sgstPercent).toStringAsFixed(0)}%)'),
+                    _pdfCell('Rs. ${inv.gstTotal.toStringAsFixed(2)}', alignRight: true),
                   ]),
                   pw.TableRow(children: [
                     _pdfCell('Platform fee'),
@@ -263,6 +254,18 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               ),
 
               pw.SizedBox(height: 24),
+              if (inv.warrantyEnabled) ...[
+                pw.Text('Warranty', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 3),
+                pw.Text(
+                  inv.warrantyDays != null
+                      ? 'Covered by a ${inv.warrantyDays}-day warranty'
+                          '${inv.warrantyExpiresAt != null ? ', valid till ${DateFormat('d MMM yyyy').format(inv.warrantyExpiresAt!)}' : ''}'
+                      : 'This service is covered by warranty',
+                  style: const pw.TextStyle(fontSize: 10),
+                ),
+                pw.SizedBox(height: 16),
+              ],
               if (inv.problemDescription.isNotEmpty) ...[
                 pw.Text('Issue reported', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600, fontWeight: pw.FontWeight.bold)),
                 pw.SizedBox(height: 3),
@@ -407,6 +410,44 @@ class _InvoiceBody extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
+        if (invoice.warrantyEnabled) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.successColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.successColor.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.verified_user_outlined, color: AppTheme.successColor, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        invoice.warrantyDays != null
+                            ? 'Covered by a ${invoice.warrantyDays}-day warranty'
+                            : 'This service is covered by warranty',
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: AppTheme.successColor),
+                      ),
+                      if (invoice.warrantyExpiresAt != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Valid till ${DateFormat('d MMM yyyy').format(invoice.warrantyExpiresAt!)}',
+                          style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
         // Price breakdown
         Container(
           padding: const EdgeInsets.all(16),
@@ -421,14 +462,7 @@ class _InvoiceBody extends StatelessWidget {
               const Text('Bill details', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
               const SizedBox(height: 14),
               _priceRow('Service amount', invoice.baseAmount),
-              if (invoice.isRepeatCustomer && invoice.repeatDiscountAmount != null)
-                _priceRow(
-                  'Repeat customer discount (${invoice.repeatDiscountPercent?.toStringAsFixed(0) ?? ''}%)',
-                  -(invoice.repeatDiscountAmount ?? 0),
-                  color: AppTheme.successColor,
-                ),
-              _priceRow('CGST (${invoice.cgstPercent.toStringAsFixed(1)}%)', invoice.cgstAmount),
-              _priceRow('SGST (${invoice.sgstPercent.toStringAsFixed(1)}%)', invoice.sgstAmount),
+              _priceRow('GST (${(invoice.cgstPercent + invoice.sgstPercent).toStringAsFixed(0)}%)', invoice.gstTotal),
               _priceRow('Platform fee', invoice.platformFeeAmount),
               _priceRow('Visit charge', invoice.visitChargeAmount),
               if (invoice.visitFeeCredit != null)

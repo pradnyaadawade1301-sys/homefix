@@ -356,13 +356,20 @@ Future<void> completeBooking(
   double finalPrice, {
   bool warrantyEnabled = false,
   int? warrantyDays,
+  String? warrantyDescription,
 }) async {
   _isLoading = true;
   _error = null;
   notifyListeners();
 
   try {
-    await _bookingService.completeBooking(bookingId, finalPrice, warrantyEnabled: warrantyEnabled, warrantyDays: warrantyDays);
+    await _bookingService.completeBooking(
+      bookingId,
+      finalPrice,
+      warrantyEnabled: warrantyEnabled,
+      warrantyDays: warrantyDays,
+      warrantyDescription: warrantyDescription,
+    );
     _error = null;
     final idx = _bookings.indexWhere((b) => b.id == bookingId);
     if (idx != -1) {

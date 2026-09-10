@@ -48,7 +48,14 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	utils.Success(c, http.StatusOK, gin.H{"message": "profile updated"})
+
+	// Return the updated user so the app can refresh its local state.
+	u, err := h.userService.GetProfile(c.Request.Context(), userID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, u)
 }
 
 type updatePhotoBody struct {

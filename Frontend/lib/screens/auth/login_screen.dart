@@ -21,6 +21,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _obscurePassword = true;
   bool _isGoogleLoading = false;
+  // Only used for "Continue with Google" when it creates a BRAND NEW account —
+  // existing accounts keep their original role regardless of this value.
+  String _googleRole = 'customer';
 
   @override
   void dispose() {
@@ -76,7 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!mounted) return;
     final authProvider = context.read<AuthProvider>();
-    final success = await authProvider.loginWithGoogle(idToken);
+    final success = await authProvider.loginWithGoogle(idToken, role: _googleRole);
 
     if (!mounted) return;
     setState(() => _isGoogleLoading = false);
@@ -243,7 +246,24 @@ MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),                
                               Expanded(child: Divider(color: Colors.grey[300])),
                             ],
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 16),
+                          // New Google accounts are created with this role; existing
+                          // accounts keep whatever role they already have.
+                          Center(
+                            child: ToggleButtons(
+                              borderRadius: BorderRadius.circular(10),
+                              constraints: const BoxConstraints(minHeight: 36, minWidth: 110),
+                              isSelected: [_googleRole == 'customer', _googleRole == 'technician'],
+                              onPressed: (index) {
+                                setState(() => _googleRole = index == 0 ? 'customer' : 'technician');
+                              },
+                              children: [
+                                Text(l10n.signupRoleCustomer),
+                                Text(l10n.signupRoleTechnician),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
                           SizedBox(
                             height: 56,
                             child: OutlinedButton(

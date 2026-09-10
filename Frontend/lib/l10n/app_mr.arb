@@ -210,6 +210,8 @@
   "techJobsWarrantySubtitle": "या कालावधीत ग्राहक मोफत पुन्हा-भेटीची विनंती करू शकतो",
   "techJobsDuration": "कालावधी",
   "techJobsDurationHint": "उदा. 6",
+  "techJobsWarrantyCoverageLabel": "ही वॉरंटी कशासाठी आहे?",
+  "techJobsWarrantyCoverageHint": "उदा: फक्त कंप्रेसर आणि गॅस रिफिल",
   "techJobsDays": "दिवस",
   "techJobsMonths": "महिने",
   "techJobsYears": "वर्षे",

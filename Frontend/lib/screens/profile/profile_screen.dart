@@ -10,6 +10,7 @@ import '../booking/bookings_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../technician/technician_jobs_screen.dart';
 import '../technician/repeat_customers_screen.dart';
+import '../technician/technician_reviews_screen.dart';
 import '../personal_info_screen.dart';
 import '../saved_addresses_screen.dart';
 import '../legal_screens.dart';
@@ -639,6 +640,19 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                   label: l10n.techJobsMyCustomersTooltip,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const RepeatCustomersScreen()),
+                  ),
+                ),
+                _ActionTile(
+                  icon: Icons.star_outline_rounded,
+                  label: 'My Reviews',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => TechnicianReviewsScreen(
+                        technicianId: profile.id,
+                        ratingAvg: profile.ratingAvg,
+                        ratingCount: profile.ratingCount,
+                      ),
+                    ),
                   ),
                 ),
                 _ActionTile(

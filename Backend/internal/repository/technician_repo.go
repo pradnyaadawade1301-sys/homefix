@@ -66,6 +66,25 @@ func (r *TechnicianRepository) GetByUserID(ctx context.Context, userID string) (
 	return &t, nil
 }
 
+// GetNameByID returns just the technician's display name (joined from users),
+// used where a full Technician row isn't needed — e.g. attributing a booking
+// status-update notification to the technician who triggered it.
+func (r *TechnicianRepository) GetNameByID(ctx context.Context, id string) (string, error) {
+	var name string
+	err := r.db.QueryRow(ctx, `
+		SELECT COALESCE(u.name, '') FROM technicians t
+		JOIN users u ON u.id = t.user_id
+		WHERE t.id = $1
+	`, id).Scan(&name)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "", nil
+		}
+		return "", err
+	}
+	return name, nil
+}
+
 // ListAvailableByCategory finds available, verified technicians for a category, joined
 // with the technician's name and category name (the raw table alone isn't enough for the
 // nearby/tracking UI — it needs a name to show and a distance to sort/display by).

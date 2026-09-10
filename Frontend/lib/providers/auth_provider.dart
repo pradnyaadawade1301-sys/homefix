@@ -93,7 +93,7 @@ class AuthProvider extends ChangeNotifier {
   /// Signup with name/phone/password/email (required) and role (customer/technician).
   Future<bool> signup({
     required String name,
-    required String phone,
+    String phone = '',
     required String password,
     required String email,
     String role = 'customer',
@@ -218,6 +218,18 @@ class AuthProvider extends ChangeNotifier {
   Future<String?> resetPassword(String email, String otp, String newPassword) async {
     try {
       await _authService.resetPassword(email, otp, newPassword);
+      return null;
+    } catch (e) {
+      return e.toString().replaceFirst('Exception: ', '');
+    }
+  }
+
+  /// Changes the logged-in user's password from the Personal Information ->
+  /// Change Password screen. Requires the current password. Returns an
+  /// error message on failure, or null on success.
+  Future<String?> changePassword(String currentPassword, String newPassword) async {
+    try {
+      await _authService.changePassword(currentPassword, newPassword);
       return null;
     } catch (e) {
       return e.toString().replaceFirst('Exception: ', '');

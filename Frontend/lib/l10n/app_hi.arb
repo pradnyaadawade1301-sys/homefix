@@ -210,6 +210,8 @@
   "techJobsWarrantySubtitle": "ग्राहक इस अवधि में मुफ्त पुनः विज़िट का अनुरोध कर सकता है",
   "techJobsDuration": "अवधि",
   "techJobsDurationHint": "जैसे 6",
+  "techJobsWarrantyCoverageLabel": "यह वारंटी किसके लिए है?",
+  "techJobsWarrantyCoverageHint": "जैसे: सिर्फ कंप्रेसर और गैस रिफिल",
   "techJobsDays": "दिन",
   "techJobsMonths": "महीने",
   "techJobsYears": "साल",

@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../core/theme.dart';
+import '../../models/booking_model.dart';
 import '../../providers/payment_provider.dart';
+import '../booking/task_completed_screen.dart';
+import '../write_review_screen.dart';
 import 'invoice_screen.dart';
 
 /// Pay a completed booking's amount via Razorpay Checkout. The customer sees a
@@ -17,12 +20,17 @@ class PaymentScreen extends StatefulWidget {
   final String bookingId;
   final double amount;
   final String bookingTitle;
+  // Passed when the caller already has the full Booking (e.g. from booking
+  // tracking) so that, once payment succeeds, the customer can be prompted
+  // to rate the technician straight away without a second fetch.
+  final Booking? booking;
 
   const PaymentScreen({
     Key? key,
     required this.bookingId,
     required this.amount,
     this.bookingTitle = 'Service booking',
+    this.booking,
   }) : super(key: key);
 
   @override
@@ -306,26 +314,40 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   Widget _buildOpening() {
-    return const Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        SizedBox(height: 60),
-        CircularProgressIndicator(color: AppTheme.primaryColor),
-        SizedBox(height: 20),
-        Text('Opening payment sheet\u2026', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-      ],
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(color: AppTheme.primaryColor),
+          SizedBox(height: 20),
+          Text(
+            'Opening payment sheet\u2026',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildVerifying() {
-    return const Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        SizedBox(height: 60),
-        CircularProgressIndicator(color: AppTheme.primaryColor),
-        SizedBox(height: 20),
-        Text('Verifying your payment\u2026', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-      ],
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(color: AppTheme.primaryColor),
+          SizedBox(height: 20),
+          Text(
+            'Verifying your payment\u2026',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
     );
   }
 
@@ -371,18 +393,41 @@ class _PaymentScreenState extends State<PaymentScreen> {
           Text('Invoice ${payment!.invoiceNumber}', style: TextStyle(fontSize: 12.5, color: Colors.grey[500])),
         ],
         const SizedBox(height: 28),
-        if (payment != null) ...[
+        if (widget.booking != null) ...[
           SizedBox(
             width: double.infinity,
             height: 50,
             child: ElevatedButton.icon(
               onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => InvoiceScreen(paymentId: payment.id)),
+                MaterialPageRoute(builder: (_) => WriteReviewScreen(booking: widget.booking!)),
               ),
-              icon: const Icon(Icons.receipt_long_outlined),
-              label: const Text('View Invoice'),
+              icon: const Icon(Icons.star_outline_rounded),
+              label: const Text('Rate Technician'),
               style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, foregroundColor: Colors.white),
             ),
+          ),
+          const SizedBox(height: 10),
+        ],
+        if (payment != null) ...[
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: widget.booking != null
+                ? OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => InvoiceScreen(paymentId: payment.id)),
+                    ),
+                    icon: const Icon(Icons.receipt_long_outlined),
+                    label: const Text('View Invoice'),
+                  )
+                : ElevatedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => InvoiceScreen(paymentId: payment.id)),
+                    ),
+                    icon: const Icon(Icons.receipt_long_outlined),
+                    label: const Text('View Invoice'),
+                    style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, foregroundColor: Colors.white),
+                  ),
           ),
           const SizedBox(height: 10),
         ],
@@ -390,7 +435,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
           width: double.infinity,
           height: 50,
           child: OutlinedButton(
-            onPressed: () => Navigator.of(context).pop(true),
+            onPressed: () {
+              if (widget.booking != null) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => TaskCompletedScreen(booking: widget.booking!, reviewed: false)),
+                );
+              } else {
+                Navigator.of(context).pop(true);
+              }
+            },
             child: const Text('Done'),
           ),
         ),

@@ -688,6 +688,12 @@ class AppLocalizationsMr extends AppLocalizations {
   String get techJobsDurationHint => 'उदा. 6';
 
   @override
+  String get techJobsWarrantyCoverageLabel => 'ही वॉरंटी कशासाठी आहे?';
+
+  @override
+  String get techJobsWarrantyCoverageHint => 'उदा: फक्त कंप्रेसर आणि गॅस रिफिल';
+
+  @override
   String get techJobsDays => 'दिवस';
 
   @override

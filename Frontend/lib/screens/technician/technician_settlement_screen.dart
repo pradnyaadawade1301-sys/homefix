@@ -6,6 +6,8 @@ import '../../models/payment_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/payment_provider.dart';
 import '../../l10n/app_localizations.dart';
+import '../payment/invoice_screen.dart';
+import 'technician_job_detail_screen.dart';
 
 /// Technician-facing settlement/history screen.
 ///
@@ -251,7 +253,12 @@ class _VisitTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final customerName = booking.customer?.name ?? AppLocalizations.of(context).techSettlementCustomerFallback;
     final date = booking.updatedAt;
-    return Container(
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => TechnicianJobDetailScreen(booking: booking)),
+      ),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -299,6 +306,7 @@ class _VisitTile extends StatelessWidget {
             ),
         ],
       ),
+    ),
     );
   }
 }
@@ -317,7 +325,12 @@ class _PaymentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final date = payment.createdAt;
-    return Container(
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => InvoiceScreen(paymentId: payment.id)),
+      ),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -367,6 +380,7 @@ class _PaymentTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

@@ -688,6 +688,13 @@ class AppLocalizationsHi extends AppLocalizations {
   String get techJobsDurationHint => 'जैसे 6';
 
   @override
+  String get techJobsWarrantyCoverageLabel => 'यह वारंटी किसके लिए है?';
+
+  @override
+  String get techJobsWarrantyCoverageHint =>
+      'जैसे: सिर्फ कंप्रेसर और गैस रिफिल';
+
+  @override
   String get techJobsDays => 'दिन';
 
   @override

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemNavigator;
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
@@ -33,6 +34,8 @@ class TechnicianJobsScreen extends StatefulWidget {
 class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
   int _navIndex = 0; // 0 = Jobs, 1 = Consultations, 2 = Settlement, 3 = History
   int _tabIndex = 0;
+  // For the "press back again to exit" behaviour on the Jobs tab.
+  DateTime? _lastBackPress;
 
   List<ConsultationRequest> _pendingRequests = [];
   List<Consultation> _upcomingConsultations = [];
@@ -197,10 +200,35 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
     }
   }
 
+  /// Back-button handling for the technician shell:
+  /// - on any non-Jobs tab, back returns to the Jobs tab instead of leaving;
+  /// - on the Jobs tab, back must be pressed twice within 2s to exit —
+  ///   matches the customer HomeScreen's behaviour so the app never just
+  ///   closes/exits on a single back press.
+  void _handleBack(bool didPop) {
+    if (didPop) return;
+    if (_navIndex != 0) {
+      setState(() => _navIndex = 0);
+      return;
+    }
+    final now = DateTime.now();
+    if (_lastBackPress == null || now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
+      _lastBackPress = now;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context)!.homePressBackExit), duration: const Duration(seconds: 2)),
+      );
+      return;
+    }
+    SystemNavigator.pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) => _handleBack(didPop),
+      child: Scaffold(
       appBar: AppBar(
         title: Text(_navTitle(l10n)),
         actions: [
@@ -252,6 +280,7 @@ icon: const Icon(Icons.language_rounded),
           BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined, key: _settlementNavKey), label: l10n.techJobsBottomNavSettlement),
           BottomNavigationBarItem(icon: const Icon(Icons.history_rounded), label: l10n.techJobsBottomNavHistory),
         ],
+      ),
       ),
     );
   }
@@ -329,14 +358,24 @@ icon: const Icon(Icons.language_rounded),
         if (_pendingRequests.isNotEmpty) _buildConsultationBanner(),
         if (_upcomingConsultations.isNotEmpty) _buildUpcomingBanner(),
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
-          child: Row(
+          padding: const EdgeInsets.fromLTRB(20, 18, 0, 6),
+          child: SingleChildScrollView(
             key: _filterKey,
-            children: [
-              _FilterChip(label: l10n.techJobsActive, selected: _tabIndex == 0, onTap: () => setState(() => _tabIndex = 0)),
-              const SizedBox(width: 8),
-              _FilterChip(label: l10n.techJobsFilterAll, selected: _tabIndex == 1, onTap: () => setState(() => _tabIndex = 1)),
-            ],
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.only(right: 20),
+            child: Row(
+              children: [
+                _FilterChip(label: l10n.techJobsActive, selected: _tabIndex == 0, onTap: () => setState(() => _tabIndex = 0)),
+                const SizedBox(width: 8),
+                _FilterChip(label: l10n.techJobsFilterAll, selected: _tabIndex == 1, onTap: () => setState(() => _tabIndex = 1)),
+                const SizedBox(width: 8),
+                _FilterChip(label: 'Book Now', selected: _tabIndex == 2, onTap: () => setState(() => _tabIndex = 2)),
+                const SizedBox(width: 8),
+                _FilterChip(label: 'Video Call', selected: _tabIndex == 3, onTap: () => setState(() => _tabIndex = 3)),
+                const SizedBox(width: 8),
+                _FilterChip(label: 'Schedule for later', selected: _tabIndex == 4, onTap: () => setState(() => _tabIndex = 4)),
+              ],
+            ),
           ),
         ),
         Expanded(
@@ -375,10 +414,29 @@ icon: const Icon(Icons.language_rounded),
                   );
                 }
 
-                final jobs = _tabIndex == 0
-                    ? provider.bookings
-.where((b) => b.status == 'requested' || b.status == 'pending_technician' || b.status == 'accepted' || b.status == 'on_the_way' || b.status == 'arrived' || b.status == 'inspecting' || b.status == 'in_progress' || b.status == 'awaiting_estimate_approval')                        .toList()
-                    : provider.bookings;
+                final jobs = switch (_tabIndex) {
+                  0 => provider.bookings
+                      .where((b) =>
+                          b.status == 'requested' ||
+                          b.status == 'pending_technician' ||
+                          b.status == 'accepted' ||
+                          b.status == 'on_the_way' ||
+                          b.status == 'arrived' ||
+                          b.status == 'inspecting' ||
+                          b.status == 'in_progress' ||
+                          b.status == 'awaiting_estimate_approval')
+                      .toList(),
+                  // "Book Now" = a direct booking, not one that came out of a
+                  // video consultation and not a slot scheduled for later.
+                  2 => provider.bookings.where((b) => b.jobBrief?.hasVideo != true && b.scheduledAt == null).toList(),
+                  // "Video Call" = booking that originated from a video
+                  // consultation with the technician.
+                  3 => provider.bookings.where((b) => b.jobBrief?.hasVideo == true).toList(),
+                  // "Schedule for later" = the customer picked a future slot
+                  // rather than booking for right now.
+                  4 => provider.bookings.where((b) => b.scheduledAt != null).toList(),
+                  _ => provider.bookings,
+                };
 
                 if (jobs.isEmpty) {
                   return ListView(
@@ -896,8 +954,10 @@ extension on _WarrantyUnit {
 class _InvoiceDialogState extends State<_InvoiceDialog> {
   late final TextEditingController _controller;
   late final TextEditingController _warrantyAmountController;
+  late final TextEditingController _warrantyDescriptionController;
   bool _warrantyEnabled = false;
   _WarrantyUnit _warrantyUnit = _WarrantyUnit.months;
+  bool _submitting = false;
 
   @override
   void initState() {
@@ -906,12 +966,14 @@ class _InvoiceDialogState extends State<_InvoiceDialog> {
       text: (widget.booking.estimatedPrice ?? 0) > 0 ? (widget.booking.estimatedPrice ?? 0).toStringAsFixed(0) : '',
     );
     _warrantyAmountController = TextEditingController();
+    _warrantyDescriptionController = TextEditingController();
   }
 
   @override
   void dispose() {
     _controller.dispose();
     _warrantyAmountController.dispose();
+    _warrantyDescriptionController.dispose();
     super.dispose();
   }
 
@@ -993,6 +1055,18 @@ class _InvoiceDialogState extends State<_InvoiceDialog> {
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _warrantyDescriptionController,
+                maxLines: 2,
+                minLines: 1,
+                decoration: InputDecoration(
+                  labelText: l10n.techJobsWarrantyCoverageLabel,
+                  hintText: l10n.techJobsWarrantyCoverageHint,
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
             ],
           ],
         ),
@@ -1002,31 +1076,66 @@ class _InvoiceDialogState extends State<_InvoiceDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: Text(l10n.techJobsCancel),
         ),
-        ElevatedButton(
-          onPressed: () {
-            final price = double.tryParse(_controller.text.trim());
-            if (price == null || price <= 0) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l10n.techJobsEnterValidAmount)),
-              );
-              return;
-            }
-            if (_warrantyEnabled && _warrantyDaysValue == null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l10n.techJobsEnterValidWarranty)),
-              );
-              return;
-            }
-            Navigator.of(context).pop();
-            widget.provider.completeBooking(
-              widget.booking.id,
-              price,
-              warrantyEnabled: _warrantyEnabled,
-              warrantyDays: _warrantyEnabled ? _warrantyDaysValue : null,
-            );
-          },
-          child: Text(l10n.techJobsSendInvoice),
-        ),
+        _submitting
+            ? const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2.2),
+                ),
+              )
+            : ElevatedButton(
+                onPressed: () async {
+                  final price = double.tryParse(_controller.text.trim());
+                  if (price == null || price <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(l10n.techJobsEnterValidAmount)),
+                    );
+                    return;
+                  }
+                  if (_warrantyEnabled && _warrantyDaysValue == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(l10n.techJobsEnterValidWarranty)),
+                    );
+                    return;
+                  }
+
+                  // Capture the dialog's own messenger BEFORE closing it —
+                  // once we pop, `context` here still resolves fine, but we
+                  // want to keep showing progress in this dialog until the
+                  // request actually finishes instead of closing it early
+                  // and silently losing any failure (that was the original
+                  // bug: the dialog closed immediately and the completeBooking
+                  // call ran fire-and-forget, so if it failed the technician
+                  // never found out and the customer never got an invoice).
+                  setState(() => _submitting = true);
+
+                  await widget.provider.completeBooking(
+                    widget.booking.id,
+                    price,
+                    warrantyEnabled: _warrantyEnabled,
+                    warrantyDays: _warrantyEnabled ? _warrantyDaysValue : null,
+                    warrantyDescription: _warrantyEnabled ? _warrantyDescriptionController.text.trim() : null,
+                  );
+
+                  if (!mounted) return;
+
+                  if (widget.provider.error != null) {
+                    // Keep the dialog open so the technician can fix the
+                    // input (e.g. invalid warranty duration) and retry,
+                    // instead of losing their entered amount.
+                    setState(() => _submitting = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(widget.provider.error!)),
+                    );
+                    return;
+                  }
+
+                  Navigator.of(context).pop();
+                },
+                child: Text(l10n.techJobsSendInvoice),
+              ),
       ],
     );
   }

@@ -687,6 +687,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get techJobsDurationHint => 'e.g. 6';
 
   @override
+  String get techJobsWarrantyCoverageLabel => 'What does this warranty cover?';
+
+  @override
+  String get techJobsWarrantyCoverageHint =>
+      'e.g. Compressor and gas refill only';
+
+  @override
   String get techJobsDays => 'Days';
 
   @override

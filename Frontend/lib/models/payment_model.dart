@@ -143,6 +143,9 @@ class InvoiceDetail {
   final bool isRepeatCustomer;
   final double? repeatDiscountPercent;
   final double? repeatDiscountAmount;
+  final bool warrantyEnabled;
+  final int? warrantyDays;
+  final DateTime? warrantyExpiresAt;
 
   InvoiceDetail({
     required this.payment,
@@ -169,6 +172,9 @@ class InvoiceDetail {
     this.isRepeatCustomer = false,
     this.repeatDiscountPercent,
     this.repeatDiscountAmount,
+    this.warrantyEnabled = false,
+    this.warrantyDays,
+    this.warrantyExpiresAt,
   });
 
   double get gstTotal => cgstAmount + sgstAmount;
@@ -199,6 +205,9 @@ class InvoiceDetail {
       isRepeatCustomer: json['is_repeat_customer'] as bool? ?? false,
       repeatDiscountPercent: (json['repeat_discount_percent'] as num?)?.toDouble(),
       repeatDiscountAmount: (json['repeat_discount_amount'] as num?)?.toDouble(),
+      warrantyEnabled: json['warranty_enabled'] as bool? ?? false,
+      warrantyDays: (json['warranty_days'] as num?)?.toInt(),
+      warrantyExpiresAt: json['warranty_expires_at'] != null ? DateTime.parse(json['warranty_expires_at'] as String) : null,
     );
   }
 }

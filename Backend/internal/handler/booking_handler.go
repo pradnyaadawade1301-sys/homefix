@@ -256,10 +256,13 @@ type completeBody struct {
 	FinalPrice float64 `json:"final_price" binding:"required"`
 	// Warranty is optional and off by default — the technician must
 	// explicitly opt in. WarrantyDays is only read/required when
-	// WarrantyEnabled is true, and is validated server-side (see
-	// BookingService.Complete) against the category's configured options.
-	WarrantyEnabled bool `json:"warranty_enabled"`
-	WarrantyDays    *int `json:"warranty_days"`
+	// WarrantyEnabled is true; any positive number of days is accepted (see
+	// BookingService.Complete — the old category-whitelist restriction was
+	// removed). WarrantyDescription is an optional free-text note on what's
+	// actually covered, e.g. "Compressor and gas refill only".
+	WarrantyEnabled     bool    `json:"warranty_enabled"`
+	WarrantyDays        *int    `json:"warranty_days"`
+	WarrantyDescription *string `json:"warranty_description"`
 }
 
 func (h *BookingHandler) Complete(c *gin.Context) {
@@ -269,7 +272,7 @@ func (h *BookingHandler) Complete(c *gin.Context) {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := h.bookingService.Complete(c.Request.Context(), bookingID, body.FinalPrice, body.WarrantyEnabled, body.WarrantyDays); err != nil {
+	if err := h.bookingService.Complete(c.Request.Context(), bookingID, body.FinalPrice, body.WarrantyEnabled, body.WarrantyDays, body.WarrantyDescription); err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}

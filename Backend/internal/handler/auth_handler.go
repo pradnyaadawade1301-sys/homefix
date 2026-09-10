@@ -84,8 +84,15 @@ type signupBody struct {
 	Name string `json:"name" binding:"required"`
 	// Email is mandatory (not just optional) since every new account must go
 	// through email verification (see VerifyEmailScreen on the Flutter side).
-	Email    string `json:"email" binding:"required,email"`
-	Phone    string `json:"phone" binding:"required"`
+	Email string `json:"email" binding:"required,email"`
+	// Phone is no longer collected on the signup screen (removed for both
+	// customer and technician). It's optional here; AuthService.SignupWithPassword
+	// fills in a unique internal placeholder when it's blank, since the phone
+	// column is still NOT NULL UNIQUE. NOTE: features that call the phone
+	// column directly — calling a technician/customer from a job, phone-based
+	// OTP login — won't have a real number to use until the person adds one
+	// later (e.g. from Personal Information, once that supports phone again).
+	Phone    string `json:"phone"`
 	Password string `json:"password" binding:"required,min=6"`
 	Role     string `json:"role"` // "customer" or "technician"
 }
@@ -121,6 +128,28 @@ func (h *AuthHandler) SetPassword(c *gin.Context) {
 		return
 	}
 	utils.Success(c, http.StatusOK, gin.H{"message": "password set"})
+}
+
+type changePasswordBody struct {
+	CurrentPassword string `json:"current_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required,min=6"`
+}
+
+// ChangePassword backs the "Change Password" screen under Personal
+// Information: the caller must supply their current password, which is
+// verified before the new one is written.
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	userID := c.GetString("user_id")
+	var body changePasswordBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.authService.ChangePassword(c.Request.Context(), userID, body.CurrentPassword, body.NewPassword); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"message": "password changed"})
 }
 
 type refreshBody struct {
