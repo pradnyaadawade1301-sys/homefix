@@ -107,7 +107,7 @@ func (r *ConsultationRepository) AssignTechnician(ctx context.Context, id, techn
 // hold that slot. The actual ring happens later via PromoteToRinging.
 func (r *ConsultationRepository) AssignTechnicianScheduled(ctx context.Context, id, technicianID string) error {
 	_, err := r.db.Exec(ctx, `
-		UPDATE consultations SET technician_id = $2, status = 'confirmed', updated_at = now()
+		UPDATE consultations SET technician_id = $2, status = 'scheduled', updated_at = now()
 		WHERE id = $1
 	`, id, technicianID)
 	return err
