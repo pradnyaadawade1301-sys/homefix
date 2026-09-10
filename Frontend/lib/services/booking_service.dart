@@ -243,14 +243,15 @@ class BookingService {
   }
 
   /// warrantyDays is only sent (and only required) when warrantyEnabled is
-  /// true — must be one of the category's admin-configured options; the
-  /// completion screen's picker already restricts it to those, and the
-  /// backend re-validates it regardless.
+  /// true — any positive number of days is accepted (the old restriction to
+  /// a fixed per-category whitelist was removed server-side).
+  /// warrantyDescription is an optional free-text note on what's covered.
   Future<void> completeBooking(
     String bookingId,
     double finalPrice, {
     bool warrantyEnabled = false,
     int? warrantyDays,
+    String? warrantyDescription,
   }) async {
     try {
       await _httpClient.post(
@@ -259,6 +260,8 @@ class BookingService {
           'final_price': finalPrice,
           'warranty_enabled': warrantyEnabled,
           if (warrantyEnabled && warrantyDays != null) 'warranty_days': warrantyDays,
+          if (warrantyEnabled && warrantyDescription != null && warrantyDescription.trim().isNotEmpty)
+            'warranty_description': warrantyDescription.trim(),
         },
       );
     } catch (e) {

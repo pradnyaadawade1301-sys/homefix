@@ -1360,6 +1360,18 @@ abstract class AppLocalizations {
   /// **'e.g. 6'**
   String get techJobsDurationHint;
 
+  /// No description provided for @techJobsWarrantyCoverageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'What does this warranty cover?'**
+  String get techJobsWarrantyCoverageLabel;
+
+  /// No description provided for @techJobsWarrantyCoverageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Compressor and gas refill only'**
+  String get techJobsWarrantyCoverageHint;
+
   /// No description provided for @techJobsDays.
   ///
   /// In en, this message translates to:

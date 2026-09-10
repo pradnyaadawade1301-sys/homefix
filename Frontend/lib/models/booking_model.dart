@@ -128,11 +128,15 @@ class Booking {
   // --- Warranty (technician-controlled, admin-configured — see migration
   // 022_booking_warranty.sql on the backend) ---
   // Set once, at completion, by the technician's optional "Warranty: Yes"
-  // choice; warrantyDays is always one of the category's configured
-  // options, never an arbitrary/unlimited number the technician typed.
+  // choice. warrantyDays used to be restricted to the category's configured
+  // options — that restriction was removed, so this can be any positive
+  // number now. warrantyDescription is an optional free-text note from the
+  // technician on what's actually covered (e.g. "Compressor and gas refill
+  // only"), set alongside warrantyDays at the same time.
   final bool warrantyEnabled;
   final int? warrantyDays;
   final DateTime? warrantyExpiresAt;
+  final String? warrantyDescription;
   // True if this booking is itself a warranty claim raised against an
   // earlier, completed booking (see [warrantyClaimOf]).
   final bool isWarrantyClaim;
@@ -164,6 +168,7 @@ class Booking {
     this.warrantyEnabled = false,
     this.warrantyDays,
     this.warrantyExpiresAt,
+    this.warrantyDescription,
     this.isWarrantyClaim = false,
     this.warrantyClaimOf,
     this.warrantyClaimOfServiceCode,
@@ -247,6 +252,7 @@ class Booking {
       warrantyDays: json['warranty_days'] as int?,
       warrantyExpiresAt:
           json['warranty_expires_at'] != null ? DateTime.tryParse(json['warranty_expires_at'] as String) : null,
+      warrantyDescription: json['warranty_description'] as String?,
       isWarrantyClaim: json['is_warranty_claim'] as bool? ?? false,
       warrantyClaimOf: json['warranty_claim_of'] as String?,
       warrantyClaimOfServiceCode: json['warranty_claim_of_service_code'] as String?,

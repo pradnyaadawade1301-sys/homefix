@@ -306,6 +306,8 @@
   "techJobsWarrantySubtitle": "Customer can raise a free revisit within this window",
   "techJobsDuration": "Duration",
   "techJobsDurationHint": "e.g. 6",
+  "techJobsWarrantyCoverageLabel": "What does this warranty cover?",
+  "techJobsWarrantyCoverageHint": "e.g. Compressor and gas refill only",
   "techJobsDays": "Days",
   "techJobsMonths": "Months",
   "techJobsYears": "Years",

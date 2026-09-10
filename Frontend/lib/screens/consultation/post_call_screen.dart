@@ -606,20 +606,26 @@ class _RecommendationCard extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+                  ),
                   onPressed: busy ? null : onDecline,
                   child: isDeclining
                       ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Decline'),
+                      : const FittedBox(fit: BoxFit.scaleDown, child: Text('Decline', maxLines: 1)),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 flex: 2,
                 child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+                  ),
                   onPressed: busy ? null : onAccept,
                   child: isBooking
                       ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('Accept & Book Visit'),
+                      : const FittedBox(fit: BoxFit.scaleDown, child: Text('Accept & Book Visit', maxLines: 1)),
                 ),
               ),
             ],

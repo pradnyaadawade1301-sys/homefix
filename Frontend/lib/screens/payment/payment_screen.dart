@@ -306,26 +306,40 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   Widget _buildOpening() {
-    return const Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        SizedBox(height: 60),
-        CircularProgressIndicator(color: AppTheme.primaryColor),
-        SizedBox(height: 20),
-        Text('Opening payment sheet\u2026', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-      ],
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(color: AppTheme.primaryColor),
+          SizedBox(height: 20),
+          Text(
+            'Opening payment sheet\u2026',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildVerifying() {
-    return const Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        SizedBox(height: 60),
-        CircularProgressIndicator(color: AppTheme.primaryColor),
-        SizedBox(height: 20),
-        Text('Verifying your payment\u2026', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-      ],
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(color: AppTheme.primaryColor),
+          SizedBox(height: 20),
+          Text(
+            'Verifying your payment\u2026',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
     );
   }
 
