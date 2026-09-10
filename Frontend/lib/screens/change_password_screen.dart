@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 
-/// Change password screen — UI-only for now.
-/// Backend note: /auth/set-password endpoint is OTP-flow only (sets a new
-/// password after OTP verification). A "current password + new password"
-/// change endpoint doesn't exist yet on the backend. Wire this up once that
-/// endpoint is added — for now this validates and shows a friendly message.
+/// Change password screen — verifies the current password and sets a new
+/// one via POST /auth/change-password (AuthProvider.changePassword).
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({Key? key}) : super(key: key);
 
@@ -36,18 +35,24 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
     setState(() => _isSubmitting = true);
 
-    // TODO: Backend endpoint for "current password -> new password" change
-    // doesn't exist yet. Only /auth/set-password (OTP-flow) is available.
-    await Future.delayed(const Duration(milliseconds: 600));
+    final error = await context.read<AuthProvider>().changePassword(
+          _currentController.text,
+          _newController.text,
+        );
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('This feature will be available once the backend supports it.'),
-      ),
-    );
+    if (error == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password updated successfully')),
+      );
+      Navigator.of(context).pop();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+    }
   }
 
   @override

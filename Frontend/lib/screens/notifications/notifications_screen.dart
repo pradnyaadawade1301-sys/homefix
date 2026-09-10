@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../services/service_locator.dart';
@@ -44,11 +45,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  String? _formatTimestamp(dynamic raw) {
+    if (raw == null) return null;
+    final dt = DateTime.tryParse(raw.toString());
+    if (dt == null) return null;
+    return DateFormat('d MMM yyyy, h:mm a').format(dt.toLocal());
+  }
+
   Future<void> _openNotification(Map<String, dynamic> n) async {
     final title = n['title']?.toString() ?? 'Notification';
     final body = n['body']?.toString() ?? n['message']?.toString() ?? '';
     final data = n['data'] is Map ? Map<String, dynamic>.from(n['data'] as Map) : null;
     final id = n['id']?.toString();
+    final createdAt = n['created_at']?.toString();
 
     // Mark read on tap, best-effort — don't block navigation on it.
     if (id != null && id.isNotEmpty && n['is_read'] != true) {
@@ -57,7 +66,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     if (!mounted) return;
     await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => NotificationDetailScreen(title: title, body: body, data: data),
+      builder: (_) => NotificationDetailScreen(title: title, body: body, data: data, createdAt: createdAt),
     ));
     if (mounted) _refresh();
   }
@@ -100,6 +109,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 final data = n['data'] is Map ? Map<String, dynamic>.from(n['data'] as Map) : null;
                 final type = data?['type'] as String?;
                 final isUnread = n['is_read'] == false;
+                final senderName = (data?['sender_name'] as String?)?.trim();
+                final timestamp = _formatTimestamp(n['created_at']);
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -146,6 +157,38 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
+                                  ),
+                                ],
+                                if ((senderName != null && senderName.isNotEmpty) || timestamp != null) ...[
+                                  const SizedBox(height: 5),
+                                  Row(
+                                    children: [
+                                      if (senderName != null && senderName.isNotEmpty) ...[
+                                        Icon(Icons.person_outline_rounded, size: 12, color: Colors.grey[500]),
+                                        const SizedBox(width: 3),
+                                        Flexible(
+                                          child: Text(
+                                            senderName,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(fontSize: 11.5, color: Colors.grey[500], fontWeight: FontWeight.w600),
+                                          ),
+                                        ),
+                                        if (timestamp != null) const SizedBox(width: 8),
+                                      ],
+                                      if (timestamp != null) ...[
+                                        Icon(Icons.schedule_rounded, size: 12, color: Colors.grey[500]),
+                                        const SizedBox(width: 3),
+                                        Flexible(
+                                          child: Text(
+                                            timestamp,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(fontSize: 11.5, color: Colors.grey[500]),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 ],
                               ],

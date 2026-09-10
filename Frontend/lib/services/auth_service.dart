@@ -39,7 +39,7 @@ class AuthService {
   /// new account must go through email verification (see VerifyEmailScreen).
   Future<AuthResponse> signup({
     required String name,
-    required String phone,
+    String phone = '',
     required String password,
     required String email,
     String role = 'customer',
@@ -114,6 +114,20 @@ class AuthService {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
   }
+  /// Change password from the Personal Information screen (requires knowing
+  /// the current password, unlike the OTP-based reset flow above).
+  /// Backend: POST /auth/change-password { current_password, new_password }
+  Future<void> changePassword(String currentPassword, String newPassword) async {
+    try {
+      await _httpClient.post(
+        ApiConfig.authChangePassword,
+        data: {'current_password': currentPassword, 'new_password': newPassword},
+      );
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
   /// "Continue with Google" — sends the ID token from google_sign_in to the
   /// backend for verification. `role` only matters the first time (brand
   /// new account); it's ignored if the Google account is already linked to

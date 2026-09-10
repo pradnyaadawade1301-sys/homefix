@@ -15,7 +15,6 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _obscurePassword = true;
@@ -25,7 +24,6 @@ class _SignupScreenState extends State<SignupScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
-    _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -51,7 +49,6 @@ class _SignupScreenState extends State<SignupScreen> {
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.signup(
       name: _nameController.text.trim(),
-      phone: _phoneController.text.trim(),
       password: _passwordController.text,
       email: _emailController.text.trim(),
       role: _role,
@@ -188,20 +185,6 @@ class _SignupScreenState extends State<SignupScreen> {
                           if (v == null || v.trim().isEmpty) return l10n.signupEmailRequired;
                           final ok = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim());
                           return ok ? null : l10n.signupEmailInvalid;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _phoneController,
-                        keyboardType: TextInputType.phone,
-                        decoration: InputDecoration(
-                          hintText: l10n.signupPhoneHint,
-                          prefixIcon: const Icon(Icons.phone_outlined),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return l10n.signupPhoneRequired;
-                          if (v.trim().length < 10) return l10n.signupPhoneInvalid;
-                          return null;
                         },
                       ),
                       const SizedBox(height: 16),

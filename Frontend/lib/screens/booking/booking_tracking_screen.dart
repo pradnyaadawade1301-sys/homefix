@@ -661,6 +661,7 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
                     bookingId: booking.id,
                     amount: booking.displayPrice!,
                     bookingTitle: booking.categoryName.isNotEmpty ? booking.categoryName : 'Service booking',
+                    booking: booking,
                   ),
                 ));
               },

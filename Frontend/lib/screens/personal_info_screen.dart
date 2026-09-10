@@ -74,8 +74,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<UserProvider>().user;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       appBar: AppBar(title: const Text('Personal Information')),
@@ -102,18 +100,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 return ok ? null : 'Enter a valid email';
               },
             ),
-            const SizedBox(height: 16),
-            TextFormField(
-              initialValue: user?.phone ?? '',
-              decoration: const InputDecoration(labelText: 'Phone Number'),
-              enabled: false,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Phone number cannot be changed here.',
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
-            ),
-
             const Divider(height: 48),
 
             // ---------- Security section ----------

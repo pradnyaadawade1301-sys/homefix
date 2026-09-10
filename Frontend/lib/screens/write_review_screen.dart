@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import '../models/booking_model.dart';
 import '../services/service_locator.dart';
+import 'booking/task_completed_screen.dart';
 
 class WriteReviewScreen extends StatefulWidget {
   final Booking booking;
@@ -38,7 +39,9 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
             comment: _commentController.text.trim(),
           );
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => TaskCompletedScreen(booking: widget.booking, reviewed: true)),
+      );
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Thanks for your feedback!')),
       );

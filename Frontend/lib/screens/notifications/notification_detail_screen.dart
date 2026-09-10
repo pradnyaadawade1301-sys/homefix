@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../core/theme.dart';
 import '../booking/booking_tracking_screen.dart';
 import '../consultation/post_call_screen.dart';
@@ -15,19 +16,30 @@ class NotificationDetailScreen extends StatelessWidget {
   final String title;
   final String body;
   final Map<String, dynamic>? data;
+  final String? createdAt;
 
   const NotificationDetailScreen({
     Key? key,
     required this.title,
     required this.body,
     this.data,
+    this.createdAt,
   }) : super(key: key);
+
+  String? _formatTimestamp(String? raw) {
+    if (raw == null) return null;
+    final dt = DateTime.tryParse(raw);
+    if (dt == null) return null;
+    return DateFormat('d MMM yyyy, h:mm a').format(dt.toLocal());
+  }
 
   @override
   Widget build(BuildContext context) {
     final bookingId = data?['booking_id'] as String?;
     final consultationId = data?['consultation_id'] as String?;
     final type = data?['type'] as String?;
+    final senderName = (data?['sender_name'] as String?)?.trim();
+    final timestamp = _formatTimestamp(createdAt);
 
     // Different label depending on what the consultation notification was
     // actually about, so the button reads naturally either way.
@@ -65,6 +77,33 @@ class NotificationDetailScreen extends StatelessWidget {
               body,
               style: TextStyle(fontSize: 14.5, color: Colors.grey[800], height: 1.4),
             ),
+            if ((senderName != null && senderName.isNotEmpty) || timestamp != null) ...[
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 16,
+                runSpacing: 6,
+                children: [
+                  if (senderName != null && senderName.isNotEmpty)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.person_outline_rounded, size: 15, color: Colors.grey[600]),
+                        const SizedBox(width: 4),
+                        Text(senderName, style: TextStyle(fontSize: 13, color: Colors.grey[700], fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  if (timestamp != null)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.schedule_rounded, size: 15, color: Colors.grey[600]),
+                        const SizedBox(width: 4),
+                        Text(timestamp, style: TextStyle(fontSize: 13, color: Colors.grey[700])),
+                      ],
+                    ),
+                ],
+              ),
+            ],
             if (bookingId != null && bookingId.isNotEmpty) ...[
               const SizedBox(height: 28),
               SizedBox(
