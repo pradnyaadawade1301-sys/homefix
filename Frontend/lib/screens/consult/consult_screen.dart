@@ -47,7 +47,7 @@ class _ConsultScreenState extends State<ConsultScreen> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       appBar: AppBar(
@@ -102,8 +102,8 @@ class _ChatHistoryTab extends StatelessWidget {
           if (withTechnician.isEmpty) {
             return _EmptyState(
               icon: Icons.chat_bubble_outline_rounded,
-              title: AppLocalizations.of(context)!.consultNoChatsTitle,
-              subtitle: AppLocalizations.of(context)!.consultNoChatsSubtitle,
+              title: AppLocalizations.of(context).consultNoChatsTitle,
+              subtitle: AppLocalizations.of(context).consultNoChatsSubtitle,
             );
           }
           return ListView.separated(
@@ -157,7 +157,7 @@ class _ChatRow extends StatelessWidget {
                     Text(tech.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
                     const SizedBox(height: 3),
                     Text(
-                      booking.categoryName.isNotEmpty ? booking.categoryName : AppLocalizations.of(context)!.consultServiceBookingFallback,
+                      booking.categoryName.isNotEmpty ? booking.categoryName : AppLocalizations.of(context).consultServiceBookingFallback,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
@@ -193,8 +193,8 @@ class _VideoHistoryTab extends StatelessWidget {
           if (calls.isEmpty) {
             return _EmptyState(
               icon: Icons.videocam_off_rounded,
-              title: AppLocalizations.of(context)!.consultNoVideoCallsTitle,
-              subtitle: AppLocalizations.of(context)!.consultNoVideoCallsSubtitle,
+              title: AppLocalizations.of(context).consultNoVideoCallsTitle,
+              subtitle: AppLocalizations.of(context).consultNoVideoCallsSubtitle,
             );
           }
           return ListView.separated(
@@ -231,7 +231,7 @@ class _VideoRow extends StatelessWidget {
   }
 
   String _statusLabel(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     switch (consultation.status) {
       case ConsultationStatus.ended:
         return l10n.consultStatusCompleted;
@@ -262,7 +262,7 @@ class _VideoRow extends StatelessWidget {
   /// should see plainly that the technician was busy and they need to pick a
   /// new time, not just a bare "Declined" tag with no next step.
   String? _helperText(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     switch (consultation.status) {
       case ConsultationStatus.rejected:
         return consultation.scheduledAt != null
@@ -292,7 +292,7 @@ class _VideoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final peerName = (consultation.technicianName != null && consultation.technicianName!.isNotEmpty)
         ? consultation.technicianName!
         : l10n.consultTechnicianFallback;

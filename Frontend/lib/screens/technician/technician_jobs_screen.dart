@@ -253,8 +253,7 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
     return Consumer<BookingProvider>(
       builder: (context, provider, _) {
         final activeCount = provider.bookings
-            .where((b) => b.status == 'accepted' || b.status == 'on_the_way' || b.status == 'arrived' || b.status == 'inspecting' || b.status == 'in_progress' || b.status == 'awaiting_estimate_approval')
-            .length;
+.where((b) => b.status == 'requested' || b.status == 'pending_technician' || b.status == 'accepted' || b.status == 'on_the_way' || b.status == 'arrived' || b.status == 'inspecting' || b.status == 'in_progress' || b.status == 'awaiting_estimate_approval')            .length;
         final completedCount = provider.bookings.where((b) => b.status == 'completed').length;
         return Container(
           key: _overviewKey,
@@ -370,8 +369,7 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
 
                 final jobs = _tabIndex == 0
                     ? provider.bookings
-                        .where((b) => b.status == 'accepted' || b.status == 'on_the_way' || b.status == 'arrived' || b.status == 'inspecting' || b.status == 'in_progress' || b.status == 'awaiting_estimate_approval')
-                        .toList()
+.where((b) => b.status == 'requested' || b.status == 'pending_technician' || b.status == 'accepted' || b.status == 'on_the_way' || b.status == 'arrived' || b.status == 'inspecting' || b.status == 'in_progress' || b.status == 'awaiting_estimate_approval')                        .toList()
                     : provider.bookings;
 
                 if (jobs.isEmpty) {

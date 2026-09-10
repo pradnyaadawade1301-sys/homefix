@@ -44,7 +44,7 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return RefreshIndicator(
       onRefresh: _load,
       child: Consumer2<BookingProvider, PaymentProvider>(
@@ -215,7 +215,7 @@ class _SummaryCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(AppLocalizations.of(context)!.techSettlementTotalEarned, style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
+                Text(AppLocalizations.of(context).techSettlementTotalEarned, style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
                 const SizedBox(height: 6),
                 Text(
                   '₹${totalEarned.toStringAsFixed(0)}',
@@ -229,7 +229,7 @@ class _SummaryCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(AppLocalizations.of(context)!.techSettlementJobsCompleted, style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
+              Text(AppLocalizations.of(context).techSettlementJobsCompleted, style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
               const SizedBox(height: 6),
               Text(
                 '$jobsCompleted',
@@ -249,7 +249,7 @@ class _VisitTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final customerName = booking.customer?.name ?? AppLocalizations.of(context)!.techSettlementCustomerFallback;
+    final customerName = booking.customer?.name ?? AppLocalizations.of(context).techSettlementCustomerFallback;
     final date = booking.updatedAt;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -354,7 +354,7 @@ class _PaymentTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 if (payment.technicianEarning != null)
-                  Text(AppLocalizations.of(context)!.techSettlementYourShare(payment.technicianEarning!.toStringAsFixed(0)),
+                  Text(AppLocalizations.of(context).techSettlementYourShare(payment.technicianEarning!.toStringAsFixed(0)),
                       style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                 const SizedBox(height: 3),
                 Text(

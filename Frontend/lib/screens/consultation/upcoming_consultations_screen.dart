@@ -34,7 +34,7 @@ class _UpcomingConsultationsScreenState extends State<UpcomingConsultationsScree
   Future<void> _load() => context.read<ConsultationProvider>().loadUpcoming();
 
   Future<void> _confirm(Consultation c) async {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     try {
       await context.read<ConsultationProvider>().confirmScheduled(c.id);
       if (!mounted) return;
@@ -55,7 +55,7 @@ class _UpcomingConsultationsScreenState extends State<UpcomingConsultationsScree
   /// The reason is optional — a technician who's in a hurry can still just
   /// tap Decline — but giving one is encouraged via the hint text.
   Future<void> _decline(Consultation c) async {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final reasonController = TextEditingController();
     final confirm = await showDialog<bool>(
       context: context,
@@ -122,7 +122,7 @@ class _UpcomingConsultationsScreenState extends State<UpcomingConsultationsScree
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final body = RefreshIndicator(
       onRefresh: _load,
       child: Consumer<ConsultationProvider>(
@@ -196,7 +196,7 @@ class _UpcomingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),

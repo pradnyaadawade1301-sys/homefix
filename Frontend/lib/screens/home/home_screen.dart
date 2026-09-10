@@ -49,7 +49,7 @@ class HomeScreenState extends State<HomeScreen> {
 ];
 
  List<_NavItemData> _navItems(BuildContext context) {
-   final l10n = AppLocalizations.of(context)!;
+   final l10n = AppLocalizations.of(context);
    return [
      _NavItemData(icon: Icons.home_rounded, label: l10n.navHome),
      _NavItemData(icon: Icons.history_rounded, label: l10n.navBooking),
@@ -78,7 +78,7 @@ class HomeScreenState extends State<HomeScreen> {
   /// Pass force: true (e.g. from a "Replay Tour" button in Settings) to show
   /// it again on demand.
   Future<void> _startGuidedTourIfNeeded({bool force = false}) async {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     await GuidedTour.maybeShow(
       context,
       force: force,
@@ -140,7 +140,7 @@ class HomeScreenState extends State<HomeScreen> {
     if (_lastBackPress == null || now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
       _lastBackPress = now;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.homePressBackExit), duration: const Duration(seconds: 2)),
+        SnackBar(content: Text(AppLocalizations.of(context).homePressBackExit), duration: const Duration(seconds: 2)),
       );
       return;
     }
@@ -229,7 +229,7 @@ class _HomeTab extends StatefulWidget {
   final GlobalKey? categoriesKey;
   final GlobalKey? notificationKey;
 
-  const _HomeTab({this.searchKey, this.promoKey, this.categoriesKey, this.notificationKey});
+  const _HomeTab({this.promoKey}) : searchKey = null, categoriesKey = null, notificationKey = null;
 
   @override
   State<_HomeTab> createState() => _HomeTabState();
@@ -329,7 +329,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: () async => _loadData(),
@@ -364,7 +364,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
   Widget _buildRepeatTechniciansSection() {
     return Consumer<BookingProvider>(
       builder: (context, provider, _) {
-        final l10n = AppLocalizations.of(context)!;
+        final l10n = AppLocalizations.of(context);
         final hasData = provider.repeatTechnicians.isNotEmpty;
         final hasError = provider.error != null && provider.repeatTechnicians.isEmpty;
         if (!provider.isLoadingRepeatTechnicians && !hasData && !hasError) {
@@ -447,7 +447,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
   Widget _buildHeader(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, _) {
-        final l10n = AppLocalizations.of(context)!;
+        final l10n = AppLocalizations.of(context);
         final name = authProvider.currentUser?.name;
         final photoUrl = authProvider.currentUser?.photoUrl;
         final displayName = (name != null && name.trim().isNotEmpty) ? name.split(' ').first : 'there';
@@ -563,7 +563,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
   }
 
   Widget _buildSearchBar() {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -639,7 +639,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
   }
 
   Widget _buildPromoBanner(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return ClipRRect(
       borderRadius: BorderRadius.circular(28),
       child: Container(
@@ -784,7 +784,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
   }
 
   Widget _sectionTitle(String title, {required VoidCallback onViewAll}) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -836,7 +836,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
   Widget _buildCategoriesRow() {
     return Consumer<CategoryProvider>(
       builder: (context, provider, _) {
-        final l10n = AppLocalizations.of(context)!;
+        final l10n = AppLocalizations.of(context);
         if (provider.isLoading && provider.categories.isEmpty) {
           return const SizedBox(
             height: 220,
@@ -921,7 +921,7 @@ itemBuilder: (context, i) {
   Widget _buildTechnicianList() {
     return Consumer<TechnicianProvider>(
       builder: (context, provider, _) {
-        final l10n = AppLocalizations.of(context)!;
+        final l10n = AppLocalizations.of(context);
         if (provider.isLoading && provider.technicians.isEmpty) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
@@ -956,7 +956,7 @@ class _TechnicianCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: () {

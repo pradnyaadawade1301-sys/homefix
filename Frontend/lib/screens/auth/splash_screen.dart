@@ -43,7 +43,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     }
 
     // Restoring a session only confirms a stored token — fetch the profile to know
-    // the role (technicians need the approval-status gate before reaching Home).
+    // the role (technicians need a KYC profile before reaching Home; approval
+    // status itself no longer gates login, only the "Verified" badge).
     final userProvider = context.read<UserProvider>();
     await userProvider.fetchProfile();
     if (!mounted) return;
@@ -66,11 +67,14 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     final profile = kycProvider.profile;
     if (profile == null) {
+      // No KYC submitted yet — that's the only thing that still blocks entry.
       Navigator.of(context).pushReplacementNamed('/technician-kyc');
-    } else if (profile.isApproved) {
-      Navigator.of(context).pushReplacementNamed('/technician-home');
     } else {
-      Navigator.of(context).pushReplacementNamed('/technician-status');
+      // KYC submitted (pending/approved/rejected all go straight in now).
+      // Verification is shown as a badge inside the app, not a login gate —
+      // admin approval only controls whether the technician shows up in
+      // customer-facing browse/booking results (see technician_repo.go).
+      Navigator.of(context).pushReplacementNamed('/technician-home');
     }
   }
 

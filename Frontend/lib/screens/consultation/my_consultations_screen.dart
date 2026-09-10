@@ -29,7 +29,7 @@ class _MyConsultationsScreenState extends State<MyConsultationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(title: Text(l10n.consultMyTitle)),
       body: RefreshIndicator(
@@ -184,7 +184,7 @@ class _ConsultationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final info = _statusInfo(l10n);
     final slotText = _formatSlot(consultation.scheduledAt);
 

@@ -90,8 +90,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   /// Shared post-login routing for both password and Google sign-in —
-  /// technicians go through their KYC/status gate, customers go straight
-  /// home.
+  /// technicians only need a submitted KYC profile to reach their dashboard;
+  /// admin approval no longer blocks login, it just controls the "Verified"
+  /// badge and whether they show up in customer browse/booking results.
   Future<void> _routeAfterLogin() async {
     final authProvider = context.read<AuthProvider>();
     if (authProvider.currentUser?.role == 'technician') {
@@ -101,10 +102,8 @@ class _LoginScreenState extends State<LoginScreen> {
       final profile = kycProvider.profile;
       if (profile == null) {
         Navigator.of(context).pushReplacementNamed('/technician-kyc');
-      } else if (profile.isApproved) {
-        Navigator.of(context).pushReplacementNamed('/technician-home');
       } else {
-        Navigator.of(context).pushReplacementNamed('/technician-status');
+        Navigator.of(context).pushReplacementNamed('/technician-home');
       }
     } else {
       Navigator.of(context).pushReplacementNamed('/home');
