@@ -424,7 +424,7 @@ func (r *BookingRepository) CreateMessage(ctx context.Context, m *models.Booking
 
 func (r *BookingRepository) ListMessages(ctx context.Context, bookingID string) ([]models.BookingMessage, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, booking_id, sender_id, sender_role, content, created_at
+		SELECT id, booking_id, sender_id, sender_role, content, created_at, read_at
 		FROM booking_messages WHERE booking_id = $1 ORDER BY created_at ASC`, bookingID)
 	if err != nil {
 		return nil, err
@@ -434,10 +434,49 @@ func (r *BookingRepository) ListMessages(ctx context.Context, bookingID string) 
 	var out []models.BookingMessage
 	for rows.Next() {
 		var m models.BookingMessage
-		if err := rows.Scan(&m.ID, &m.BookingID, &m.SenderID, &m.SenderRole, &m.Content, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.BookingID, &m.SenderID, &m.SenderRole, &m.Content, &m.CreatedAt, &m.ReadAt); err != nil {
 			return nil, err
 		}
 		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+// MarkMessagesRead marks every unread message in this booking's chat that
+// wasn't sent by readerID (i.e. the other side's messages) as read. Called
+// whenever a user opens that chat thread — see BookingService.ListMessages.
+func (r *BookingRepository) MarkMessagesRead(ctx context.Context, bookingID, readerID string) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE booking_messages SET read_at = now()
+		 WHERE booking_id = $1 AND sender_id != $2 AND read_at IS NULL`,
+		bookingID, readerID)
+	return err
+}
+
+// UnreadMessageCounts returns, for every booking in bookingIDs, how many of
+// that booking's chat messages are unread by userID (sent by someone else,
+// read_at still NULL). Bookings with zero unread messages are simply absent
+// from the map — powers the WhatsApp-style badge on the chat list.
+func (r *BookingRepository) UnreadMessageCounts(ctx context.Context, bookingIDs []string, userID string) (map[string]int, error) {
+	out := map[string]int{}
+	if len(bookingIDs) == 0 {
+		return out, nil
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT booking_id, COUNT(*) FROM booking_messages
+		WHERE booking_id = ANY($1) AND sender_id != $2 AND read_at IS NULL
+		GROUP BY booking_id`, bookingIDs, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var n int
+		if err := rows.Scan(&id, &n); err != nil {
+			return nil, err
+		}
+		out[id] = n
 	}
 	return out, rows.Err()
 }

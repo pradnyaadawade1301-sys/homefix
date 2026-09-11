@@ -161,6 +161,10 @@ type BookingMessage struct {
 	SenderRole string    `json:"sender_role"` // "customer" | "technician" | "admin"
 	Content    string    `json:"content"`
 	CreatedAt  time.Time `json:"created_at"`
+	// ReadAt is nil until the recipient opens the chat thread (see
+	// BookingService.ListMessages, which marks the other side's messages
+	// read as a side effect of fetching them).
+	ReadAt *time.Time `json:"read_at,omitempty"`
 }
 
 // --- Detailed / joined shapes used by the customer + technician "my bookings" screens ---
@@ -211,6 +215,11 @@ type BookingDetail struct {
 	// against — set only when Booking.IsWarrantyClaim is true. Lets the UI
 	// show "Warranty claim for SRV-001042" without a second lookup.
 	WarrantyClaimOfServiceCode *string `json:"warranty_claim_of_service_code,omitempty"`
+	// UnreadMessageCount is how many chat messages on this booking the
+	// viewer hasn't opened yet — powers the WhatsApp-style badge on the
+	// chat list (Consult > Chat). Populated by ListForCustomerDetailed /
+	// ListForTechnicianDetailed; omitted (zero value) elsewhere.
+	UnreadMessageCount int `json:"unread_message_count,omitempty"`
 }
 
 type BookingStatusHistory struct {

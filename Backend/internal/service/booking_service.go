@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"homefix-backend/internal/models"
@@ -106,13 +107,46 @@ func (s *BookingService) TechnicianOwnedByUser(ctx context.Context, technicianID
 // ListForCustomerDetailed powers the customer's "My Bookings" screen — each booking
 // carries the assigned technician's name/phone/rating once one is assigned.
 func (s *BookingService) ListForCustomerDetailed(ctx context.Context, customerID string) ([]models.BookingDetail, error) {
-	return s.bookingRepo.ListByCustomerDetailed(ctx, customerID)
+	list, err := s.bookingRepo.ListByCustomerDetailed(ctx, customerID)
+	if err != nil {
+		return nil, err
+	}
+	s.attachUnreadCounts(ctx, list, customerID)
+	return list, nil
 }
 
 // ListForTechnicianDetailed powers the technician's "My Jobs" screen — each booking
-// carries the customer's name/phone and the job address.
-func (s *BookingService) ListForTechnicianDetailed(ctx context.Context, technicianID string) ([]models.BookingDetail, error) {
-	return s.bookingRepo.ListByTechnicianDetailed(ctx, technicianID)
+// carries the customer's name/phone and the job address. viewerUserID (the
+// technician's OWN user id, not technicianID) is who unread counts are computed
+// against, since booking_messages.sender_id stores a user id.
+func (s *BookingService) ListForTechnicianDetailed(ctx context.Context, technicianID, viewerUserID string) ([]models.BookingDetail, error) {
+	list, err := s.bookingRepo.ListByTechnicianDetailed(ctx, technicianID)
+	if err != nil {
+		return nil, err
+	}
+	s.attachUnreadCounts(ctx, list, viewerUserID)
+	return list, nil
+}
+
+// attachUnreadCounts fills in UnreadMessageCount on each booking in list —
+// best effort, a failure here shouldn't stop the bookings themselves from
+// loading (see the WhatsApp-style badge on Consult > Chat).
+func (s *BookingService) attachUnreadCounts(ctx context.Context, list []models.BookingDetail, viewerUserID string) {
+	if len(list) == 0 {
+		return
+	}
+	ids := make([]string, len(list))
+	for i, b := range list {
+		ids[i] = b.ID
+	}
+	counts, err := s.bookingRepo.UnreadMessageCounts(ctx, ids, viewerUserID)
+	if err != nil {
+		log.Printf("UnreadMessageCounts failed: %v", err)
+		return
+	}
+	for i := range list {
+		list[i].UnreadMessageCount = counts[list[i].ID]
+	}
 }
 
 // Accept is called by a technician tapping "Accept" on a job. It handles
@@ -495,6 +529,12 @@ func (s *BookingService) ListMessages(ctx context.Context, bookingID, userID, us
 	}
 	if _, err := s.resolveBookingParticipantRole(ctx, b, userID, userRole); err != nil {
 		return nil, err
+	}
+	// Opening the thread is the read receipt — mark the other side's
+	// messages read so the unread badge on the chat list clears. Best
+	// effort: a failure here shouldn't stop the messages from loading.
+	if err := s.bookingRepo.MarkMessagesRead(ctx, bookingID, userID); err != nil {
+		log.Printf("MarkMessagesRead failed for booking %s: %v", bookingID, err)
 	}
 	return s.bookingRepo.ListMessages(ctx, bookingID)
 }

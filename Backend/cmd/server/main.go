@@ -189,5 +189,13 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 		log.Printf("startup migration: failed to ensure warranty_description column exists: %v", err)
 	}
 
+	// 032_booking_message_read_at — same "Render never applies migrations/
+	// files" issue as above. Backs the WhatsApp-style unread-message count
+	// on the chat list. Safe no-op once the column already exists.
+	if _, err := pool.Exec(ctx,
+		`ALTER TABLE booking_messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ;`); err != nil {
+		log.Printf("startup migration: failed to ensure booking_messages.read_at column exists: %v", err)
+	}
+
 	log.Println("startup migrations: done")
 }

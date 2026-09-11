@@ -116,7 +116,7 @@ func (h *BookingHandler) TechnicianBookings(c *gin.Context) {
 			return
 		}
 	}
-	list, err := h.bookingService.ListForTechnicianDetailed(c.Request.Context(), technicianID)
+	list, err := h.bookingService.ListForTechnicianDetailed(c.Request.Context(), technicianID, userID)
 	if err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
 		return
