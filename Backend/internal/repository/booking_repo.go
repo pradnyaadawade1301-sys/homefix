@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -81,11 +82,27 @@ func (r *BookingRepository) ListByTechnician(ctx context.Context, technicianID s
 	return r.listByColumn(ctx, "technician_id", technicianID)
 }
 
+// listByColumn only ever gets called with a hardcoded column name from
+// within this file (see ListByCustomer/ListByTechnician below) — col is
+// never user-supplied today. Still, string-concatenating it straight into
+// SQL is a dangerous pattern to leave lying around: if a future caller ever
+// passes anything derived from user input, it becomes a SQL injection
+// vector. Whitelisting the allowed values here closes that off regardless
+// of how the function gets called in the future.
 func (r *BookingRepository) listByColumn(ctx context.Context, col, val string) ([]models.Booking, error) {
+	var whereCol string
+	switch col {
+	case "customer_id":
+		whereCol = "customer_id"
+	case "technician_id":
+		whereCol = "technician_id"
+	default:
+		return nil, fmt.Errorf("listByColumn: unsupported column %q", col)
+	}
 	rows, err := r.db.Query(ctx, `
 		SELECT id, customer_id, technician_id, category_id, address_id, status, payment_status,
 		       COALESCE(problem_description,''), notes, COALESCE(images, '{}'), scheduled_at, estimated_price, final_price, created_at, updated_at
-		FROM bookings WHERE `+col+` = $1 ORDER BY created_at DESC
+		FROM bookings WHERE `+whereCol+` = $1 ORDER BY created_at DESC
 	`, val)
 	if err != nil {
 		return nil, err
@@ -101,7 +118,11 @@ func (r *BookingRepository) listByColumn(ctx context.Context, col, val string) (
 		}
 		out = append(out, b)
 	}
-	return out, nil
+	// Other functions in this file (ListRepeatCustomersByTechnician,
+	// ListMessages) correctly check rows.Err() after the loop; this one
+	// didn't, which meant a mid-scan DB disconnect silently returned a
+	// truncated result instead of an error.
+	return out, rows.Err()
 }
 
 // SetPaymentStatus is only ever called from a verified payment confirmation/refund
@@ -336,8 +357,13 @@ func (r *BookingRepository) History(ctx context.Context, bookingID string) ([]mo
 // counted as "prior".
 func (r *BookingRepository) CountPriorBookings(ctx context.Context, customerID, technicianID string) (int, error) {
 	var count int
+	// Only bookings that actually completed should count as a "prior
+	// relationship" — cancelled/rejected attempts and warranty-claim revisits
+	// (which aren't a new relationship, just a free fix on an existing one)
+	// were previously counted too, inflating this number.
 	err := r.db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM bookings WHERE customer_id = $1 AND technician_id = $2
+		SELECT COUNT(*) FROM bookings
+		WHERE customer_id = $1 AND technician_id = $2 AND status = 'completed' AND is_warranty_claim = false
 	`, customerID, technicianID).Scan(&count)
 	return count, err
 }
@@ -350,7 +376,7 @@ func (r *BookingRepository) ListRepeatCustomersByTechnician(ctx context.Context,
 		SELECT b.customer_id, COALESCE(u.name,''), COALESCE(u.phone,''), COUNT(*) AS total_bookings, MAX(b.created_at) AS last_booking_at
 		FROM bookings b
 		JOIN users u ON u.id = b.customer_id
-		WHERE b.technician_id = $1
+		WHERE b.technician_id = $1 AND b.status = 'completed' AND b.is_warranty_claim = false
 		GROUP BY b.customer_id, u.name, u.phone
 		HAVING COUNT(*) > 1
 		ORDER BY total_bookings DESC, last_booking_at DESC
@@ -384,7 +410,7 @@ func (r *BookingRepository) ListRepeatTechniciansByCustomer(ctx context.Context,
 		JOIN technicians t ON t.id = b.technician_id
 		JOIN users u ON u.id = t.user_id
 		LEFT JOIN categories cat ON cat.id = t.category_id
-		WHERE b.customer_id = $1 AND b.technician_id IS NOT NULL
+		WHERE b.customer_id = $1 AND b.technician_id IS NOT NULL AND b.status = 'completed' AND b.is_warranty_claim = false
 		GROUP BY b.technician_id, u.name, u.phone, cat.name, t.profile_photo_url, t.rating_avg
 		HAVING COUNT(*) > 1
 		ORDER BY total_bookings DESC, last_booking_at DESC
@@ -644,8 +670,20 @@ func (r *BookingRepository) ListByCustomerAndTechnicianDetailed(ctx context.Cont
 	return out, rows.Err()
 }
 
+// Same SQL-injection-pattern concern as listByColumn above — col is always
+// hardcoded by callers today (ListByCustomerDetailed/ListByTechnicianDetailed
+// below), whitelisted here so it stays that way.
 func (r *BookingRepository) listDetailedByColumn(ctx context.Context, col, val string) ([]models.BookingDetail, error) {
-	rows, err := r.db.Query(ctx, detailedSelect+" WHERE "+col+" = $1 ORDER BY b.created_at DESC", val)
+	var whereCol string
+	switch col {
+	case "b.customer_id":
+		whereCol = "b.customer_id"
+	case "b.technician_id":
+		whereCol = "b.technician_id"
+	default:
+		return nil, fmt.Errorf("listDetailedByColumn: unsupported column %q", col)
+	}
+	rows, err := r.db.Query(ctx, detailedSelect+" WHERE "+whereCol+" = $1 ORDER BY b.created_at DESC", val)
 	if err != nil {
 		return nil, err
 	}

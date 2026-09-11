@@ -137,6 +137,13 @@ class TechnicianKycProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+  Future<void> updateLocation(double lat, double lng) async {
+  final profile = _profile;
+  if (profile == null) return;
+  try {
+    await _kycService.updateLocation(profile.id, lat, lng);
+  } catch (_) {}
+}
 
   /// Online/offline master toggle. This is the ONLY thing that actually
   /// flips `is_available` in the DB — without calling this, a technician

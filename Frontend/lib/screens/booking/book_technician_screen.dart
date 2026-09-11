@@ -9,6 +9,7 @@ import '../../providers/address_provider.dart';
 import '../../providers/booking_provider.dart';
 import '../../services/service_locator.dart';
 import 'booking_tracking_screen.dart';
+import '../../widgets/add_address_sheet.dart';
 
 /// Step 7 of the customer flow ("Book Technician Flow"): pick/add an address,
 /// pick a preferred date + time, add notes, then create the booking.
@@ -189,21 +190,15 @@ class _BookTechnicianScreenState extends State<BookTechnicianScreen> {
     });
   }
 
-  Future<void> _addAddress() async {
-    final result = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => const _AddAddressSheet(),
-    );
-    if (result == true && mounted) {
-      final addresses = context.read<AddressProvider>().addresses;
-      if (addresses.isNotEmpty) {
-        setState(() => _selectedAddressId = addresses.last.id);
-      }
+Future<void> _addAddress() async {
+  final result = await showAddAddressSheet(context);
+  if (result == true && mounted) {
+    final addresses = context.read<AddressProvider>().addresses;
+    if (addresses.isNotEmpty) {
+      setState(() => _selectedAddressId = addresses.last.id);
     }
   }
+}
 
   Future<void> _openAddPhotoSheet() async {
     final canAddPhoto = _newImages.length < _maxImages;

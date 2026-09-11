@@ -227,6 +227,16 @@ class TechnicianKycService {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
   }
+  Future<void> updateLocation(String technicianId, double lat, double lng) async {
+  try {
+    await _httpClient.patch(
+      '${ApiConfig.technicianDetail}/$technicianId/location',
+      data: {'lat': lat, 'lng': lng},
+    );
+  } catch (e) {
+    throw Exception(ApiEnvelope.errorMessage(e));
+  }
+}
 
   /// Changes (or removes, when [photoUrl] is empty) the technician's own
   /// profile photo — separate from the one-time photo set during

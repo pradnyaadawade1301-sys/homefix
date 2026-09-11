@@ -79,14 +79,10 @@ class _TechnicianListScreenState extends State<TechnicianListScreen> {
     }
   }
 
-  double? get _visitCharge {
-    if (widget.categoryId == null) return null;
-    final categories = context.read<CategoryProvider>().categories;
-    for (final c in categories) {
-      if (c.id == widget.categoryId) return c.basePrice;
-    }
-    return null;
-  }
+ double? get _visitCharge {
+  if (widget.categoryId == null) return null;
+  return 100;
+}
 
   /// Rough ETA estimate from distance, assuming ~30 km/h average city
   /// travel speed. This is a client-side estimate for display only — there
@@ -324,8 +320,7 @@ class _RecommendedTechCard extends StatelessWidget {
                 _StatChip(icon: Icons.work_outline_rounded, iconColor: AppTheme.primaryColor, label: '${technician.experienceYears} yrs exp'),
                 if (technician.distanceKm != null)
                   _StatChip(icon: Icons.location_on_outlined, iconColor: Colors.redAccent, label: '${technician.distanceKm!.toStringAsFixed(1)} km away'),
-                if (etaMinutes != null)
-                  _StatChip(icon: Icons.access_time_rounded, iconColor: Colors.blueAccent, label: 'Arrives in $etaMinutes min'),
+
                 if (visitCharge != null)
                   _StatChip(icon: Icons.currency_rupee_rounded, iconColor: Colors.green, label: 'Visit charge \u20b9${visitCharge!.toStringAsFixed(0)}'),
               ],

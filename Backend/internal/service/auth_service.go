@@ -156,6 +156,12 @@ func (s *AuthService) LoginWithPassword(ctx context.Context, identifier, passwor
 	if !utils.CheckPassword(password, u.PasswordHash) {
 		return nil, "", "", errors.New("invalid credentials")
 	}
+	// LoginWithGoogle already checks this (see below) — the password path was
+	// missing it entirely, letting a deactivated/banned user log in as long
+	// as they still knew their password.
+	if !u.IsActive {
+		return nil, "", "", errors.New("this account has been deactivated")
+	}
 	access, refresh, err := s.issueTokens(u.ID, u.Role)
 	if err != nil {
 		return nil, "", "", err

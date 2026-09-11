@@ -2,13 +2,14 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
-	"log"
-	"time"
-
 	"homefix-backend/internal/models"
 	"homefix-backend/internal/repository"
+	"log"
+	"math/big"
+	"time"
 )
 
 type BookingService struct {
@@ -225,6 +226,58 @@ func (s *BookingService) Reject(ctx context.Context, bookingID, technicianID str
 	return nil
 }
 
+// validBookingTransitions is the state machine UpdateStatus enforces. Without
+// it, nothing stopped e.g. a "cancelled" booking being moved to
+// "in_progress", or a "completed" one back to "arrived", or "requested"
+// jumping straight to "completed" — silently corrupting the booking's
+// lifecycle and status history. Terminal states (completed, cancelled) have
+// no outgoing transitions at all.
+var validBookingTransitions = map[string]map[string]bool{
+	models.BookingRequested: {
+		models.BookingPendingTechnician: true,
+		models.BookingAccepted:          true,
+		models.BookingCancelled:         true,
+	},
+	models.BookingPendingTechnician: {
+		models.BookingAccepted:  true,
+		models.BookingRequested: true, // technician declined -> back to the open pool
+		models.BookingCancelled: true,
+	},
+	models.BookingAccepted: {
+		models.BookingOnTheWay:  true,
+		models.BookingCancelled: true,
+	},
+	models.BookingOnTheWay: {
+		models.BookingArrived:   true,
+		models.BookingCancelled: true,
+	},
+	models.BookingArrived: {
+		models.BookingInspecting: true,
+		models.BookingCancelled:  true,
+	},
+	models.BookingInspecting: {
+		models.BookingAwaitingEstimateApproval: true,
+		models.BookingInProgress:               true,
+		models.BookingRepairInProgress:         true,
+		models.BookingCancelled:                true,
+	},
+	models.BookingAwaitingEstimateApproval: {
+		models.BookingInProgress:       true,
+		models.BookingRepairInProgress: true,
+		models.BookingCancelled:        true,
+	},
+	models.BookingInProgress: {
+		models.BookingCompleted: true,
+		models.BookingCancelled: true,
+	},
+	models.BookingRepairInProgress: {
+		models.BookingCompleted: true,
+		models.BookingCancelled: true,
+	},
+	// BookingCompleted and BookingCancelled are terminal — deliberately absent
+	// from this map, so any transition out of them is rejected below.
+}
+
 func (s *BookingService) UpdateStatus(ctx context.Context, bookingID, status, note string) error {
 	if !models.ValidBookingStatuses[status] {
 		return errors.New("invalid status: " + status)
@@ -235,6 +288,9 @@ func (s *BookingService) UpdateStatus(ctx context.Context, bookingID, status, no
 	}
 	if b == nil {
 		return errors.New("booking not found")
+	}
+	if b.Status != status && !validBookingTransitions[b.Status][status] {
+		return fmt.Errorf("cannot move a booking from %q to %q", b.Status, status)
 	}
 	if err := s.bookingRepo.UpdateStatus(ctx, bookingID, status, note); err != nil {
 		return err
@@ -439,6 +495,7 @@ func (s *BookingService) RaiseWarrantyClaim(ctx context.Context, customerID, ori
 		desc += ": " + note
 	}
 	originalID := original.ID
+	zeroPrice := 0.0
 	newBooking := &models.Booking{
 		CustomerID:         customerID,
 		CategoryID:         original.CategoryID,
@@ -446,6 +503,10 @@ func (s *BookingService) RaiseWarrantyClaim(ctx context.Context, customerID, ori
 		ProblemDescription: desc,
 		IsWarrantyClaim:    true,
 		WarrantyClaimOf:    &originalID,
+		// A warranty claim revisit must be free — without this, Create()
+		// falls back to the category's base price as the estimate, charging
+		// the customer again for a defect they're covered for.
+		EstimatedPrice: &zeroPrice,
 	}
 	created, err := s.bookingRepo.Create(ctx, newBooking)
 	if err != nil {
@@ -470,7 +531,25 @@ func (s *BookingService) RaiseWarrantyClaim(ctx context.Context, customerID, ori
 	return created, nil
 }
 
+// Cancel is the odd one out among status transitions: unlike UpdateStatus (and
+// every other transition), it used to jump straight to bookingRepo.UpdateStatus
+// without checking the booking's current status first. That let an already
+// "completed" or "cancelled" booking be cancelled again, corrupting the status
+// history. Fetch-and-validate first, matching the pattern used everywhere else.
 func (s *BookingService) Cancel(ctx context.Context, bookingID, reason string) error {
+	b, err := s.bookingRepo.GetByID(ctx, bookingID)
+	if err != nil {
+		return err
+	}
+	if b == nil {
+		return errors.New("booking not found")
+	}
+	if b.Status == models.BookingCompleted {
+		return errors.New("a completed booking cannot be cancelled")
+	}
+	if b.Status == models.BookingCancelled {
+		return errors.New("this booking is already cancelled")
+	}
 	return s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingCancelled, reason)
 }
 
@@ -594,12 +673,23 @@ func (s *BookingService) resolveBookingParticipantRole(ctx context.Context, b *m
 	return "", errors.New("you are not a participant in this booking")
 }
 
+// generateOTP returns a cryptographically random 4-digit numeric code (as
+// used for the technician arrival OTP the customer reads aloud). Previously
+// this used time.Now().UnixNano() % 10000, which is predictable by anyone who
+// can estimate roughly when the technician arrived — crypto/rand closes that.
 func generateOTP() string {
-	n := time.Now().UnixNano() % 10000
-	if n < 0 {
-		n = -n
+	n, err := rand.Int(rand.Reader, big.NewInt(10000))
+	if err != nil {
+		// crypto/rand failing at all is effectively unheard-of on real
+		// systems; fall back to the old (weak) source rather than panicking
+		// mid-booking-creation, since a usable-but-imperfect OTP still beats
+		// hard-failing the whole booking flow.
+		n = big.NewInt(time.Now().UnixNano() % 10000)
+		if n.Sign() < 0 {
+			n = n.Abs(n)
+		}
 	}
-	return fmt.Sprintf("%04d", n)
+	return fmt.Sprintf("%04d", n.Int64())
 }
 
 func (s *BookingService) VerifyOTP(ctx context.Context, bookingID, otp string) (bool, error) {
