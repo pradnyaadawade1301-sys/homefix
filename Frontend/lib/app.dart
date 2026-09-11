@@ -11,6 +11,7 @@ import 'providers/address_provider.dart';
 import 'providers/ai_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/booking_provider.dart';
+import 'providers/call_log_provider.dart';
 import 'providers/category_provider.dart';
 import 'providers/consultation_provider.dart';
 import 'providers/locale_provider.dart';
@@ -25,6 +26,7 @@ import 'screens/technician/technician_kyc_screen.dart';
 import 'screens/technician/technician_status_screen.dart';
 import 'services/auth_service.dart';
 import 'services/booking_service.dart';
+import 'services/call_log_service.dart';
 import 'services/consultation_service.dart';
 import 'services/location_service.dart';
 import 'services/service_locator.dart';
@@ -65,6 +67,7 @@ class _MyAppState extends State<MyApp> {
   late UserService _userService;
   late NotificationService _notificationService;
   late ConsultationService _consultationService;
+  late CallLogService _callLogService;
   late UploadService _uploadService;
   late AIService _aiService;
   late PaymentService _paymentService;
@@ -90,6 +93,7 @@ class _MyAppState extends State<MyApp> {
     _userService = UserService(httpClient: _httpClient);
     _notificationService = NotificationService(httpClient: _httpClient);
     _consultationService = ConsultationService(httpClient: _httpClient);
+    _callLogService = CallLogService(httpClient: _httpClient);
     _uploadService = UploadService(httpClient: _httpClient);
     _aiService = AIService(httpClient: _httpClient);
     _paymentService = PaymentService(httpClient: _httpClient);
@@ -259,6 +263,9 @@ class _MyAppState extends State<MyApp> {
         Provider<NotificationService>.value(value: _notificationService),
         ChangeNotifierProvider(
           create: (_) => ConsultationProvider(consultationService: _consultationService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => CallLogProvider(service: _callLogService),
         ),
         Provider<UploadService>.value(value: _uploadService),
         Provider<AIService>.value(value: _aiService),
