@@ -199,5 +199,29 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 		log.Printf("startup migration: failed to ensure booking_messages.read_at column exists: %v", err)
 	}
 
+	// 033_call_logs — same "Render never applies migrations/ files" issue as
+	// above. Creates the real call-history table (who called whom, when,
+	// missed/received) backing GET /calls/history. Safe no-op once it exists.
+	if _, err := pool.Exec(ctx,
+		`CREATE TABLE IF NOT EXISTS call_logs (
+			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+			booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
+			consultation_id UUID REFERENCES consultations(id) ON DELETE SET NULL,
+			caller_user_id UUID NOT NULL REFERENCES users(id),
+			callee_user_id UUID NOT NULL REFERENCES users(id),
+			status VARCHAR(20) NOT NULL DEFAULT 'ringing',
+			started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			answered_at TIMESTAMPTZ,
+			ended_at TIMESTAMPTZ,
+			duration_seconds INT,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			CONSTRAINT call_logs_has_thread CHECK (booking_id IS NOT NULL OR consultation_id IS NOT NULL)
+		 );
+		 CREATE INDEX IF NOT EXISTS idx_call_logs_caller ON call_logs(caller_user_id, created_at DESC);
+		 CREATE INDEX IF NOT EXISTS idx_call_logs_callee ON call_logs(callee_user_id, created_at DESC);
+		 CREATE INDEX IF NOT EXISTS idx_call_logs_booking ON call_logs(booking_id);`); err != nil {
+		log.Printf("startup migration: failed to ensure call_logs table exists: %v", err)
+	}
+
 	log.Println("startup migrations: done")
 }
