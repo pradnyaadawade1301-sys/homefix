@@ -921,6 +921,16 @@ class AppLocalizationsMr extends AppLocalizations {
   String get consultTabVideo => 'व्हिडिओ';
 
   @override
+  String get consultTabCall => 'कॉल';
+
+  @override
+  String get consultNoCallsTitle => 'अद्याप कोणतेही कॉल नाहीत';
+
+  @override
+  String get consultNoCallsSubtitle =>
+      'तुमच्या बुकिंगसाठी तंत्रज्ञ नियुक्त झाल्यावर, तुम्ही त्यांना इथून कॉल करू शकाल.';
+
+  @override
   String get consultNoChatsTitle => 'अद्याप कोणतीही चॅट नाही';
 
   @override

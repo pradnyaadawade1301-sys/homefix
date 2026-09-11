@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/booking_call_launcher.dart';
 import '../../core/theme.dart';
 import '../../models/booking_model.dart';
 import '../../models/consultation_model.dart';
+import '../../models/call_log_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/consultation_provider.dart';
+import '../../providers/call_log_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../chat/booking_chat_screen.dart';
 import '../consultation/post_call_screen.dart';
@@ -32,10 +35,11 @@ class _ConsultScreenState extends State<ConsultScreen> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<BookingProvider>().fetchUserBookings();
       context.read<ConsultationProvider>().loadHistory();
+      context.read<CallLogProvider>().loadHistory();
     });
   }
 
@@ -65,6 +69,7 @@ class _ConsultScreenState extends State<ConsultScreen> with SingleTickerProvider
           tabs: [
             Tab(icon: const Icon(Icons.chat_bubble_outline_rounded), text: l10n.consultTabChat),
             Tab(icon: const Icon(Icons.videocam_outlined), text: l10n.consultTabVideo),
+            Tab(icon: const Icon(Icons.call_outlined), text: l10n.consultTabCall),
           ],
         ),
       ),
@@ -73,6 +78,7 @@ class _ConsultScreenState extends State<ConsultScreen> with SingleTickerProvider
         children: const [
           _ChatHistoryTab(),
           _VideoHistoryTab(),
+          _CallHistoryTab(),
         ],
       ),
     );
@@ -182,6 +188,159 @@ class _ChatRow extends StatelessWidget {
                 const SizedBox(width: 8),
               ],
               const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The real audio-call log: every call the customer has ever placed or
+/// received with a technician — most recent first, showing who it was
+/// with, the date/time it happened, and whether it was answered or missed
+/// (see GET /calls/history, CallLogProvider). Tapping a row calls that
+/// technician back on the same booking thread.
+class _CallHistoryTab extends StatelessWidget {
+  const _CallHistoryTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: () => context.read<CallLogProvider>().loadHistory(),
+      child: Consumer<CallLogProvider>(
+        builder: (context, provider, _) {
+          if (provider.isLoading && provider.calls.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final calls = provider.calls;
+
+          if (calls.isEmpty) {
+            return _EmptyState(
+              icon: Icons.call_outlined,
+              title: AppLocalizations.of(context).consultNoCallsTitle,
+              subtitle: AppLocalizations.of(context).consultNoCallsSubtitle,
+            );
+          }
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: calls.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (context, index) => _CallLogRow(call: calls[index]),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CallLogRow extends StatelessWidget {
+  final CallLogEntry call;
+  const _CallLogRow({required this.call});
+
+  static String _formatDateTime(DateTime dt) {
+    final now = DateTime.now();
+    final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+    final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final minute = dt.minute.toString().padLeft(2, '0');
+    final ampm = dt.hour < 12 ? 'AM' : 'PM';
+    final time = '$hour12:$minute $ampm';
+    if (isToday) return time;
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${dt.day.toString().padLeft(2, '0')} ${months[dt.month - 1]}, $time';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final missed = call.isMissed;
+    final peerName = call.peerName.isNotEmpty ? call.peerName : 'Technician';
+
+    // Direction + outcome icon, phone-log style: outgoing calls point
+    // up-right, incoming point down-left, missed calls are red.
+    IconData directionIcon;
+    Color directionColor;
+    if (missed) {
+      directionIcon = call.isOutgoing ? Icons.call_made_rounded : Icons.call_missed_rounded;
+      directionColor = AppTheme.errorColor;
+    } else {
+      directionIcon = call.isOutgoing ? Icons.call_made_rounded : Icons.call_received_rounded;
+      directionColor = AppTheme.successColor;
+    }
+
+    String subtitle;
+    if (missed) {
+      subtitle = call.isOutgoing ? 'Not answered' : 'Missed call';
+    } else if (call.durationSeconds != null) {
+      final mins = call.durationSeconds! ~/ 60;
+      final secs = call.durationSeconds! % 60;
+      subtitle = mins > 0 ? '${mins}m ${secs}s' : '${secs}s';
+    } else {
+      subtitle = call.isOutgoing ? 'Outgoing call' : 'Incoming call';
+    }
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: call.bookingId != null
+            ? () => startBookingAudioCall(
+                  context,
+                  bookingId: call.bookingId!,
+                  peerDisplayName: peerName,
+                )
+            : null,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.lightOutline),
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.12),
+                child: Text(
+                  peerName.isNotEmpty ? peerName[0].toUpperCase() : '?',
+                  style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      peerName,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14.5,
+                        color: missed ? AppTheme.errorColor : const Color(0xFF1A1F36),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Icon(directionIcon, size: 14, color: directionColor),
+                        const SizedBox(width: 4),
+                        Text(subtitle, style: TextStyle(fontSize: 12.5, color: Colors.grey[600])),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    _formatDateTime(call.startedAt),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 6),
+                  const Icon(Icons.call_outlined, color: AppTheme.primaryColor, size: 18),
+                ],
+              ),
             ],
           ),
         ),

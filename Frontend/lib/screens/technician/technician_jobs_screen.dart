@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemNavigator;
 import 'package:provider/provider.dart';
+import '../../core/booking_call_launcher.dart';
 import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/booking_model.dart';
@@ -735,6 +736,15 @@ class _JobCard extends StatelessWidget {
                           ),
                         ],
                       ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.call_outlined, color: AppTheme.primaryColor, size: 20),
+                    tooltip: 'Call',
+                    onPressed: () => startBookingAudioCall(
+                      context,
+                      bookingId: booking.id,
+                      peerDisplayName: customer.name.isNotEmpty ? customer.name : l10n.techJobsCustomerFallback,
                     ),
                   ),
                   IconButton(

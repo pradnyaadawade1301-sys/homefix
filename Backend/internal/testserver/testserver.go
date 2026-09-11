@@ -42,6 +42,7 @@ func New(pool *pgxpool.Pool) *Server {
 	techRepo := repository.NewTechnicianRepository(pool)
 	bookingRepo := repository.NewBookingRepository(pool)
 	consultRepo := repository.NewConsultationRepository(pool)
+	callLogRepo := repository.NewCallLogRepository(pool)
 	paymentRepo := repository.NewPaymentRepository(pool)
 	walletRepo := repository.NewWalletRepository(pool)
 	reviewRepo := repository.NewReviewRepository(pool)
@@ -60,7 +61,7 @@ func New(pool *pgxpool.Pool) *Server {
 	authService := service.NewAuthService(userRepo, service.NewMailService("", 0, "", "", ""), JWTAccessSecret, JWTRefreshSecret, 15, 720, "")
 	userService := service.NewUserService(userRepo)
 	techService := service.NewTechnicianService(techRepo, catRepo, reviewRepo)
-	bookingService := service.NewBookingService(bookingRepo, catRepo, techRepo, paymentRepo, userRepo, nil)
+	bookingService := service.NewBookingService(bookingRepo, catRepo, techRepo, paymentRepo, userRepo, callLogRepo, nil)
 	consultService := service.NewConsultationService(consultRepo, techRepo, bookingService, reviewRepo, aiRepo, nil)
 	walletService := service.NewWalletService(walletRepo)
 	reviewService := service.NewReviewService(reviewRepo, bookingRepo)
@@ -82,7 +83,8 @@ func New(pool *pgxpool.Pool) *Server {
 		AI:           handler.NewAIHandler(groqService),
 		Notification: handler.NewNotificationHandler(notifRepo),
 		Upload:       handler.NewUploadHandler("/tmp/homefix-test-uploads", "http://localhost:8080"),
-		Call:         handler.NewCallHandler(bookingRepo, techRepo, consultRepo, JWTAccessSecret),
+		Call:         handler.NewCallHandler(bookingRepo, techRepo, consultRepo, callLogRepo, JWTAccessSecret),
+		CallLog:      handler.NewCallLogHandler(callLogRepo),
 		Consultation: handler.NewConsultationHandler(consultService, []string{"stun:stun.l.google.com:19302"}, "", "", 3600),
 		WebRTC:       handler.NewWebRTCHandler([]string{"stun:stun.l.google.com:19302"}, "", "", 3600),
 		Dispute:      handler.NewDisputeHandler(disputeService),

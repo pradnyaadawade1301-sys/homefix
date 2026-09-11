@@ -19,21 +19,28 @@ import (
 // find each other. It never sees, stores, or relays the actual audio/video — once the
 // two devices exchange that handshake, the call media flows directly device-to-device
 // (peer-to-peer), through TURN only when a direct/STUN path isn't reachable.
+//
+// It also owns the *call history* side effect: callLogRepo is nil-safe (tests /
+// tools that don't wire it just skip logging), and gets exactly two writes per
+// call — MarkAnswered when the room reaches 2 participants, MarkEnded when it
+// empties back to 0 — so every call, answered or missed, ends up with a row.
 type CallHandler struct {
 	bookingRepo    *repository.BookingRepository
 	technicianRepo *repository.TechnicianRepository
 	consultRepo    *repository.ConsultationRepository
+	callLogRepo    *repository.CallLogRepository
 	accessSecret   string
 
 	mu    sync.Mutex
 	rooms map[string]map[*websocket.Conn]string // roomID -> {conn: userID}
 }
 
-func NewCallHandler(bookingRepo *repository.BookingRepository, technicianRepo *repository.TechnicianRepository, consultRepo *repository.ConsultationRepository, accessSecret string) *CallHandler {
+func NewCallHandler(bookingRepo *repository.BookingRepository, technicianRepo *repository.TechnicianRepository, consultRepo *repository.ConsultationRepository, callLogRepo *repository.CallLogRepository, accessSecret string) *CallHandler {
 	return &CallHandler{
 		bookingRepo:    bookingRepo,
 		technicianRepo: technicianRepo,
 		consultRepo:    consultRepo,
+		callLogRepo:    callLogRepo,
 		accessSecret:   accessSecret,
 		rooms:          make(map[string]map[*websocket.Conn]string),
 	}
@@ -160,6 +167,9 @@ func (h *CallHandler) authorize(ctx context.Context, roomID, userID string) bool
 // present. Since the customer is always the offer-sender, that offer never got
 // sent and the call hung on "Connecting..." forever on both ends. Notifying
 // both sides removes any dependency on join order.
+//
+// The same "room reached 2" moment is also exactly "the call was answered" —
+// so this is where the call_logs row for this thread flips to 'received'.
 func (h *CallHandler) join(roomID string, conn *websocket.Conn, userID string) bool {
 	h.mu.Lock()
 	if h.rooms[roomID] == nil {
@@ -183,6 +193,14 @@ func (h *CallHandler) join(roomID string, conn *websocket.Conn, userID string) b
 	}
 	h.mu.Unlock()
 
+	if size == 2 && h.callLogRepo != nil {
+		go func() {
+			if err := h.callLogRepo.MarkAnswered(context.Background(), roomID); err != nil {
+				log.Printf("call log: mark answered failed: %v", err)
+			}
+		}()
+	}
+
 	for _, peer := range peers {
 		_ = peer.WriteMessage(websocket.TextMessage, []byte(`{"type":"peer-joined"}`))
 	}
@@ -191,6 +209,10 @@ func (h *CallHandler) join(roomID string, conn *websocket.Conn, userID string) b
 
 // leave removes a connection and tells the remaining peer (if any) that the call
 // ended, so their UI can hang up cleanly instead of hanging on a dead connection.
+//
+// When the room empties completely (both sides gone), that's "the call is
+// over" — close out its call_logs row. If it was never answered this settles
+// as 'missed'; if it was answered, it becomes 'received' with a duration.
 func (h *CallHandler) leave(roomID string, conn *websocket.Conn) {
 	h.mu.Lock()
 	room := h.rooms[roomID]
@@ -200,11 +222,20 @@ func (h *CallHandler) leave(roomID string, conn *websocket.Conn) {
 			delete(h.rooms, roomID)
 		}
 	}
-	peers := make([]*websocket.Conn, 0, len(room))
+	remaining := len(room)
+	peers := make([]*websocket.Conn, 0, remaining)
 	for c := range room {
 		peers = append(peers, c)
 	}
 	h.mu.Unlock()
+
+	if remaining == 0 && h.callLogRepo != nil {
+		go func() {
+			if err := h.callLogRepo.MarkEnded(context.Background(), roomID); err != nil {
+				log.Printf("call log: mark ended failed: %v", err)
+			}
+		}()
+	}
 
 	for _, peer := range peers {
 		_ = peer.WriteMessage(websocket.TextMessage, []byte(`{"type":"peer-left"}`))

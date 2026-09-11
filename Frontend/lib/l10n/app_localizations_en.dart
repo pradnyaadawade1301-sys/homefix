@@ -922,6 +922,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get consultTabVideo => 'Video';
 
   @override
+  String get consultTabCall => 'Call';
+
+  @override
+  String get consultNoCallsTitle => 'No calls yet';
+
+  @override
+  String get consultNoCallsSubtitle =>
+      'Once a technician is assigned to your booking, you\'ll be able to call them here.';
+
+  @override
   String get consultNoChatsTitle => 'No chats yet';
 
   @override

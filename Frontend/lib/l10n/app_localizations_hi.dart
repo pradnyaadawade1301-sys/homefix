@@ -922,6 +922,16 @@ class AppLocalizationsHi extends AppLocalizations {
   String get consultTabVideo => 'वीडियो';
 
   @override
+  String get consultTabCall => 'कॉल';
+
+  @override
+  String get consultNoCallsTitle => 'अभी तक कोई कॉल नहीं';
+
+  @override
+  String get consultNoCallsSubtitle =>
+      'जब आपकी बुकिंग के लिए टेक्नीशियन तय हो जाएगा, तो आप उन्हें यहाँ कॉल कर सकेंगे।';
+
+  @override
   String get consultNoChatsTitle => 'अभी तक कोई चैट नहीं';
 
   @override

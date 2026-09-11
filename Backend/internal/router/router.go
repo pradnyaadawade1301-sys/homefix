@@ -23,6 +23,7 @@ type Handlers struct {
 	Notification *handler.NotificationHandler
 	Upload       *handler.UploadHandler
 	Call         *handler.CallHandler
+	CallLog      *handler.CallLogHandler
 	Consultation *handler.ConsultationHandler
 	WebRTC       *handler.WebRTCHandler
 	Dispute      *handler.DisputeHandler
@@ -141,6 +142,9 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		// BookingService.InitiateCall figures out which one the caller is and
 		// rings the other side.
 		authed.POST("/bookings/:id/call/initiate", h.Booking.InitiateCall)
+		// Real call history (who called, when, missed/received) — same list for
+		// both customer and technician, scoped to whoever is authenticated.
+		authed.GET("/calls/history", h.CallLog.History)
 		// Service estimate: technician raises/revises it, customer approves or declines.
 		authed.POST("/bookings/:id/estimate", middleware.RequireRole("technician"), h.Booking.SubmitEstimate)
 		authed.GET("/bookings/:id/estimate", h.Booking.GetEstimate)

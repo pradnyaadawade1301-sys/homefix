@@ -18,11 +18,12 @@ type BookingService struct {
 	techRepo    *repository.TechnicianRepository
 	paymentRepo *repository.PaymentRepository
 	userRepo    *repository.UserRepository
+	callLogRepo *repository.CallLogRepository
 	fcm         *FirebaseService
 }
 
-func NewBookingService(bookingRepo *repository.BookingRepository, catRepo *repository.CategoryRepository, techRepo *repository.TechnicianRepository, paymentRepo *repository.PaymentRepository, userRepo *repository.UserRepository, fcm *FirebaseService) *BookingService {
-	return &BookingService{bookingRepo: bookingRepo, catRepo: catRepo, techRepo: techRepo, paymentRepo: paymentRepo, userRepo: userRepo, fcm: fcm}
+func NewBookingService(bookingRepo *repository.BookingRepository, catRepo *repository.CategoryRepository, techRepo *repository.TechnicianRepository, paymentRepo *repository.PaymentRepository, userRepo *repository.UserRepository, callLogRepo *repository.CallLogRepository, fcm *FirebaseService) *BookingService {
+	return &BookingService{bookingRepo: bookingRepo, catRepo: catRepo, techRepo: techRepo, paymentRepo: paymentRepo, userRepo: userRepo, callLogRepo: callLogRepo, fcm: fcm}
 }
 
 // Create makes a new booking. If preferredTechnicianID is non-empty (customer
@@ -424,6 +425,24 @@ func (s *BookingService) InitiateCall(ctx context.Context, callerUserID, booking
 	}
 	if !isCustomer && !callerIsTechnician {
 		return nil, errors.New("you are not a participant of this booking")
+	}
+
+	// Write the call_logs row up front. Whoever tapped "Call" is the caller;
+	// the other participant is the callee. This is what makes a missed call
+	// still show up in both sides' Call history.
+	if s.callLogRepo != nil {
+		calleeUserID := b.CustomerID
+		if isCustomer {
+			if t, err := s.techRepo.GetByID(ctx, *b.TechnicianID); err == nil && t != nil {
+				calleeUserID = t.UserID
+			}
+		}
+		if calleeUserID != "" && calleeUserID != callerUserID {
+			bID := bookingID
+			if _, err := s.callLogRepo.Create(ctx, &bID, nil, callerUserID, calleeUserID); err != nil {
+				log.Printf("call log: create failed: %v", err)
+			}
+		}
 	}
 
 	if s.fcm != nil {
