@@ -81,10 +81,18 @@ func (s *TechnicianService) SetAvailability(ctx context.Context, technicianID st
 	return s.techRepo.SetAvailability(ctx, technicianID, available)
 }
 
-// UpdateProfilePhoto changes (or, when photoURL is nil, removes) a technician's
-// profile photo shown to customers on the browse/detail screens.
-func (s *TechnicianService) UpdateProfilePhoto(ctx context.Context, technicianID string, photoURL *string) error {
-	return s.techRepo.UpdateProfilePhoto(ctx, technicianID, photoURL)
+// UpdateProfilePhoto lets a technician change or remove (photoURL == "") the
+// photo they set once during KYC registration — resolves the technician
+// row from their user id so they can only ever touch their own profile.
+func (s *TechnicianService) UpdateProfilePhoto(ctx context.Context, userID, photoURL string) error {
+	t, err := s.techRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if t == nil {
+		return errors.New("technician profile not found")
+	}
+	return s.techRepo.UpdateProfilePhoto(ctx, t.ID, photoURL)
 }
 
 // UpdateWorkingHours validates and persists a technician's self-set weekly
@@ -107,15 +115,6 @@ func (s *TechnicianService) Verify(ctx context.Context, technicianID, status, re
 		return errors.New(`status must be "approved" or "rejected"`)
 	}
 	return s.techRepo.SetApprovalStatus(ctx, technicianID, status, reason)
-}
-
-// SetVerifiedBadge is the separate, deliberate "give this technician the
-// blue tick" admin action — independent of KYC approval (see
-// TechnicianRepository.SetVerified). An admin typically only does this for
-// technicians that are already approved, but nothing here enforces that
-// ordering; it's just a flag flip.
-func (s *TechnicianService) SetVerifiedBadge(ctx context.Context, technicianID string, verified bool) error {
-	return s.techRepo.SetVerified(ctx, technicianID, verified)
 }
 
 func (s *TechnicianService) Reviews(ctx context.Context, technicianID string) ([]models.Review, error) {

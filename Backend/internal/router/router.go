@@ -101,13 +101,12 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 
 		authed.POST("/technicians", h.Technician.Register)
 		authed.GET("/technicians/me", h.Technician.Me)
+		authed.PUT("/technicians/me/photo", middleware.RequireRole("technician"), h.Technician.UpdatePhoto)
 		authed.GET("/technicians/available", h.Technician.FindAvailable)
 		authed.GET("/technicians/:id/reviews", h.Technician.Reviews)
 		authed.PATCH("/technicians/:id/availability", middleware.RequireRole("technician"), h.Technician.SetAvailability)
-		authed.PUT("/technicians/:id/photo", middleware.RequireRole("technician"), h.Technician.UpdatePhoto)
 		authed.PATCH("/technicians/:id/location", middleware.RequireRole("technician"), h.Technician.UpdateLocation)
 		authed.PATCH("/technicians/:id/verify", middleware.RequireRole("admin"), h.Technician.Verify)
-		authed.PATCH("/technicians/:id/verified-badge", middleware.RequireRole("admin"), h.Technician.SetVerifiedBadge)
 		authed.GET("/technicians/:id/bookings", middleware.RequireRole("technician", "admin"), h.Booking.TechnicianBookings)
 		authed.GET("/technicians/:id/repeat-customers", middleware.RequireRole("technician", "admin"), h.Booking.RepeatCustomers)
 		authed.GET("/technicians/:id/customers/:customerId/history", middleware.RequireRole("technician", "admin"), h.Booking.ServiceHistory)
@@ -151,6 +150,7 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		// signaling relay as booking calls (CallHandler.Signal accepts either a booking
 		// or a consultation id — see call_handler.go).
 		authed.POST("/consultations/request", h.Consultation.Request)
+		authed.GET("/consultations/mine", h.Consultation.Mine)
 		authed.GET("/consultations/pending", middleware.RequireRole("technician"), h.Consultation.Pending)
 		authed.GET("/consultations/:id", h.Consultation.Get)
 		authed.GET("/consultations/:id/call", h.Consultation.CallInfo)

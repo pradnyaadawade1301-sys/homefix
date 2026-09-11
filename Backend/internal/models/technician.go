@@ -28,11 +28,13 @@ type TechnicianPublic struct {
 	CategoryID      string    `json:"category_id"`
 	CategoryName    string    `json:"category_name"`
 	ExperienceYears int       `json:"experience_years"`
-	ProfilePhotoURL string    `json:"profile_photo_url,omitempty"`
 	RatingAvg       float64   `json:"rating_avg"`
 	RatingCount     int       `json:"rating_count"`
 	IsVerified      bool      `json:"is_verified"`
 	IsAvailable     bool      `json:"is_available"`
+	// ProfilePhotoURL lets the customer see who they're booking/talking to —
+	// same photo the technician sets/changes in their own profile.
+	ProfilePhotoURL string `json:"profile_photo_url,omitempty"`
 	// WorkingHours is the technician's self-set weekly schedule (display-only).
 	WorkingHours WorkingHours `json:"working_hours,omitempty"`
 	CreatedAt    time.Time    `json:"created_at"`
@@ -48,10 +50,10 @@ type TechnicianNearby struct {
 	CategoryID      string   `json:"category_id"`
 	CategoryName    string   `json:"category_name"`
 	ExperienceYears int      `json:"experience_years"`
-	ProfilePhotoURL string   `json:"profile_photo_url,omitempty"`
 	RatingAvg       float64  `json:"rating_avg"`
 	RatingCount     int      `json:"rating_count"`
 	IsAvailable     bool     `json:"is_available"`
+	ProfilePhotoURL string   `json:"profile_photo_url,omitempty"`
 	CurrentLat      *float64 `json:"current_lat,omitempty"`
 	CurrentLng      *float64 `json:"current_lng,omitempty"`
 	// DistanceKm is nil when the caller didn't supply lat/lng (results are then sorted by rating instead).

@@ -87,6 +87,29 @@ func (h *TechnicianHandler) Me(c *gin.Context) {
 	utils.Success(c, http.StatusOK, t)
 }
 
+type technicianPhotoBody struct {
+	// Empty string removes the photo (falls back to the name-initial avatar
+	// in the app) — same convention as UpdatePhoto on the user profile.
+	PhotoURL string `json:"photo_url"`
+}
+
+// UpdatePhoto lets a technician change or remove the profile photo they set
+// once during KYC registration — RegisterTechnician only ever sets it at
+// signup, so without this endpoint there was no way to change it afterwards.
+func (h *TechnicianHandler) UpdatePhoto(c *gin.Context) {
+	userID := c.GetString("user_id")
+	var body technicianPhotoBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.techService.UpdateProfilePhoto(c.Request.Context(), userID, body.PhotoURL); err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"message": "photo updated"})
+}
+
 func (h *TechnicianHandler) FindAvailable(c *gin.Context) {
 	categoryID := c.Query("category_id")
 	if categoryID == "" {
@@ -153,41 +176,6 @@ func (h *TechnicianHandler) SetAvailability(c *gin.Context) {
 		return
 	}
 	utils.Success(c, http.StatusOK, gin.H{"message": "availability updated"})
-}
-
-type updateTechPhotoBody struct {
-	// PhotoURL is the "url" returned by POST /api/v1/uploads. Send null/omit to
-	// remove the current photo — mirrors UserHandler.UpdatePhoto for customers.
-	PhotoURL *string `json:"photo_url"`
-}
-
-// UpdatePhoto lets a technician change or remove their own profile photo after
-// registration (previously only settable once, at KYC time). Like SetAvailability,
-// a technician can only update their OWN row.
-func (h *TechnicianHandler) UpdatePhoto(c *gin.Context) {
-	userID := c.GetString("user_id")
-	technicianID := c.Param("id")
-
-	self, err := h.techService.GetByUser(c.Request.Context(), userID)
-	if err != nil {
-		utils.Error(c, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if self == nil || self.ID != technicianID {
-		utils.Error(c, http.StatusForbidden, "you can only update your own profile photo")
-		return
-	}
-
-	var body updateTechPhotoBody
-	if err := c.ShouldBindJSON(&body); err != nil {
-		utils.Error(c, http.StatusBadRequest, err.Error())
-		return
-	}
-	if err := h.techService.UpdateProfilePhoto(c.Request.Context(), technicianID, body.PhotoURL); err != nil {
-		utils.Error(c, http.StatusInternalServerError, err.Error())
-		return
-	}
-	utils.Success(c, http.StatusOK, gin.H{"message": "photo updated"})
 }
 
 type workingHoursBody struct {
@@ -260,29 +248,6 @@ func (h *TechnicianHandler) Verify(c *gin.Context) {
 		return
 	}
 	utils.Success(c, http.StatusOK, gin.H{"message": "approval status updated", "status": body.Status})
-}
-
-type setVerifiedBadgeBody struct {
-	Verified bool `json:"verified"`
-}
-
-// SetVerifiedBadge is the "blue tick" toggle — separate from Verify (which
-// handles KYC approval/rejection). An admin uses this after reviewing a
-// technician's documents to explicitly grant/revoke the verified badge shown
-// on their profile and control whether they appear in the public "browse
-// technicians" listing.
-func (h *TechnicianHandler) SetVerifiedBadge(c *gin.Context) {
-	technicianID := c.Param("id")
-	var body setVerifiedBadgeBody
-	if err := c.ShouldBindJSON(&body); err != nil {
-		utils.Error(c, http.StatusBadRequest, err.Error())
-		return
-	}
-	if err := h.techService.SetVerifiedBadge(c.Request.Context(), technicianID, body.Verified); err != nil {
-		utils.Error(c, http.StatusBadRequest, err.Error())
-		return
-	}
-	utils.Success(c, http.StatusOK, gin.H{"message": "verified badge updated", "verified": body.Verified})
 }
 
 func (h *TechnicianHandler) Reviews(c *gin.Context) {

@@ -96,12 +96,12 @@ func (r *TechnicianRepository) ListAvailableByCategory(ctx context.Context, cate
 	var err error
 	if lat != nil && lng != nil {
 		query := `
-			SELECT id, name, category_id, category_name, experience_years, profile_photo_url,
-			       rating_avg, rating_count, is_available, current_lat, current_lng, distance_km
+			SELECT id, name, category_id, category_name, experience_years,
+			       rating_avg, rating_count, is_available, profile_photo_url, current_lat, current_lng, distance_km
 			FROM (
 				SELECT t.id, COALESCE(u.name,'') AS name, t.category_id, c.name AS category_name, t.experience_years,
-				       COALESCE(t.profile_photo_url,'') AS profile_photo_url,
-				       t.rating_avg, t.rating_count, t.is_available, t.current_lat, t.current_lng,
+				       t.rating_avg, t.rating_count, t.is_available, COALESCE(t.profile_photo_url,'') AS profile_photo_url,
+				       t.current_lat, t.current_lng,
 				       (6371 * acos(LEAST(1.0, GREATEST(-1.0,
 				           cos(radians($2)) * cos(radians(COALESCE(t.current_lat,$2))) *
 				           cos(radians(COALESCE(t.current_lng,$3)) - radians($3)) +
@@ -122,8 +122,7 @@ func (r *TechnicianRepository) ListAvailableByCategory(ctx context.Context, cate
 	} else {
 		rows, err = r.db.Query(ctx, `
 			SELECT t.id, COALESCE(u.name,''), t.category_id, c.name, t.experience_years,
-			       COALESCE(t.profile_photo_url,''),
-			       t.rating_avg, t.rating_count, t.is_available, t.current_lat, t.current_lng,
+			       t.rating_avg, t.rating_count, t.is_available, COALESCE(t.profile_photo_url,''), t.current_lat, t.current_lng,
 			       NULL::float8 AS distance_km
 			FROM technicians t
 			JOIN users u ON u.id = t.user_id
@@ -142,7 +141,7 @@ func (r *TechnicianRepository) ListAvailableByCategory(ctx context.Context, cate
 	for rows.Next() {
 		var t models.TechnicianNearby
 		if err := rows.Scan(&t.ID, &t.Name, &t.CategoryID, &t.CategoryName, &t.ExperienceYears,
-			&t.ProfilePhotoURL, &t.RatingAvg, &t.RatingCount, &t.IsAvailable, &t.CurrentLat, &t.CurrentLng, &t.DistanceKm); err != nil {
+			&t.RatingAvg, &t.RatingCount, &t.IsAvailable, &t.ProfilePhotoURL, &t.CurrentLat, &t.CurrentLng, &t.DistanceKm); err != nil {
 			return nil, err
 		}
 		out = append(out, t)
@@ -155,8 +154,7 @@ func (r *TechnicianRepository) ListAvailableByCategory(ctx context.Context, cate
 func (r *TechnicianRepository) ListPublic(ctx context.Context, categoryID string) ([]models.TechnicianPublic, error) {
 	query := `
 		SELECT t.id, COALESCE(u.name,''), t.category_id, c.name, t.experience_years,
-		       COALESCE(t.profile_photo_url,''),
-		       t.rating_avg, t.rating_count, t.is_verified, t.is_available, t.working_hours, t.created_at
+		       t.rating_avg, t.rating_count, t.is_verified, t.is_available, COALESCE(t.profile_photo_url,''), t.working_hours, t.created_at
 		FROM technicians t
 		JOIN users u ON u.id = t.user_id
 		JOIN categories c ON c.id = t.category_id
@@ -178,7 +176,7 @@ func (r *TechnicianRepository) ListPublic(ctx context.Context, categoryID string
 	for rows.Next() {
 		var t models.TechnicianPublic
 		if err := rows.Scan(&t.ID, &t.Name, &t.CategoryID, &t.CategoryName, &t.ExperienceYears,
-			&t.ProfilePhotoURL, &t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.WorkingHours, &t.CreatedAt); err != nil {
+			&t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.ProfilePhotoURL, &t.WorkingHours, &t.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, t)
@@ -191,14 +189,14 @@ func (r *TechnicianRepository) GetPublicByID(ctx context.Context, id string) (*m
 	var t models.TechnicianPublic
 	err := r.db.QueryRow(ctx, `
 		SELECT t.id, COALESCE(u.name,''), t.category_id, c.name, t.experience_years,
-		       COALESCE(t.profile_photo_url,''),
-		       t.rating_avg, t.rating_count, t.is_verified, t.is_available, t.working_hours, t.created_at
+		       t.rating_avg, t.rating_count, t.is_verified, t.is_available,
+		       COALESCE(t.profile_photo_url,''), t.working_hours, t.created_at
 		FROM technicians t
 		JOIN users u ON u.id = t.user_id
 		JOIN categories c ON c.id = t.category_id
 		WHERE t.id = $1
 	`, id).Scan(&t.ID, &t.Name, &t.CategoryID, &t.CategoryName, &t.ExperienceYears,
-		&t.ProfilePhotoURL, &t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.WorkingHours, &t.CreatedAt)
+		&t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.ProfilePhotoURL, &t.WorkingHours, &t.CreatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -208,20 +206,21 @@ func (r *TechnicianRepository) GetPublicByID(ctx context.Context, id string) (*m
 	return &t, nil
 }
 
-// UpdateProfilePhoto sets or clears (nil) the technician's profile photo — mirrors
-// UserRepository's UpdatePhotoURL for customers, so technicians can change/remove
-// their photo after registration instead of it being fixed at KYC time forever.
-func (r *TechnicianRepository) UpdateProfilePhoto(ctx context.Context, id string, photoURL *string) error {
-	url := ""
-	if photoURL != nil {
-		url = *photoURL
-	}
-	_, err := r.db.Exec(ctx, `UPDATE technicians SET profile_photo_url = $1, updated_at = now() WHERE id = $2`, url, id)
+func (r *TechnicianRepository) SetAvailability(ctx context.Context, id string, available bool) error {
+	_, err := r.db.Exec(ctx, `UPDATE technicians SET is_available = $1, updated_at = now() WHERE id = $2`, available, id)
 	return err
 }
 
-func (r *TechnicianRepository) SetAvailability(ctx context.Context, id string, available bool) error {
-	_, err := r.db.Exec(ctx, `UPDATE technicians SET is_available = $1, updated_at = now() WHERE id = $2`, available, id)
+// UpdateProfilePhoto lets a technician change or remove (photoURL == "") the
+// profile photo they set during KYC registration — RegisterTechnician only
+// sets it once at signup, so without this there's no way to ever change it
+// afterwards.
+func (r *TechnicianRepository) UpdateProfilePhoto(ctx context.Context, id, photoURL string) error {
+	var arg interface{}
+	if photoURL != "" {
+		arg = photoURL
+	}
+	_, err := r.db.Exec(ctx, `UPDATE technicians SET profile_photo_url = $1, updated_at = now() WHERE id = $2`, arg, id)
 	return err
 }
 
@@ -288,14 +287,5 @@ func (r *TechnicianRepository) SetApprovalStatus(ctx context.Context, id, status
 		SET approval_status = $1, rejection_reason = $2, is_verified = ($4 = 'approved'), updated_at = now()
 		WHERE id = $3
 	`, status, reason, id, status)
-	return err
-}
-
-// SetVerified toggles the technician's "verified" badge column directly, independent
-// of SetApprovalStatus. Used by TechnicianService.SetVerifiedBadge, which an admin
-// calls to give (or revoke) a "blue tick" style badge without touching whether the
-// technician is approved to operate at all.
-func (r *TechnicianRepository) SetVerified(ctx context.Context, id string, verified bool) error {
-	_, err := r.db.Exec(ctx, `UPDATE technicians SET is_verified = $1, updated_at = now() WHERE id = $2`, verified, id)
 	return err
 }
