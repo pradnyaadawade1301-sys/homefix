@@ -228,15 +228,12 @@ class TechnicianKycService {
     }
   }
 
-  /// Changes (photoUrl != null) or removes (photoUrl == null) the technician's
-  /// own profile photo — PUT /technicians/:id/photo. Unlike the KYC-time upload,
-  /// this can be called anytime after registration, like WhatsApp's avatar editor.
-  Future<void> updatePhoto(String technicianId, String? photoUrl) async {
+  /// Changes (or removes, when [photoUrl] is empty) the technician's own
+  /// profile photo — separate from the one-time photo set during
+  /// [uploadFile]+registration, this is PUT /technicians/me/photo.
+  Future<void> updateProfilePhoto(String photoUrl) async {
     try {
-      await _httpClient.put(
-        '${ApiConfig.technicianDetail}/$technicianId/photo',
-        data: {'photo_url': photoUrl},
-      );
+      await _httpClient.put('/technicians/me/photo', data: {'photo_url': photoUrl});
     } catch (e) {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
@@ -340,26 +337,12 @@ class UserService {
     }
   }
 
-  /// Uploads a picked image and returns its public URL, ready to pass to [updatePhoto].
-  Future<String> uploadPhoto(File file) async {
+  /// Changes (photoUrl non-empty) or removes (photoUrl == '') the user's own
+  /// profile photo — PUT /users/me/photo, separate from [updateProfile]
+  /// (name/email) so the app can update just the avatar in one call.
+  Future<void> updatePhoto(String photoUrl) async {
     try {
-      final filename = file.path.split(Platform.pathSeparator).last;
-      final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(file.path, filename: filename),
-      });
-      final response = await _httpClient.post(ApiConfig.uploads, data: formData);
-      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
-      return data['url'] as String;
-    } catch (e) {
-      throw Exception(ApiEnvelope.errorMessage(e));
-    }
-  }
-
-  /// Sets (photoUrl != null) or removes (photoUrl == null) the caller's own avatar —
-  /// like WhatsApp's "change photo" / "remove photo" — via PUT /users/me/photo.
-  Future<void> updatePhoto(String? photoUrl) async {
-    try {
-      await _httpClient.put(ApiConfig.userPhoto, data: {'photo_url': photoUrl});
+      await _httpClient.put('/users/me/photo', data: {'photo_url': photoUrl.isEmpty ? null : photoUrl});
     } catch (e) {
       throw Exception(ApiEnvelope.errorMessage(e));
     }

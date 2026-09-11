@@ -330,15 +330,12 @@ func (s *BookingService) AuthorizeCallParticipant(ctx context.Context, userID, b
 	return nil, errors.New("not a participant of this booking")
 }
 
-func (s *BookingService) InitiateCall(ctx context.Context, technicianUserID, bookingID string) (*models.Booking, error) {
-	tech, err := s.techRepo.GetByUserID(ctx, technicianUserID)
-	if err != nil {
-		return nil, err
-	}
-	if tech == nil {
-		return nil, errors.New("technician profile not found")
-	}
-
+// InitiateCall lets either side of an active booking (the customer or the
+// assigned technician) start an audio call about it — callerUserID is
+// whichever one tapped "Call"; the other side gets the "Incoming call" FCM
+// push and auto-joins the same /ws/call/:id room (see app.dart on the
+// Flutter side).
+func (s *BookingService) InitiateCall(ctx context.Context, callerUserID, bookingID string) (*models.Booking, error) {
 	detail, err := s.GetDetail(ctx, bookingID)
 	if err != nil {
 		return nil, err
@@ -347,8 +344,8 @@ func (s *BookingService) InitiateCall(ctx context.Context, technicianUserID, boo
 		return nil, errors.New("booking not found")
 	}
 	b := &detail.Booking
-	if b.TechnicianID == nil || *b.TechnicianID != tech.ID {
-		return nil, errors.New("you are not assigned to this booking")
+	if b.TechnicianID == nil {
+		return nil, errors.New("no technician is assigned to this booking yet")
 	}
 	switch b.Status {
 	case models.BookingAccepted, models.BookingOnTheWay, models.BookingArrived, models.BookingInspecting, models.BookingInProgress:
@@ -357,19 +354,58 @@ func (s *BookingService) InitiateCall(ctx context.Context, technicianUserID, boo
 		return nil, errors.New("a call can only be started while the job is active")
 	}
 
-	if s.fcm != nil {
-		technicianName := "Your technician"
-		if detail.Technician != nil && detail.Technician.Name != "" {
-			technicianName = detail.Technician.Name
+	isCustomer := callerUserID == b.CustomerID
+	var callerIsTechnician bool
+	var tech *models.Technician
+	if !isCustomer {
+		tech, err = s.techRepo.GetByUserID(ctx, callerUserID)
+		if err != nil {
+			return nil, err
 		}
-		_ = s.fcm.SendToUser(ctx, b.CustomerID, "Incoming call",
-			technicianName+" is calling you about your booking.",
-			map[string]string{
-				"type":            "booking_call_incoming",
-				"booking_id":      bookingID,
-				"technician_name": technicianName,
-				"call_type":       "audio",
-			})
+		if tech != nil && *b.TechnicianID == tech.ID {
+			callerIsTechnician = true
+		}
+	}
+	if !isCustomer && !callerIsTechnician {
+		return nil, errors.New("you are not a participant of this booking")
+	}
+
+	if s.fcm != nil {
+		if isCustomer {
+			// Customer is calling — ring the assigned technician.
+			customerName := "Your customer"
+			if detail.Customer != nil && detail.Customer.Name != "" {
+				customerName = detail.Customer.Name
+			}
+			technicianUserID := ""
+			if t, err := s.techRepo.GetByID(ctx, *b.TechnicianID); err == nil && t != nil {
+				technicianUserID = t.UserID
+			}
+			if technicianUserID != "" {
+				_ = s.fcm.SendToUser(ctx, technicianUserID, "Incoming call",
+					customerName+" is calling you about the booking.",
+					map[string]string{
+						"type":          "booking_call_incoming",
+						"booking_id":    bookingID,
+						"customer_name": customerName,
+						"call_type":     "audio",
+					})
+			}
+		} else {
+			// Technician is calling — ring the customer.
+			technicianName := "Your technician"
+			if detail.Technician != nil && detail.Technician.Name != "" {
+				technicianName = detail.Technician.Name
+			}
+			_ = s.fcm.SendToUser(ctx, b.CustomerID, "Incoming call",
+				technicianName+" is calling you about your booking.",
+				map[string]string{
+					"type":            "booking_call_incoming",
+					"booking_id":      bookingID,
+					"technician_name": technicianName,
+					"call_type":       "audio",
+				})
+		}
 	}
 	return b, nil
 }

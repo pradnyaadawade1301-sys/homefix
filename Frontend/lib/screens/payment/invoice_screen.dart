@@ -420,7 +420,7 @@ class _InvoiceBody extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(Icons.verified_user_outlined, color: AppTheme.successColor, size: 22),
+                const Icon(Icons.verified_user_outlined, color: AppTheme.successColor, size: 22),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -430,7 +430,7 @@ class _InvoiceBody extends StatelessWidget {
                         invoice.warrantyDays != null
                             ? 'Covered by a ${invoice.warrantyDays}-day warranty'
                             : 'This service is covered by warranty',
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: AppTheme.successColor),
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: AppTheme.successColor),
                       ),
                       if (invoice.warrantyExpiresAt != null) ...[
                         const SizedBox(height: 2),

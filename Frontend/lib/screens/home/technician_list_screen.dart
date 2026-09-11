@@ -289,15 +289,10 @@ class _RecommendedTechCard extends StatelessWidget {
                 CircleAvatar(
                   radius: 30,
                   backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.15),
-                  backgroundImage: technician.profilePhotoUrl != null
-                      ? NetworkImage(technician.profilePhotoUrl!)
-                      : null,
-                  child: technician.profilePhotoUrl == null
-                      ? Text(
-                          technician.name.isNotEmpty ? technician.name[0].toUpperCase() : '?',
-                          style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 22),
-                        )
-                      : null,
+                  child: Text(
+                    technician.name.isNotEmpty ? technician.name[0].toUpperCase() : '?',
+                    style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 22),
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -386,11 +381,11 @@ class _TechCard extends StatelessWidget {
         categoryId: technician.categoryId,
         categoryName: technician.categoryName,
         experienceYears: technician.experienceYears,
-        profilePhotoUrl: technician.profilePhotoUrl,
         ratingAvg: technician.ratingAvg,
         ratingCount: technician.ratingCount,
         isVerified: false,
         isAvailable: technician.isAvailable,
+        profilePhotoUrl: technician.profilePhotoUrl,
         createdAt: DateTime.now(),
       ),
       etaMinutes: etaMinutes,
@@ -421,15 +416,10 @@ class _TechCard extends StatelessWidget {
             CircleAvatar(
               radius: 28,
               backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
-              backgroundImage: technician.profilePhotoUrl != null
-                  ? NetworkImage(technician.profilePhotoUrl!)
-                  : null,
-              child: technician.profilePhotoUrl == null
-                  ? Text(
-                      technician.name.isNotEmpty ? technician.name[0].toUpperCase() : '?',
-                      style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 18),
-                    )
-                  : null,
+              child: Text(
+                technician.name.isNotEmpty ? technician.name[0].toUpperCase() : '?',
+                style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 18),
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(

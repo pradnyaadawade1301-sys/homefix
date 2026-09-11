@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
+import '../../core/booking_call_launcher.dart';
 import '../chat/booking_chat_screen.dart';
 import 'job_brief_card.dart';
 import 'technician_jobs_screen.dart' show JobActionRow;
@@ -228,6 +229,18 @@ class TechnicianJobDetailScreen extends StatelessWidget {
                                     peerName: customer.name.isNotEmpty ? customer.name : 'Customer',
                                   ),
                                 )),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.call_outlined, size: 16),
+                                label: const Text('Call'),
+                                onPressed: () => startBookingAudioCall(
+                                  context,
+                                  bookingId: current.id,
+                                  peerDisplayName: customer.name.isNotEmpty ? customer.name : 'Customer',
+                                ),
                               ),
                             ),
                           ],

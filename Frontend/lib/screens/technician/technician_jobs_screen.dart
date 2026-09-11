@@ -165,7 +165,7 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
   }
 
   Future<void> _confirmLogout() async {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -215,7 +215,7 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
     if (_lastBackPress == null || now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
       _lastBackPress = now;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.homePressBackExit), duration: const Duration(seconds: 2)),
+        SnackBar(content: Text(AppLocalizations.of(context).homePressBackExit), duration: const Duration(seconds: 2)),
       );
       return;
     }
@@ -224,7 +224,7 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) => _handleBack(didPop),
@@ -286,7 +286,7 @@ icon: const Icon(Icons.language_rounded),
   }
 
   Widget _buildGreetingHeader() {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return Consumer<BookingProvider>(
       builder: (context, provider, _) {
         final activeCount = provider.bookings
@@ -350,7 +350,7 @@ icon: const Icon(Icons.language_rounded),
   }
 
   Widget _buildJobsBody() {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return Column(
       children: [
         _buildGreetingHeader(),
@@ -475,7 +475,7 @@ icon: const Icon(Icons.language_rounded),
   }
 
   Widget _buildConsultationBanner() {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
       child: InkWell(
@@ -545,7 +545,7 @@ icon: const Icon(Icons.language_rounded),
   }
 
   Widget _buildUpcomingBanner() {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
       child: InkWell(
@@ -645,7 +645,7 @@ class _JobCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final customer = booking.customer;
     return InkWell(
       borderRadius: BorderRadius.circular(16),
@@ -776,7 +776,7 @@ class JobActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final provider = context.read<BookingProvider>();
     final kycProfile = context.watch<TechnicianKycProvider>().profile;
 
@@ -882,7 +882,7 @@ class JobActionRow extends StatelessWidget {
     String bookingId,
     String technicianId,
   ) async {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -988,7 +988,7 @@ class _InvoiceDialogState extends State<_InvoiceDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return AlertDialog(
       title: Text(l10n.techJobsGenerateInvoiceTitle),
       content: SingleChildScrollView(
@@ -1042,7 +1042,7 @@ class _InvoiceDialogState extends State<_InvoiceDialog> {
                   Expanded(
                     flex: 3,
                     child: DropdownButtonFormField<_WarrantyUnit>(
-                      value: _warrantyUnit,
+                      initialValue: _warrantyUnit,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
                         isDense: true,
@@ -1162,7 +1162,7 @@ class _OtpVerifyRowState extends State<_OtpVerifyRow> {
   }
 
   Future<void> _submit() async {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final otp = _controller.text.trim();
     if (widget.technicianId == null) return;
     if (otp.length != 4) {
@@ -1184,7 +1184,7 @@ class _OtpVerifyRowState extends State<_OtpVerifyRow> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

@@ -229,7 +229,7 @@ class _HomeTab extends StatefulWidget {
   final GlobalKey? categoriesKey;
   final GlobalKey? notificationKey;
 
-  const _HomeTab({this.promoKey}) : searchKey = null, categoriesKey = null, notificationKey = null;
+  const _HomeTab() : promoKey = null, searchKey = null, categoriesKey = null, notificationKey = null;
 
   @override
   State<_HomeTab> createState() => _HomeTabState();

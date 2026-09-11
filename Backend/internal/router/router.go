@@ -137,7 +137,10 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		// BookingService.InitiateCall) — reuses the same /ws/call/:id relay
 		// as Live Video Consultations.
 		authed.GET("/bookings/:id/call", h.Booking.CallInfo)
-		authed.POST("/bookings/:id/call/initiate", middleware.RequireRole("technician"), h.Booking.InitiateCall)
+		// Either the customer or the assigned technician may start the call —
+		// BookingService.InitiateCall figures out which one the caller is and
+		// rings the other side.
+		authed.POST("/bookings/:id/call/initiate", h.Booking.InitiateCall)
 		// Service estimate: technician raises/revises it, customer approves or declines.
 		authed.POST("/bookings/:id/estimate", middleware.RequireRole("technician"), h.Booking.SubmitEstimate)
 		authed.GET("/bookings/:id/estimate", h.Booking.GetEstimate)

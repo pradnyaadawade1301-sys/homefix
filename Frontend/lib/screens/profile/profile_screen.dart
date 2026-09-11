@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../models/user_model.dart';
+import '../../services/service_locator.dart' show UploadService;
 import '../booking/bookings_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../technician/technician_jobs_screen.dart';
@@ -20,7 +21,6 @@ import '../change_password_screen.dart';
 import '../service_history_screen.dart';
 import '../payment_methods_screen.dart';
 import '../payment/transaction_history_screen.dart';
-import '../privacy_security_screen.dart';
 import '../help_center_screen.dart';
 import '../contact_support_screen.dart';
 import '../home/home_screen.dart';
@@ -274,11 +274,146 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
 typedef _OpenPlaceholder = void Function(String title, IconData icon);
 
+/// WhatsApp-style "View / Change / Remove" photo sheet, shared by the
+/// into a public URL (UploadService.uploadFile), [save] persists that URL
+/// (or '' to remove) against the right backend row for that role, and
+/// [onUploadingChanged] lets the caller show a spinner on the avatar while
+/// the network calls are in flight.
+///
+/// Every `await` below is followed by a `context.mounted` check before the
+/// context is touched again — without that, tapping the sheet and then
+/// navigating away (or the sheet closing) while the upload/save is still in
+/// flight throws on a deactivated widget's ancestor, which is the most
+/// common way this kind of flow crashes the whole screen.
+Future<void> _showProfilePhotoSheet(
+  BuildContext context, {
+  required String? photoUrl,
+  required Future<String?> Function(File) upload,
+  required Future<bool> Function(String photoUrl) save,
+  required void Function(bool) onUploadingChanged,
+}) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final choice = await showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+            ),
+            if (photoUrl != null && photoUrl.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.visibility_outlined),
+                title: const Text('View Photo'),
+                onTap: () => Navigator.pop(sheetContext, 'view'),
+              ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(sheetContext, 'gallery'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Take Photo'),
+              onTap: () => Navigator.pop(sheetContext, 'camera'),
+            ),
+            if (photoUrl != null && photoUrl.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded, color: AppTheme.errorColor),
+                title: const Text('Remove Photo', style: TextStyle(color: AppTheme.errorColor)),
+                onTap: () => Navigator.pop(sheetContext, 'remove'),
+              ),
+            ListTile(
+              leading: const Icon(Icons.close_rounded),
+              title: const Text('Cancel'),
+              onTap: () => Navigator.pop(sheetContext, null),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  if (choice == null) return;
+
+  if (choice == 'view') {
+    if (!context.mounted || photoUrl == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: GestureDetector(
+          onTap: () => Navigator.of(context).pop(),
+          child: InteractiveViewer(
+            child: Image.network(
+              photoUrl,
+              errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, color: Colors.white, size: 48),
+            ),
+          ),
+        ),
+      ),
+    );
+    return;
+  }
+
+  if (choice == 'remove') {
+    onUploadingChanged(true);
+    try {
+      final ok = await save('');
+      if (!context.mounted) return;
+      if (!ok) messenger.showSnackBar(const SnackBar(content: Text('Could not remove photo. Please try again.')));
+    } catch (e) {
+      if (context.mounted) messenger.showSnackBar(SnackBar(content: Text('Could not remove photo: $e')));
+    } finally {
+      onUploadingChanged(false);
+    }
+    return;
+  }
+
+  // 'gallery' or 'camera'
+  XFile? picked;
+  try {
+    picked = await ImagePicker().pickImage(
+      source: choice == 'camera' ? ImageSource.camera : ImageSource.gallery,
+      maxWidth: 1280,
+      imageQuality: 85,
+    );
+  } catch (e) {
+    if (context.mounted) messenger.showSnackBar(SnackBar(content: Text('Could not open ${choice == 'camera' ? 'camera' : 'gallery'}: $e')));
+    return;
+  }
+  if (picked == null) return; // user backed out of the native picker
+
+  onUploadingChanged(true);
+  try {
+    final url = await upload(File(picked.path));
+    if (url == null || url.isEmpty) {
+      if (context.mounted) messenger.showSnackBar(const SnackBar(content: Text('Upload failed. Please try again.')));
+      return;
+    }
+    final ok = await save(url);
+    if (!context.mounted) return;
+    if (!ok) messenger.showSnackBar(const SnackBar(content: Text('Could not save photo. Please try again.')));
+  } catch (e) {
+    if (context.mounted) messenger.showSnackBar(SnackBar(content: Text('Could not update photo: $e')));
+  } finally {
+    onUploadingChanged(false);
+  }
+}
+
 // ============================================================================
 // CUSTOMER PROFILE
 // ============================================================================
 
-class _CustomerProfileBody extends StatelessWidget {
+class _CustomerProfileBody extends StatefulWidget {
   final User user;
   final VoidCallback onLogout;
   final VoidCallback onDelete;
@@ -298,30 +433,37 @@ class _CustomerProfileBody extends StatelessWidget {
   });
 
   @override
+  State<_CustomerProfileBody> createState() => _CustomerProfileBodyState();
+}
+
+class _CustomerProfileBodyState extends State<_CustomerProfileBody> {
+  bool _uploadingPhoto = false;
+
+  @override
   Widget build(BuildContext context) {
+    final user = widget.user;
     final l10n = AppLocalizations.of(context);
+    final uploadService = context.read<UploadService>();
+    final userProvider = context.read<UserProvider>();
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
       children: [
-        Consumer<UserProvider>(
-          builder: (context, userProvider, _) {
-            final current = userProvider.user ?? user;
-            final hasPhoto = current.photoUrl != null && current.photoUrl!.isNotEmpty;
-            return _ProfileHeader(
-              name: current.name.isNotEmpty ? current.name : 'Guest',
-              subtitle: current.phone,
-              roleLabel: l10n.profileCustomerRole,
-              photoUrl: hasPhoto ? current.photoUrl : null,
-              verifiedBadge: current.phoneVerified,
-              isSavingPhoto: userProvider.isSavingPhoto,
-              onEditPhoto: () => showAvatarEditSheet(
-                context,
-                hasPhoto: hasPhoto,
-                onChangePhoto: (file) => userProvider.changePhoto(file),
-                onRemovePhoto: () => userProvider.removePhoto(),
-              ),
-            );
-          },
+        _ProfileHeader(
+          name: user.name.isNotEmpty ? user.name : 'Guest',
+          subtitle: user.phone,
+          roleLabel: l10n.profileCustomerRole,
+          photoUrl: (user.photoUrl != null && user.photoUrl!.isNotEmpty) ? user.photoUrl : null,
+          verifiedBadge: user.phoneVerified,
+          isUploading: _uploadingPhoto,
+          onEditPhoto: () => _showProfilePhotoSheet(
+            context,
+            photoUrl: user.photoUrl,
+            upload: uploadService.uploadFile,
+            save: userProvider.updatePhoto,
+            onUploadingChanged: (v) {
+              if (mounted) setState(() => _uploadingPhoto = v);
+            },
+          ),
         ),
         const SizedBox(height: 16),
         _SectionCard(
@@ -344,7 +486,7 @@ class _CustomerProfileBody extends StatelessWidget {
             _ActionTile(
               icon: Icons.history_rounded,
               label: l10n.profileServiceHistory,
-              onTap: () => openScreen(const ServiceHistoryScreen()),
+              onTap: () => widget.openScreen(const ServiceHistoryScreen()),
             ),
             _ActionTile(
               icon: Icons.calendar_month_outlined,
@@ -356,12 +498,12 @@ class _CustomerProfileBody extends StatelessWidget {
             _ActionTile(
               icon: Icons.payment_outlined,
               label: l10n.profilePaymentMethods,
-              onTap: () => openScreen(const PaymentMethodsScreen()),
+              onTap: () => widget.openScreen(const PaymentMethodsScreen()),
             ),
             _ActionTile(
               icon: Icons.receipt_long_outlined,
               label: l10n.profileTransactionHistory,
-              onTap: () => openScreen(const TransactionHistoryScreen()),
+              onTap: () => widget.openScreen(const TransactionHistoryScreen()),
             ),
           ],
         ),
@@ -379,7 +521,7 @@ class _CustomerProfileBody extends StatelessWidget {
             _ActionTile(
               icon: Icons.explore_outlined,
               label: l10n.profileReplayTour,
-              onTap: onReplayTour,
+              onTap: widget.onReplayTour,
             ),
             _ActionTile(
               icon: Icons.language_rounded,
@@ -395,13 +537,13 @@ class _CustomerProfileBody extends StatelessWidget {
             _ActionTile(
               icon: Icons.help_outline_rounded,
               label: l10n.profileHelpCenter,
-              onTap: () => openScreen(const HelpCenterScreen()),
+              onTap: () => widget.openScreen(const HelpCenterScreen()),
             ),
             
             _ActionTile(
               icon: Icons.support_agent_outlined,
               label: l10n.profileContactSupport,
-              onTap: () => openScreen(const ContactSupportScreen()),
+              onTap: () => widget.openScreen(const ContactSupportScreen()),
             ),
             _ActionTile(
               icon: Icons.description_outlined,
@@ -424,7 +566,7 @@ class _CustomerProfileBody extends StatelessWidget {
           width: double.infinity,
           height: 52,
           child: OutlinedButton.icon(
-            onPressed: onLogout,
+            onPressed: widget.onLogout,
             icon: const Icon(Icons.logout_rounded, color: AppTheme.errorColor),
             label: Text(l10n.profileLogout, style: const TextStyle(color: AppTheme.errorColor)),
             style: OutlinedButton.styleFrom(side: const BorderSide(color: AppTheme.errorColor)),
@@ -432,7 +574,7 @@ class _CustomerProfileBody extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         TextButton(
-          onPressed: onDelete,
+          onPressed: widget.onDelete,
           child: Text(l10n.profileDeleteAccount, style: const TextStyle(color: Colors.grey)),
         ),
       ],
@@ -469,6 +611,7 @@ class _TechnicianProfileBody extends StatefulWidget {
 
 class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
   bool _togglingAvailability = false;
+  bool _uploadingPhoto = false;
 
   Future<void> _onToggleAvailability(bool value) async {
     if (_togglingAvailability) return;
@@ -564,12 +707,15 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
               roleLabel: categoryName,
               photoUrl: profile.profilePhotoUrl.isNotEmpty ? profile.profilePhotoUrl : null,
               verifiedBadge: profile.isVerified,
-              isSavingPhoto: kycProvider.isUploading,
-              onEditPhoto: () => showAvatarEditSheet(
+              isUploading: _uploadingPhoto,
+              onEditPhoto: () => _showProfilePhotoSheet(
                 context,
-                hasPhoto: profile.profilePhotoUrl.isNotEmpty,
-                onChangePhoto: (file) => kycProvider.changePhoto(file),
-                onRemovePhoto: () => kycProvider.removePhoto(),
+                photoUrl: profile.profilePhotoUrl.isNotEmpty ? profile.profilePhotoUrl : null,
+                upload: context.read<UploadService>().uploadFile,
+                save: kycProvider.updateProfilePhoto,
+                onUploadingChanged: (v) {
+                  if (mounted) setState(() => _uploadingPhoto = v);
+                },
               ),
               extra: Wrap(
                 alignment: WrapAlignment.center,
@@ -689,17 +835,6 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
               title: l10n.profileSectionAppSettings,
               children: [
                 _ActionTile(
-                  icon: Icons.notifications_outlined,
-                  label: l10n.profileNotificationSettings,
-                  onTap: () => widget.openPlaceholder(l10n.profileNotificationSettings, Icons.notifications_outlined),
-                ),
-             
-                _ActionTile(
-                  icon: Icons.privacy_tip_outlined,
-                  label: l10n.profilePrivacySecurity,
-                  onTap: () => widget.openScreen(const PrivacySecurityScreen()),
-                ),
-                _ActionTile(
                   icon: Icons.explore_outlined,
                   label: l10n.profileReplayTour,
                   onTap: widget.onReplayTour,
@@ -708,11 +843,6 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                   icon: Icons.language_rounded,
                   label: l10n.profileLanguage,
                   onTap: () => showLanguagePicker(context),
-                ),
-                _ActionTile(
-                  icon: Icons.lock_outline_rounded,
-                  label: l10n.profileChangePasswordPin,
-                  onTap: widget.openChangePassword,
                 ),
               ],
             ),
@@ -774,8 +904,11 @@ class _ProfileHeader extends StatelessWidget {
   final String? photoUrl;
   final bool verifiedBadge;
   final Widget? extra;
+  // When provided, the avatar becomes tappable (camera badge shown) and
+  // this opens the View/Change/Remove Photo sheet. Null hides the badge
+  // entirely for screens with no photo-edit capability.
   final VoidCallback? onEditPhoto;
-  final bool isSavingPhoto;
+  final bool isUploading;
 
   const _ProfileHeader({
     required this.name,
@@ -785,11 +918,20 @@ class _ProfileHeader extends StatelessWidget {
     required this.verifiedBadge,
     this.extra,
     this.onEditPhoto,
-    this.isSavingPhoto = false,
+    this.isUploading = false,
   });
 
   static const Color _accent = Color(0xFF0F766E);
   static const Color _accentDark = Color(0xFF115E59);
+
+  Widget _initialAvatar() => Container(
+        color: _accent.withValues(alpha: 0.1),
+        alignment: Alignment.center,
+        child: Text(
+          name.isNotEmpty ? name[0].toUpperCase() : '?',
+          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: _accent),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -808,7 +950,6 @@ class _ProfileHeader extends StatelessWidget {
       child: Column(
         children: [
           Stack(
-            clipBehavior: Clip.none,
             children: [
               GestureDetector(
                 onTap: onEditPhoto,
@@ -821,32 +962,47 @@ class _ProfileHeader extends StatelessWidget {
                     boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 10, offset: const Offset(0, 4))],
                   ),
                   padding: const EdgeInsets.all(3),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: _accent.withValues(alpha: 0.1),
-                        backgroundImage: photoUrl != null ? NetworkImage(photoUrl!) : null,
-                        child: photoUrl == null
-                            ? Text(
-                                name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: _accent),
+                  child: ClipOval(
+                    child: isUploading
+                        ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.4)))
+                        : (photoUrl != null
+                            ? Image.network(
+                                photoUrl!,
+                                width: 78,
+                                height: 78,
+                                fit: BoxFit.cover,
+                                // A broken/expired URL should never leave the
+                                // avatar visually blank (see the technician
+                                // profile bug where profile_photo_url pointed
+                                // at a dead link) — fall back to the
+                                // name-initial avatar instead.
+                                errorBuilder: (context, error, stack) => _initialAvatar(),
+                                loadingBuilder: (context, child, progress) =>
+                                    progress == null ? child : _initialAvatar(),
                               )
-                            : null,
-                      ),
-                      if (isSavingPhoto)
-                        Container(
-                          decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withValues(alpha: 0.35)),
-                          child: const Padding(
-                            padding: EdgeInsets.all(24),
-                            child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
-                          ),
-                        ),
-                    ],
+                            : _initialAvatar()),
                   ),
                 ),
               ),
-              if (verifiedBadge)
+              if (onEditPhoto != null)
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: GestureDetector(
+                    onTap: onEditPhoto,
+                    child: Container(
+                      width: 26,
+                      height: 26,
+                      decoration: const BoxDecoration(
+                        color: _accent,
+                        shape: BoxShape.circle,
+                        border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 2)),
+                      ),
+                      child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 13),
+                    ),
+                  ),
+                )
+              else if (verifiedBadge)
                 Positioned(
                   bottom: 2,
                   right: 2,
@@ -854,23 +1010,6 @@ class _ProfileHeader extends StatelessWidget {
                     padding: const EdgeInsets.all(3),
                     decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                     child: const Icon(Icons.verified_rounded, color: _accent, size: 18),
-                  ),
-                ),
-              if (onEditPhoto != null)
-                Positioned(
-                  bottom: -2,
-                  left: -2,
-                  child: GestureDetector(
-                    onTap: onEditPhoto,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: _accent, width: 1.5),
-                      ),
-                      child: const Icon(Icons.camera_alt_rounded, color: _accent, size: 15),
-                    ),
                   ),
                 ),
             ],
@@ -898,77 +1037,6 @@ class _ProfileHeader extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-/// Opens a WhatsApp-style bottom sheet ("Take Photo" / "Choose from Gallery" /
-/// "Remove Photo") and drives [onChangePhoto] or [onRemovePhoto] based on the
-/// pick. Shared by the customer and technician profile headers.
-Future<void> showAvatarEditSheet(
-  BuildContext context, {
-  required bool hasPhoto,
-  required Future<bool> Function(File file) onChangePhoto,
-  required Future<bool> Function() onRemovePhoto,
-}) async {
-  final picker = ImagePicker();
-  final action = await showModalBottomSheet<String>(
-    context: context,
-    backgroundColor: Colors.white,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-    builder: (sheetContext) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
-              ),
-              ListTile(
-                leading: const Icon(Icons.camera_alt_rounded, color: AppTheme.primaryColor),
-                title: const Text('Take Photo', style: TextStyle(fontWeight: FontWeight.w600)),
-                onTap: () => Navigator.pop(sheetContext, 'camera'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_rounded, color: AppTheme.primaryColor),
-                title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w600)),
-                onTap: () => Navigator.pop(sheetContext, 'gallery'),
-              ),
-              if (hasPhoto)
-                ListTile(
-                  leading: const Icon(Icons.delete_outline_rounded, color: AppTheme.errorColor),
-                  title: const Text('Remove Photo', style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.errorColor)),
-                  onTap: () => Navigator.pop(sheetContext, 'remove'),
-                ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-
-  if (action == null || !context.mounted) return;
-
-  if (action == 'remove') {
-    final ok = await onRemovePhoto();
-    if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Could not remove photo. Please try again.')));
-    }
-    return;
-  }
-
-  final source = action == 'camera' ? ImageSource.camera : ImageSource.gallery;
-  final picked = await picker.pickImage(source: source, imageQuality: 85);
-  if (picked == null || !context.mounted) return;
-  final ok = await onChangePhoto(File(picked.path));
-  if (!ok && context.mounted) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Could not update photo. Please try again.')));
   }
 }
 

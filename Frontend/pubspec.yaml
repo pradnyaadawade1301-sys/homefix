@@ -74,6 +74,9 @@ dependencies:
 
   # Image & Media
   image_picker: ^1.0.4
+  # Crop UI shown after picking a profile photo — WhatsApp-style square/circle
+  # crop-to-adjust before upload, used by showAvatarEditSheet in profile_screen.dart.
+  image_cropper: ^8.0.2
   cached_network_image: ^3.3.0
 
   # Audio recording — "Record voice description" on Issue Details screen,

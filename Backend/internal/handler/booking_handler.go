@@ -482,11 +482,11 @@ func (h *BookingHandler) CallInfo(c *gin.Context) {
 	})
 }
 
-// InitiateCall - POST /bookings/:id/call/initiate (technician only). Notifies
-// the customer via FCM that their technician is calling — see
-// BookingService.InitiateCall for the validation (must be the assigned
-// technician, booking must be active) — and returns the same
-// booking+ice_servers+room_id shape as CallInfo so the technician's app can
+// InitiateCall - POST /bookings/:id/call/initiate. Either the customer or the
+// assigned technician may call this — see BookingService.InitiateCall, which
+// figures out which one the caller is, validates the booking is active, and
+// notifies the *other* side via FCM. Returns the same
+// booking+ice_servers+room_id shape as CallInfo so the caller's app can
 // immediately join the call room without a second round trip.
 func (h *BookingHandler) InitiateCall(c *gin.Context) {
 	userID := c.GetString("user_id")

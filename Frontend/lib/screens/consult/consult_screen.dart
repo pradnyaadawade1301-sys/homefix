@@ -165,6 +165,22 @@ class _ChatRow extends StatelessWidget {
                   ],
                 ),
               ),
+              if (booking.unreadMessageCount > 0) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  constraints: const BoxConstraints(minWidth: 22),
+                  child: Text(
+                    booking.unreadMessageCount > 99 ? '99+' : '${booking.unreadMessageCount}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
               const Icon(Icons.chevron_right_rounded, color: Colors.grey),
             ],
           ),

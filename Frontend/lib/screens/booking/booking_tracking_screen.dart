@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/booking_call_launcher.dart';
 import '../../core/theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
@@ -975,6 +976,19 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
               ],
             ),
           ),
+     Container(
+  margin: const EdgeInsets.only(right: 8),
+  decoration: const BoxDecoration(color: AppTheme.primaryColor, shape: BoxShape.circle),
+  child: IconButton(
+    icon: const Icon(Icons.call_rounded, color: Colors.white, size: 18),
+    tooltip: 'Call',
+    onPressed: () => startBookingAudioCall(
+      context,
+      bookingId: widget.bookingId,
+      peerDisplayName: tech.name.isNotEmpty ? tech.name : 'Technician',
+    ),
+  ),
+),
      Container(
   decoration: const BoxDecoration(color: AppTheme.primaryColor, shape: BoxShape.circle),
   child: IconButton(

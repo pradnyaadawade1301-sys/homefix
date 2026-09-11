@@ -153,13 +153,16 @@ class _MyAppState extends State<MyApp> {
       app.navigatorKey.currentState?.pushNamed('/consultation-requests');
     };
 
-    // Wire up a technician's "Audio Call" about an active booking: ring,
-    // fetch ICE servers + confirm we're actually a participant (see
-    // BookingService.getCallInfo -> GET /bookings/:id/call), then jump
-    // straight into the audio-only call screen — the customer shouldn't
-    // have to tap anything to answer, same as the consultation flow above,
-    // just going directly to the call instead of a request-list screen
-    // since there's nothing to accept/decline here.
+    // Wire up an "Audio Call" about an active booking — either side
+    // (technician or customer) may have started it (see
+    // BookingService.InitiateCall on the backend), so this fires for
+    // whichever one is on the receiving end: ring, fetch ICE servers +
+    // confirm we're actually a participant (see BookingService.getCallInfo
+    // -> GET /bookings/:id/call), then jump straight into the audio-only
+    // call screen — the receiver shouldn't have to tap anything to answer,
+    // same as the consultation flow above, just going directly to the call
+    // instead of a request-list screen since there's nothing to
+    // accept/decline here.
     app.fcmNotificationService.onIncomingBookingCall = (payload) async {
       debugPrint('[FCM] Incoming booking audio call: $payload');
       final bookingId = payload['booking_id'] as String?;
@@ -209,7 +212,13 @@ class _MyAppState extends State<MyApp> {
             isCaller: false,
             audioOnly: true,
             iceServers: callInfo.iceServers,
-            peerDisplayName: callInfo.technicianName ?? (payload['technician_name'] as String?),
+            // The push payload only ever carries ONE of these two fields —
+            // whichever name matches who's actually calling (see
+            // BookingService.InitiateCall) — so it tells us unambiguously
+            // whose name to show, unlike callInfo which always has both
+            // (a booking always has both a customer and a technician).
+            peerDisplayName: (payload['technician_name'] as String?) ??
+                (payload['customer_name'] as String?),
           ),
         ));
       } catch (e) {

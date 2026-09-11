@@ -142,6 +142,9 @@ class Booking {
   final bool isWarrantyClaim;
   final String? warrantyClaimOf;
   final String? warrantyClaimOfServiceCode;
+  // How many chat messages on this booking the current user hasn't opened
+  // yet — powers the WhatsApp-style badge on the Consult > Chat list.
+  final int unreadMessageCount;
 
   Booking({
     required this.id,
@@ -172,6 +175,7 @@ class Booking {
     this.isWarrantyClaim = false,
     this.warrantyClaimOf,
     this.warrantyClaimOfServiceCode,
+    this.unreadMessageCount = 0,
   });
 
   /// Price to display: final price once the job is done, otherwise the estimate.
@@ -256,6 +260,7 @@ class Booking {
       isWarrantyClaim: json['is_warranty_claim'] as bool? ?? false,
       warrantyClaimOf: json['warranty_claim_of'] as String?,
       warrantyClaimOfServiceCode: json['warranty_claim_of_service_code'] as String?,
+      unreadMessageCount: json['unread_message_count'] as int? ?? 0,
     );
   }
 }
@@ -592,11 +597,11 @@ class Technician {
   final String categoryId;
   final String categoryName;
   final int experienceYears;
-  final String? profilePhotoUrl;
   final double ratingAvg;
   final int ratingCount;
   final bool isVerified;
   final bool isAvailable;
+  final String? profilePhotoUrl;
   final DateTime createdAt;
   final Map<String, DayHours?> workingHours;
 
@@ -606,11 +611,11 @@ class Technician {
     required this.categoryId,
     required this.categoryName,
     required this.experienceYears,
-    this.profilePhotoUrl,
     required this.ratingAvg,
     required this.ratingCount,
     required this.isVerified,
     required this.isAvailable,
+    this.profilePhotoUrl,
     required this.createdAt,
     this.workingHours = const {},
   });
@@ -622,13 +627,11 @@ class Technician {
       categoryId: (json['category_id'] as String?) ?? '',
       categoryName: (json['category_name'] as String?) ?? '',
       experienceYears: json['experience_years'] as int? ?? 0,
-      profilePhotoUrl: (json['profile_photo_url'] as String?)?.isNotEmpty == true
-          ? json['profile_photo_url'] as String
-          : null,
       ratingAvg: (json['rating_avg'] as num?)?.toDouble() ?? 0.0,
       ratingCount: json['rating_count'] as int? ?? 0,
       isVerified: json['is_verified'] as bool? ?? false,
       isAvailable: json['is_available'] as bool? ?? true,
+      profilePhotoUrl: (json['profile_photo_url'] as String?)?.isNotEmpty == true ? json['profile_photo_url'] as String : null,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
@@ -647,6 +650,7 @@ class Technician {
       'rating_count': ratingCount,
       'is_verified': isVerified,
       'is_available': isAvailable,
+      'profile_photo_url': profilePhotoUrl,
       'created_at': createdAt.toIso8601String(),
       'working_hours': workingHours.map((k, v) => MapEntry(k, v?.toJson())),
     };
@@ -662,10 +666,10 @@ class TechnicianNearby {
   final String categoryId;
   final String categoryName;
   final int experienceYears;
-  final String? profilePhotoUrl;
   final double ratingAvg;
   final int ratingCount;
   final bool isAvailable;
+  final String? profilePhotoUrl;
   final double? currentLat;
   final double? currentLng;
   final double? distanceKm;
@@ -676,10 +680,10 @@ class TechnicianNearby {
     required this.categoryId,
     required this.categoryName,
     required this.experienceYears,
-    this.profilePhotoUrl,
     required this.ratingAvg,
     required this.ratingCount,
     required this.isAvailable,
+    this.profilePhotoUrl,
     this.currentLat,
     this.currentLng,
     this.distanceKm,
@@ -694,12 +698,10 @@ class TechnicianNearby {
       categoryId: (json['category_id'] as String?) ?? '',
       categoryName: (json['category_name'] as String?) ?? '',
       experienceYears: json['experience_years'] as int? ?? 0,
-      profilePhotoUrl: (json['profile_photo_url'] as String?)?.isNotEmpty == true
-          ? json['profile_photo_url'] as String
-          : null,
       ratingAvg: (json['rating_avg'] as num?)?.toDouble() ?? 0.0,
       ratingCount: json['rating_count'] as int? ?? 0,
       isAvailable: json['is_available'] as bool? ?? true,
+      profilePhotoUrl: (json['profile_photo_url'] as String?)?.isNotEmpty == true ? json['profile_photo_url'] as String : null,
       currentLat: (json['current_lat'] as num?)?.toDouble(),
       currentLng: (json['current_lng'] as num?)?.toDouble(),
       distanceKm: (json['distance_km'] as num?)?.toDouble(),
@@ -750,7 +752,7 @@ class TechnicianProfile {
   bool get isApproved => approvalStatus == 'approved';
   bool get isRejected => approvalStatus == 'rejected';
 
-  TechnicianProfile copyWith({bool? isAvailable, String? profilePhotoUrl, Map<String, DayHours?>? workingHours}) {
+  TechnicianProfile copyWith({bool? isAvailable, Map<String, DayHours?>? workingHours, String? profilePhotoUrl}) {
     return TechnicianProfile(
       id: id,
       userId: userId,
