@@ -171,22 +171,22 @@ func (s *RazorpayService) CreateOrder(ctx context.Context, bookingID, userID str
 	}
 
 	p := &models.Payment{
-		BookingID:              bookingID,
-		UserID:                 userID,
-		TransactionRef:         ref,
-		Amount:                 totalAmount,
-		BaseAmount:             &effectiveBase,
-		GstAmount:              &gstAmount,
-		GstPercent:             &s.gstPct,
-		PlatformFeeAmount:      &platformFee,
-		VisitChargeAmount:      &visitCharge,
-		Currency:               "INR",
-		IsRepeatCustomer:       isRepeat,
-		RepeatDiscountPercent:  repeatDiscountPercent,
-		RepeatDiscountAmount:   repeatDiscountAmount,
-		RazorpayOrderID:        &orderID,
-		PaymentType:            models.PaymentTypeService,
-		VisitFeeCredit:         visitFeeCredit,
+		BookingID:             bookingID,
+		UserID:                userID,
+		TransactionRef:        ref,
+		Amount:                totalAmount,
+		BaseAmount:            &effectiveBase,
+		GstAmount:             &gstAmount,
+		GstPercent:            &s.gstPct,
+		PlatformFeeAmount:     &platformFee,
+		VisitChargeAmount:     &visitCharge,
+		Currency:              "INR",
+		IsRepeatCustomer:      isRepeat,
+		RepeatDiscountPercent: repeatDiscountPercent,
+		RepeatDiscountAmount:  repeatDiscountAmount,
+		RazorpayOrderID:       &orderID,
+		PaymentType:           models.PaymentTypeService,
+		VisitFeeCredit:        visitFeeCredit,
 	}
 	created, err := s.paymentRepo.Create(ctx, p)
 	if err != nil {
@@ -469,10 +469,18 @@ func (s *RazorpayService) RefundVisitFee(ctx context.Context, bookingID string) 
 		return nil // nothing paid, nothing to refund
 	}
 
+	// Track whether Razorpay actually refunded the money to the original
+	// payment method — if it did, crediting the wallet too would double-pay
+	// the customer. The wallet credit below is only a fallback for the case
+	// where there's no Razorpay-side refund path (or it failed) and the
+	// customer still needs to be made whole some other way.
+	razorpayRefunded := false
 	if p.RazorpayPaymentID != nil && *p.RazorpayPaymentID != "" {
 		amountPaise := int(p.Amount*100 + 0.5)
 		if _, err := s.client.Payment.Refund(*p.RazorpayPaymentID, amountPaise, nil, nil); err != nil {
 			fmt.Printf("[razorpay] visit-fee refund API call failed for payment %s (%s): %v\n", p.ID, *p.RazorpayPaymentID, err)
+		} else {
+			razorpayRefunded = true
 		}
 	}
 
@@ -482,7 +490,9 @@ func (s *RazorpayService) RefundVisitFee(ctx context.Context, bookingID string) 
 	if err := s.bookingRepo.SetVisitFeeStatus(ctx, bookingID, models.VisitFeeRefunded); err != nil {
 		return err
 	}
-	_, _ = s.walletRepo.Credit(ctx, p.UserID, p.Amount, "visit_fee_refund", &p.ID)
+	if !razorpayRefunded {
+		_, _ = s.walletRepo.Credit(ctx, p.UserID, p.Amount, "visit_fee_refund", &p.ID)
+	}
 	return nil
 }
 

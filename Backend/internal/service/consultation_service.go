@@ -467,13 +467,6 @@ func (s *ConsultationService) PendingForUser(ctx context.Context, userID string)
 // MyConsultations is the customer-facing call history (GET /consultations/mine) —
 // every consultation they've ever requested, most recent first.
 func (s *ConsultationService) MyConsultations(ctx context.Context, userID string) ([]models.ConsultationWithDetails, error) {
-	tech, err := s.techRepo.GetByUserID(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	if tech != nil {
-		return s.consultRepo.ListForTechnician(ctx, tech.ID)
-	}
 	return s.consultRepo.ListForCustomer(ctx, userID)
 }
 

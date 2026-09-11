@@ -66,7 +66,17 @@ func (h *BookingHandler) Create(c *gin.Context) {
 	}
 	created, err := h.bookingService.Create(c.Request.Context(), b, preferredTechnicianID)
 	if err != nil {
-		utils.Error(c, http.StatusBadRequest, err.Error())
+		// Create() returns a small set of known validation errors (bad
+		// category/technician ID, already-assigned booking) that are the
+		// caller's fault -> 400. Anything else (DB connectivity, internal
+		// failures) is a server-side problem and should be a 500, not a 400
+		// that misleads the client into thinking their request was wrong.
+		switch err.Error() {
+		case "category not found", "selected technician not found", "this booking has already been assigned":
+			utils.Error(c, http.StatusBadRequest, err.Error())
+		default:
+			utils.Error(c, http.StatusInternalServerError, err.Error())
+		}
 		return
 	}
 	utils.Success(c, http.StatusCreated, created)
@@ -600,7 +610,20 @@ func (h *BookingHandler) RespondToEstimate(c *gin.Context) {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	utils.Success(c, http.StatusOK, gin.H{"message": "estimate " + body.Decision + "d"})
+	// Build the message explicitly per decision rather than string-suffixing
+	// body.Decision ("estimate " + decision + "d") — that pattern breaks for
+	// any non-"approve"/"decline" value and, for decline specifically, never
+	// mentioned that the booking was also cancelled as a result.
+	var message string
+	switch body.Decision {
+	case "approve":
+		message = "Estimate approved. Your booking is now in progress."
+	case "decline":
+		message = "Estimate declined. This booking has been cancelled."
+	default:
+		message = "Estimate response recorded."
+	}
+	utils.Success(c, http.StatusOK, gin.H{"message": message})
 }
 
 // --- Before/after service photos ---

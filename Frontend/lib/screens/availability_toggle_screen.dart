@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import '../providers/category_provider.dart';
 import '../utils/working_hours.dart';
+import '../services/location_service.dart';
 
 /// Technician availability control — a master online/offline toggle.
 ///
@@ -33,18 +34,28 @@ class _AvailabilityToggleScreenState extends State<AvailabilityToggleScreen> {
     });
   }
 
-  Future<void> _onToggle(bool value) async {
-    if (_toggling) return;
-    setState(() => _toggling = true);
-    final ok = await context.read<TechnicianKycProvider>().setAvailability(value);
-    if (mounted) setState(() => _toggling = false);
-    if (!ok && mounted) {
-      final error = context.read<TechnicianKycProvider>().error;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error ?? 'Could not update availability. Please try again.')),
-      );
+ Future<void> _onToggle(bool value) async {
+  if (_toggling) return;
+  setState(() => _toggling = true);
+  final ok = await context.read<TechnicianKycProvider>().setAvailability(value);
+  if (mounted) setState(() => _toggling = false);
+  if (!ok && mounted) {
+    final error = context.read<TechnicianKycProvider>().error;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(error ?? 'Could not update availability. Please try again.')),
+    );
+    return;
+  }
+  if (ok && value && mounted) {
+    final locationData = await LocationService().getCurrentLocation();
+    if (locationData?.latitude != null && locationData?.longitude != null && mounted) {
+      await context.read<TechnicianKycProvider>().updateLocation(
+            locationData!.latitude!,
+            locationData.longitude!,
+          );
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {

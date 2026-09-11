@@ -227,6 +227,16 @@ class TechnicianKycService {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
   }
+  Future<void> updateLocation(String technicianId, double lat, double lng) async {
+  try {
+    await _httpClient.patch(
+      '${ApiConfig.technicianDetail}/$technicianId/location',
+      data: {'lat': lat, 'lng': lng},
+    );
+  } catch (e) {
+    throw Exception(ApiEnvelope.errorMessage(e));
+  }
+}
 
   /// Changes (photoUrl != null) or removes (photoUrl == null) the technician's
   /// own profile photo — PUT /technicians/:id/photo. Unlike the KYC-time upload,

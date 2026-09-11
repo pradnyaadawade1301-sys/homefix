@@ -7,6 +7,7 @@ import '../../models/consultation_model.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/consultation_provider.dart';
 import '../home/technician_list_screen.dart';
+import '../../widgets/add_address_sheet.dart';
 
 /// Shown right after a Live Video Consultation call ends. If the technician
 /// sent a post-call recommendation (see TechnicianPostCallScreen), it's shown
@@ -64,6 +65,15 @@ class _PostCallScreenState extends State<PostCallScreen> {
       _loadRecommendation();
     });
   }
+  Future<void> _addAddress() async {
+  final result = await showAddAddressSheet(context);
+  if (result == true && mounted) {
+    final addresses = context.read<AddressProvider>().addresses;
+    if (addresses.isNotEmpty) {
+      setState(() => _selectedAddressId = addresses.last.id);
+    }
+  }
+}
 
   Future<void> _loadRecommendation() async {
     try {
@@ -465,28 +475,52 @@ class _PostCallScreenState extends State<PostCallScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton.icon(
-            onPressed: () async {
-              await context.read<AddressProvider>().fetchAddresses();
-            },
-            icon: const Icon(Icons.refresh, size: 16),
-            label: const Text('Refresh'),
-          ),
+  Align(
+  alignment: Alignment.centerRight,
+  child: Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      TextButton.icon(
+        onPressed: () async {
+          await context.read<AddressProvider>().fetchAddresses();
+        },
+        icon: const Icon(Icons.refresh, size: 16),
+        label: const Text('Refresh'),
+      ),
+      TextButton.icon(
+        onPressed: _addAddress,
+        icon: const Icon(Icons.add_location_alt_outlined, size: 16),
+        label: const Text('Add address'),
+      ),
+    ],
+  ),
+),
+Consumer<AddressProvider>(
+  builder: (context, provider, _) {
+    if (provider.isLoading && provider.addresses.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (provider.addresses.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('No saved addresses yet.',
+                style: TextStyle(fontSize: 12.5, color: Colors.grey[600])),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _addAddress,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add a new address'),
+            ),
+          ],
         ),
-        Consumer<AddressProvider>(
-          builder: (context, provider, _) {
-            if (provider.isLoading && provider.addresses.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Center(child: CircularProgressIndicator()),
-              );
-            }
-            if (provider.addresses.isEmpty) {
-              return Text('No saved addresses yet — add one from your profile.',
-                  style: TextStyle(fontSize: 12.5, color: Colors.grey[600]));
-            }
+      );
+    }
             return Column(
               children: provider.addresses.map((a) {
                 final selected = a.id == _selectedAddressId;

@@ -172,7 +172,20 @@ func (s *DisputeService) Resolve(ctx context.Context, id, status, adminNotes, re
 		if d.BookingID == nil {
 			return nil, errors.New("refund resolution requires a booking-linked dispute")
 		}
-		payments, err := s.paymentRepo.ListByUser(ctx, d.RaisedBy)
+		// Payments are always stored against the CUSTOMER's user_id, but
+		// d.RaisedBy is whoever filed the dispute — which can be the
+		// TECHNICIAN. Looking payments up by RaisedBy silently returns zero
+		// results (and "no paid payment found") for every technician-raised
+		// dispute, making refunds permanently impossible for them. Look up
+		// the booking's actual customer instead.
+		booking, err := s.bookingRepo.GetByID(ctx, *d.BookingID)
+		if err != nil {
+			return nil, err
+		}
+		if booking == nil {
+			return nil, errors.New("booking not found")
+		}
+		payments, err := s.paymentRepo.ListByUser(ctx, booking.CustomerID)
 		if err != nil {
 			return nil, err
 		}
