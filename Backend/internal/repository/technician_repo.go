@@ -290,3 +290,12 @@ func (r *TechnicianRepository) SetApprovalStatus(ctx context.Context, id, status
 	`, status, reason, id, status)
 	return err
 }
+
+// SetVerified toggles the technician's "verified" badge column directly, independent
+// of SetApprovalStatus. Used by TechnicianService.SetVerifiedBadge, which an admin
+// calls to give (or revoke) a "blue tick" style badge without touching whether the
+// technician is approved to operate at all.
+func (r *TechnicianRepository) SetVerified(ctx context.Context, id string, verified bool) error {
+	_, err := r.db.Exec(ctx, `UPDATE technicians SET is_verified = $1, updated_at = now() WHERE id = $2`, verified, id)
+	return err
+}
