@@ -28,6 +28,7 @@ type TechnicianPublic struct {
 	CategoryID      string    `json:"category_id"`
 	CategoryName    string    `json:"category_name"`
 	ExperienceYears int       `json:"experience_years"`
+	ProfilePhotoURL string    `json:"profile_photo_url,omitempty"`
 	RatingAvg       float64   `json:"rating_avg"`
 	RatingCount     int       `json:"rating_count"`
 	IsVerified      bool      `json:"is_verified"`
@@ -47,6 +48,7 @@ type TechnicianNearby struct {
 	CategoryID      string   `json:"category_id"`
 	CategoryName    string   `json:"category_name"`
 	ExperienceYears int      `json:"experience_years"`
+	ProfilePhotoURL string   `json:"profile_photo_url,omitempty"`
 	RatingAvg       float64  `json:"rating_avg"`
 	RatingCount     int      `json:"rating_count"`
 	IsAvailable     bool     `json:"is_available"`

@@ -82,7 +82,11 @@ func (h *UserHandler) UpdatePhoto(c *gin.Context) {
 }
 
 type fcmTokenBody struct {
-	Token string `json:"token" binding:"required"`
+	// Not "required" — an empty string is a valid, intentional value: the
+	// frontend sends it on logout to clear this device's registration so
+	// the account being logged OUT of stops receiving pushes meant for
+	// whoever logs into this device next (see AuthProvider.logout).
+	Token string `json:"token"`
 }
 
 func (h *UserHandler) RegisterFCMToken(c *gin.Context) {

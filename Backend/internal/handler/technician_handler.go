@@ -155,6 +155,41 @@ func (h *TechnicianHandler) SetAvailability(c *gin.Context) {
 	utils.Success(c, http.StatusOK, gin.H{"message": "availability updated"})
 }
 
+type updateTechPhotoBody struct {
+	// PhotoURL is the "url" returned by POST /api/v1/uploads. Send null/omit to
+	// remove the current photo — mirrors UserHandler.UpdatePhoto for customers.
+	PhotoURL *string `json:"photo_url"`
+}
+
+// UpdatePhoto lets a technician change or remove their own profile photo after
+// registration (previously only settable once, at KYC time). Like SetAvailability,
+// a technician can only update their OWN row.
+func (h *TechnicianHandler) UpdatePhoto(c *gin.Context) {
+	userID := c.GetString("user_id")
+	technicianID := c.Param("id")
+
+	self, err := h.techService.GetByUser(c.Request.Context(), userID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if self == nil || self.ID != technicianID {
+		utils.Error(c, http.StatusForbidden, "you can only update your own profile photo")
+		return
+	}
+
+	var body updateTechPhotoBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.techService.UpdateProfilePhoto(c.Request.Context(), technicianID, body.PhotoURL); err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"message": "photo updated"})
+}
+
 type workingHoursBody struct {
 	WorkingHours models.WorkingHours `json:"working_hours" binding:"required"`
 }

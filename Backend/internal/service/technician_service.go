@@ -81,6 +81,12 @@ func (s *TechnicianService) SetAvailability(ctx context.Context, technicianID st
 	return s.techRepo.SetAvailability(ctx, technicianID, available)
 }
 
+// UpdateProfilePhoto changes (or, when photoURL is nil, removes) a technician's
+// profile photo shown to customers on the browse/detail screens.
+func (s *TechnicianService) UpdateProfilePhoto(ctx context.Context, technicianID string, photoURL *string) error {
+	return s.techRepo.UpdateProfilePhoto(ctx, technicianID, photoURL)
+}
+
 // UpdateWorkingHours validates and persists a technician's self-set weekly
 // schedule. Display-only — it does not affect matching or booking.
 func (s *TechnicianService) UpdateWorkingHours(ctx context.Context, technicianID string, wh models.WorkingHours) error {

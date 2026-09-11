@@ -104,6 +104,7 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.GET("/technicians/available", h.Technician.FindAvailable)
 		authed.GET("/technicians/:id/reviews", h.Technician.Reviews)
 		authed.PATCH("/technicians/:id/availability", middleware.RequireRole("technician"), h.Technician.SetAvailability)
+		authed.PUT("/technicians/:id/photo", middleware.RequireRole("technician"), h.Technician.UpdatePhoto)
 		authed.PATCH("/technicians/:id/location", middleware.RequireRole("technician"), h.Technician.UpdateLocation)
 		authed.PATCH("/technicians/:id/verify", middleware.RequireRole("admin"), h.Technician.Verify)
 		authed.PATCH("/technicians/:id/verified-badge", middleware.RequireRole("admin"), h.Technician.SetVerifiedBadge)

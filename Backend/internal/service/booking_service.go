@@ -15,11 +15,12 @@ type BookingService struct {
 	catRepo     *repository.CategoryRepository
 	techRepo    *repository.TechnicianRepository
 	paymentRepo *repository.PaymentRepository
+	userRepo    *repository.UserRepository
 	fcm         *FirebaseService
 }
 
-func NewBookingService(bookingRepo *repository.BookingRepository, catRepo *repository.CategoryRepository, techRepo *repository.TechnicianRepository, paymentRepo *repository.PaymentRepository, fcm *FirebaseService) *BookingService {
-	return &BookingService{bookingRepo: bookingRepo, catRepo: catRepo, techRepo: techRepo, paymentRepo: paymentRepo, fcm: fcm}
+func NewBookingService(bookingRepo *repository.BookingRepository, catRepo *repository.CategoryRepository, techRepo *repository.TechnicianRepository, paymentRepo *repository.PaymentRepository, userRepo *repository.UserRepository, fcm *FirebaseService) *BookingService {
+	return &BookingService{bookingRepo: bookingRepo, catRepo: catRepo, techRepo: techRepo, paymentRepo: paymentRepo, userRepo: userRepo, fcm: fcm}
 }
 
 // Create makes a new booking. If preferredTechnicianID is non-empty (customer
@@ -468,8 +469,16 @@ func (s *BookingService) SendMessage(ctx context.Context, bookingID, userID, use
 			}
 		}
 		if recipientID != userID {
+			// sender_name lets the recipient's app open straight into this
+			// chat thread with the right AppBar title on tap, without an
+			// extra round trip before the screen can render (see
+			// NotificationDetailScreen / app.dart's onNotificationTap).
+			senderName := ""
+			if sender, err := s.userRepo.GetByID(ctx, userID); err == nil && sender != nil {
+				senderName = sender.Name
+			}
 			_ = s.fcm.SendToUser(ctx, recipientID, "New message",
-				content, map[string]string{"booking_id": bookingID, "type": "booking_message"})
+				content, map[string]string{"booking_id": bookingID, "type": "booking_message", "sender_name": senderName})
 		}
 	}
 

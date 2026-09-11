@@ -91,7 +91,7 @@ func main() {
 	authService := service.NewAuthService(userRepo, mailService, cfg.JWTAccessSecret, cfg.JWTRefreshSecret, cfg.JWTAccessTTLMin, cfg.JWTRefreshTTLHrs, cfg.GoogleClientID)
 	userService := service.NewUserService(userRepo)
 	techService := service.NewTechnicianService(techRepo, catRepo, reviewRepo)
-	bookingService := service.NewBookingService(bookingRepo, catRepo, techRepo, paymentRepo, fcmService)
+	bookingService := service.NewBookingService(bookingRepo, catRepo, techRepo, paymentRepo, userRepo, fcmService)
 	consultService := service.NewConsultationService(consultRepo, techRepo, bookingService, reviewRepo, aiRepo, fcmService)
 	walletService := service.NewWalletService(walletRepo)
 	reviewService := service.NewReviewService(reviewRepo, bookingRepo)

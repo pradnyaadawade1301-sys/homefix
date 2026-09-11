@@ -153,6 +153,7 @@ func (r *TechnicianRepository) ListAvailableByCategory(ctx context.Context, cate
 func (r *TechnicianRepository) ListPublic(ctx context.Context, categoryID string) ([]models.TechnicianPublic, error) {
 	query := `
 		SELECT t.id, COALESCE(u.name,''), t.category_id, c.name, t.experience_years,
+		       COALESCE(t.profile_photo_url,''),
 		       t.rating_avg, t.rating_count, t.is_verified, t.is_available, t.working_hours, t.created_at
 		FROM technicians t
 		JOIN users u ON u.id = t.user_id
@@ -175,7 +176,7 @@ func (r *TechnicianRepository) ListPublic(ctx context.Context, categoryID string
 	for rows.Next() {
 		var t models.TechnicianPublic
 		if err := rows.Scan(&t.ID, &t.Name, &t.CategoryID, &t.CategoryName, &t.ExperienceYears,
-			&t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.WorkingHours, &t.CreatedAt); err != nil {
+			&t.ProfilePhotoURL, &t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.WorkingHours, &t.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, t)
@@ -188,13 +189,14 @@ func (r *TechnicianRepository) GetPublicByID(ctx context.Context, id string) (*m
 	var t models.TechnicianPublic
 	err := r.db.QueryRow(ctx, `
 		SELECT t.id, COALESCE(u.name,''), t.category_id, c.name, t.experience_years,
+		       COALESCE(t.profile_photo_url,''),
 		       t.rating_avg, t.rating_count, t.is_verified, t.is_available, t.working_hours, t.created_at
 		FROM technicians t
 		JOIN users u ON u.id = t.user_id
 		JOIN categories c ON c.id = t.category_id
 		WHERE t.id = $1
 	`, id).Scan(&t.ID, &t.Name, &t.CategoryID, &t.CategoryName, &t.ExperienceYears,
-		&t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.WorkingHours, &t.CreatedAt)
+		&t.ProfilePhotoURL, &t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.WorkingHours, &t.CreatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -202,6 +204,18 @@ func (r *TechnicianRepository) GetPublicByID(ctx context.Context, id string) (*m
 		return nil, err
 	}
 	return &t, nil
+}
+
+// UpdateProfilePhoto sets or clears (nil) the technician's profile photo — mirrors
+// UserRepository's UpdatePhotoURL for customers, so technicians can change/remove
+// their photo after registration instead of it being fixed at KYC time forever.
+func (r *TechnicianRepository) UpdateProfilePhoto(ctx context.Context, id string, photoURL *string) error {
+	url := ""
+	if photoURL != nil {
+		url = *photoURL
+	}
+	_, err := r.db.Exec(ctx, `UPDATE technicians SET profile_photo_url = $1, updated_at = now() WHERE id = $2`, url, id)
+	return err
 }
 
 func (r *TechnicianRepository) SetAvailability(ctx context.Context, id string, available bool) error {
