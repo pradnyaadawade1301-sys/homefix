@@ -443,8 +443,6 @@ class _CustomerProfileBodyState extends State<_CustomerProfileBody> {
   Widget build(BuildContext context) {
     final user = widget.user;
     final l10n = AppLocalizations.of(context);
-    final uploadService = context.read<UploadService>();
-    final userProvider = context.read<UserProvider>();
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
       children: [
@@ -455,15 +453,6 @@ class _CustomerProfileBodyState extends State<_CustomerProfileBody> {
           photoUrl: (user.photoUrl != null && user.photoUrl!.isNotEmpty) ? user.photoUrl : null,
           verifiedBadge: user.phoneVerified,
           isUploading: _uploadingPhoto,
-          onEditPhoto: () => _showProfilePhotoSheet(
-            context,
-            photoUrl: user.photoUrl,
-            upload: uploadService.uploadFile,
-            save: userProvider.updatePhoto,
-            onUploadingChanged: (v) {
-              if (mounted) setState(() => _uploadingPhoto = v);
-            },
-          ),
         ),
         const SizedBox(height: 16),
         _SectionCard(
