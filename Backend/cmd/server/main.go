@@ -50,6 +50,7 @@ func main() {
 	techRepo := repository.NewTechnicianRepository(pool)
 	bookingRepo := repository.NewBookingRepository(pool)
 	consultRepo := repository.NewConsultationRepository(pool)
+	callLogRepo := repository.NewCallLogRepository(pool)
 	paymentRepo := repository.NewPaymentRepository(pool)
 	walletRepo := repository.NewWalletRepository(pool)
 	reviewRepo := repository.NewReviewRepository(pool)
@@ -91,7 +92,7 @@ func main() {
 	authService := service.NewAuthService(userRepo, mailService, cfg.JWTAccessSecret, cfg.JWTRefreshSecret, cfg.JWTAccessTTLMin, cfg.JWTRefreshTTLHrs, cfg.GoogleClientID)
 	userService := service.NewUserService(userRepo)
 	techService := service.NewTechnicianService(techRepo, catRepo, reviewRepo)
-	bookingService := service.NewBookingService(bookingRepo, catRepo, techRepo, paymentRepo, userRepo, fcmService)
+	bookingService := service.NewBookingService(bookingRepo, catRepo, techRepo, paymentRepo, userRepo, callLogRepo, fcmService)
 	consultService := service.NewConsultationService(consultRepo, techRepo, bookingService, reviewRepo, aiRepo, fcmService)
 	walletService := service.NewWalletService(walletRepo)
 	reviewService := service.NewReviewService(reviewRepo, bookingRepo)
@@ -117,7 +118,8 @@ func main() {
 		AI:           handler.NewAIHandler(groqService),
 		Notification: handler.NewNotificationHandler(notifRepo),
 		Upload:       handler.NewUploadHandler(cfg.UploadDir, cfg.PublicBaseURL),
-		Call:         handler.NewCallHandler(bookingRepo, techRepo, consultRepo, cfg.JWTAccessSecret),
+		Call:         handler.NewCallHandler(bookingRepo, techRepo, consultRepo, callLogRepo, cfg.JWTAccessSecret),
+		CallLog:      handler.NewCallLogHandler(callLogRepo),
 		Consultation: handler.NewConsultationHandler(consultService, cfg.StunURLs, cfg.TurnURL, cfg.TurnSecret, cfg.TurnTTLSecond),
 		WebRTC:       handler.NewWebRTCHandler(cfg.StunURLs, cfg.TurnURL, cfg.TurnSecret, cfg.TurnTTLSecond),
 		Dispute:      handler.NewDisputeHandler(disputeService),
