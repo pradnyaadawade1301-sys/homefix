@@ -96,10 +96,11 @@ func (r *TechnicianRepository) ListAvailableByCategory(ctx context.Context, cate
 	var err error
 	if lat != nil && lng != nil {
 		query := `
-			SELECT id, name, category_id, category_name, experience_years,
+			SELECT id, name, category_id, category_name, experience_years, profile_photo_url,
 			       rating_avg, rating_count, is_available, current_lat, current_lng, distance_km
 			FROM (
 				SELECT t.id, COALESCE(u.name,'') AS name, t.category_id, c.name AS category_name, t.experience_years,
+				       COALESCE(t.profile_photo_url,'') AS profile_photo_url,
 				       t.rating_avg, t.rating_count, t.is_available, t.current_lat, t.current_lng,
 				       (6371 * acos(LEAST(1.0, GREATEST(-1.0,
 				           cos(radians($2)) * cos(radians(COALESCE(t.current_lat,$2))) *
@@ -121,6 +122,7 @@ func (r *TechnicianRepository) ListAvailableByCategory(ctx context.Context, cate
 	} else {
 		rows, err = r.db.Query(ctx, `
 			SELECT t.id, COALESCE(u.name,''), t.category_id, c.name, t.experience_years,
+			       COALESCE(t.profile_photo_url,''),
 			       t.rating_avg, t.rating_count, t.is_available, t.current_lat, t.current_lng,
 			       NULL::float8 AS distance_km
 			FROM technicians t
@@ -140,7 +142,7 @@ func (r *TechnicianRepository) ListAvailableByCategory(ctx context.Context, cate
 	for rows.Next() {
 		var t models.TechnicianNearby
 		if err := rows.Scan(&t.ID, &t.Name, &t.CategoryID, &t.CategoryName, &t.ExperienceYears,
-			&t.RatingAvg, &t.RatingCount, &t.IsAvailable, &t.CurrentLat, &t.CurrentLng, &t.DistanceKm); err != nil {
+			&t.ProfilePhotoURL, &t.RatingAvg, &t.RatingCount, &t.IsAvailable, &t.CurrentLat, &t.CurrentLng, &t.DistanceKm); err != nil {
 			return nil, err
 		}
 		out = append(out, t)
@@ -274,30 +276,17 @@ func (r *TechnicianRepository) ListByApprovalStatus(ctx context.Context, status 
 }
 
 // SetApprovalStatus is how an admin approves or rejects a technician's KYC submission.
-// SetApprovalStatus sets whether a technician's KYC has been approved — this
-// only controls whether they can go online / receive bookings (see
-// profile_screen.dart's canGoOnline). It does NOT touch is_verified any more:
-// the "Verified" blue-tick badge is now a separate, deliberate admin action
-// (see SetVerified below) — an approved technician isn't automatically
-// shown as "Verified" to customers just because their documents checked out.
+// status must be "approved" or "rejected"; is_verified is kept in sync so existing
+// browse/booking queries (which filter on is_verified) keep working unchanged.
 func (r *TechnicianRepository) SetApprovalStatus(ctx context.Context, id, status, reason string) error {
+	// $1 is used both as the varchar assigned to approval_status and inside a
+	// boolean comparison for is_verified — pgx can't deduce a single consistent
+	// type for one placeholder used in two different contexts, so it's passed
+	// twice (as $1 and $4) instead.
 	_, err := r.db.Exec(ctx, `
 		UPDATE technicians
-		SET approval_status = $1, rejection_reason = $2, updated_at = now()
+		SET approval_status = $1, rejection_reason = $2, is_verified = ($4 = 'approved'), updated_at = now()
 		WHERE id = $3
-	`, status, reason, id)
-	return err
-}
-
-// SetVerified toggles the "Verified" blue-tick badge — a separate signal
-// from approval_status. Approval unlocks going online/receiving bookings;
-// verified controls the blue tick shown on the technician's profile and
-// whether they appear in ListPublic's "browse technicians" screen. An admin
-// can only meaningfully verify a technician that's already approved, but
-// approval alone no longer implies verified.
-func (r *TechnicianRepository) SetVerified(ctx context.Context, id string, verified bool) error {
-	_, err := r.db.Exec(ctx, `
-		UPDATE technicians SET is_verified = $2, updated_at = now() WHERE id = $1
-	`, id, verified)
+	`, status, reason, id, status)
 	return err
 }
