@@ -236,11 +236,13 @@ class TechnicianJobDetailScreen extends StatelessWidget {
                               child: ElevatedButton.icon(
                                 icon: const Icon(Icons.call_outlined, size: 16),
                                 label: const Text('Call'),
-                                onPressed: () => startBookingAudioCall(
-                                  context,
-                                  bookingId: current.id,
-                                  peerDisplayName: customer.name.isNotEmpty ? customer.name : 'Customer',
-                                ),
+                                onPressed: isCallableBookingStatus(current.status)
+                                    ? () => startBookingAudioCall(
+                                          context,
+                                          bookingId: current.id,
+                                          peerDisplayName: customer.name.isNotEmpty ? customer.name : 'Customer',
+                                        )
+                                    : null,
                               ),
                             ),
                           ],

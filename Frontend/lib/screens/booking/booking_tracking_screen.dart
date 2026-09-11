@@ -208,7 +208,7 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
                   // "confirmed" when it isn't, so that case gets its own
                   // "waiting for response" banner instead.
                   if (booking.technician != null && booking.status != 'pending_technician') ...[
-                    _technicianCard(booking.technician!),
+                    _technicianCard(booking.technician!, booking.status),
                     const SizedBox(height: 24),
                   ] else if (booking.status == 'pending_technician') ...[
                     Container(
@@ -929,7 +929,7 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
     );
   }
 
-  Widget _technicianCard(BookingTechnicianInfo tech) {
+  Widget _technicianCard(BookingTechnicianInfo tech, String bookingStatus) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -978,15 +978,20 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
           ),
      Container(
   margin: const EdgeInsets.only(right: 8),
-  decoration: const BoxDecoration(color: AppTheme.primaryColor, shape: BoxShape.circle),
+  decoration: BoxDecoration(
+    color: isCallableBookingStatus(bookingStatus) ? AppTheme.primaryColor : Colors.grey,
+    shape: BoxShape.circle,
+  ),
   child: IconButton(
     icon: const Icon(Icons.call_rounded, color: Colors.white, size: 18),
-    tooltip: 'Call',
-    onPressed: () => startBookingAudioCall(
-      context,
-      bookingId: widget.bookingId,
-      peerDisplayName: tech.name.isNotEmpty ? tech.name : 'Technician',
-    ),
+    tooltip: isCallableBookingStatus(bookingStatus) ? 'Call' : 'You can call once the job is active',
+    onPressed: isCallableBookingStatus(bookingStatus)
+        ? () => startBookingAudioCall(
+              context,
+              bookingId: widget.bookingId,
+              peerDisplayName: tech.name.isNotEmpty ? tech.name : 'Technician',
+            )
+        : null,
   ),
 ),
      Container(

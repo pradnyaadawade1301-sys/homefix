@@ -222,7 +222,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
                       ),
                     if (b.technician != null) ...[
   const SizedBox(height: 12),
-  _TechnicianTile(technician: b.technician!, bookingId: b.id),
+  _TechnicianTile(technician: b.technician!, bookingId: b.id, bookingStatus: b.status),
 ],
                     ],
                   ),
@@ -242,7 +242,8 @@ class _BookingsScreenState extends State<BookingsScreen> {
 class _TechnicianTile extends StatelessWidget {
   final BookingTechnicianInfo technician;
   final String bookingId;
-  const _TechnicianTile({required this.technician, required this.bookingId});
+  final String bookingStatus;
+  const _TechnicianTile({required this.technician, required this.bookingId, required this.bookingStatus});
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -286,13 +287,19 @@ class _TechnicianTile extends StatelessWidget {
           ),
 
           IconButton(
-  icon: const Icon(Icons.call_outlined, color: AppTheme.primaryColor, size: 20),
-  tooltip: 'Call',
-  onPressed: () => startBookingAudioCall(
-    context,
-    bookingId: bookingId,
-    peerDisplayName: technician.name.isNotEmpty ? technician.name : l10n.bookingsTechnicianFallback,
+  icon: Icon(
+    Icons.call_outlined,
+    color: isCallableBookingStatus(bookingStatus) ? AppTheme.primaryColor : Colors.grey[400],
+    size: 20,
   ),
+  tooltip: isCallableBookingStatus(bookingStatus) ? 'Call' : 'You can call once the job is active',
+  onPressed: isCallableBookingStatus(bookingStatus)
+      ? () => startBookingAudioCall(
+            context,
+            bookingId: bookingId,
+            peerDisplayName: technician.name.isNotEmpty ? technician.name : l10n.bookingsTechnicianFallback,
+          )
+      : null,
 ),
           IconButton(
   icon: const Icon(Icons.forum_outlined, color: AppTheme.primaryColor, size: 20),

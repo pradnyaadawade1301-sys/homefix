@@ -738,13 +738,21 @@ class _JobCard extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.call_outlined, color: AppTheme.primaryColor, size: 20),
-                    tooltip: 'Call',
-                    onPressed: () => startBookingAudioCall(
-                      context,
-                      bookingId: booking.id,
-                      peerDisplayName: customer.name.isNotEmpty ? customer.name : l10n.techJobsCustomerFallback,
+                    icon: Icon(
+                      Icons.call_outlined,
+                      color: isCallableBookingStatus(booking.status) ? AppTheme.primaryColor : Colors.grey[400],
+                      size: 20,
                     ),
+                    tooltip: isCallableBookingStatus(booking.status)
+                        ? 'Call'
+                        : 'You can call once the job is active',
+                    onPressed: isCallableBookingStatus(booking.status)
+                        ? () => startBookingAudioCall(
+                              context,
+                              bookingId: booking.id,
+                              peerDisplayName: customer.name.isNotEmpty ? customer.name : l10n.techJobsCustomerFallback,
+                            )
+                        : null,
                   ),
                   IconButton(
                     icon: const Icon(Icons.forum_outlined, color: AppTheme.primaryColor, size: 20),
