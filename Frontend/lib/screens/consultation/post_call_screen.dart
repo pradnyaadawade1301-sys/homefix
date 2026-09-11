@@ -75,30 +75,44 @@ class _PostCallScreenState extends State<PostCallScreen> {
   }
 }
 
-  Future<void> _loadRecommendation() async {
-    try {
-      final consultation = await context.read<ConsultationProvider>().refreshStatus(widget.consultationId);
-      if (!mounted) return;
-      setState(() {
-        _consultation = consultation;
-        _isLoadingRecommendation = false;
-      });
-      // Still nothing decisive (no pending recommendation, not declined)?
-      // Technician might still be sending one — check again shortly instead
-      // of leaving the customer stuck on a stale "waiting" screen.
-      if (consultation.hasPendingRecommendation != true && consultation.recommendationStatus != 'declined') {
-        _pollTimer?.cancel();
-        _pollTimer = Timer(const Duration(seconds: 5), _loadRecommendation);
-      }
-    } catch (_) {
-      // Non-fatal — retry on the same cadence; the "Book manually instead"
-      // escape hatch below still works even if this never resolves.
-      if (!mounted) return;
-      setState(() => _isLoadingRecommendation = false);
-      _pollTimer?.cancel();
-      _pollTimer = Timer(const Duration(seconds: 5), _loadRecommendation);
+ Future<void> _loadRecommendation() async {
+  try {
+    final consultation = await context.read<ConsultationProvider>().refreshStatus(widget.consultationId);
+    if (!mounted) return;
+    setState(() {
+      _consultation = consultation;
+      _isLoadingRecommendation = false;
+    });
+    final noDecisiveRecommendation =
+        consultation.hasPendingRecommendation != true && consultation.recommendationStatus != 'declined';
+    if (!noDecisiveRecommendation) return;
+
+    // A call that ended a while ago (opened from Consult > Video history,
+    // not right after hanging up) is never going to get a recommendation
+    // now — the technician's window for that has long passed. Skip the
+    // "waiting" polling loop entirely instead of leaving a stale-looking
+    // "Waiting for the technician's recommendation…" on screen forever.
+    final endedRecently =
+        consultation.endTime == null || DateTime.now().difference(consultation.endTime!) < const Duration(minutes: 2);
+    if (!endedRecently) {
+      setState(() => _skippedWaiting = true);
+      return;
     }
+
+    // Still nothing decisive (no pending recommendation, not declined)?
+    // Technician might still be sending one — check again shortly instead
+    // of leaving the customer stuck on a stale "waiting" screen.
+    _pollTimer?.cancel();
+    _pollTimer = Timer(const Duration(seconds: 5), _loadRecommendation);
+  } catch (_) {
+    // Non-fatal — retry on the same cadence; the "Book manually instead"
+    // escape hatch below still works even if this never resolves.
+    if (!mounted) return;
+    setState(() => _isLoadingRecommendation = false);
+    _pollTimer?.cancel();
+    _pollTimer = Timer(const Duration(seconds: 5), _loadRecommendation);
   }
+}
 
   Future<void> _declineRecommendation() async {
     setState(() => _isDecliningRecommendation = true);
