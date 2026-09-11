@@ -42,6 +42,24 @@ class User {
     );
   }
 
+  /// Returns a copy with the avatar changed or cleared — used after the
+  /// WhatsApp-style "change photo" / "remove photo" actions on the profile
+  /// screen so the UI reflects it immediately without a full refetch.
+  User copyWithPhoto(String? photoUrl) {
+    return User(
+      id: id,
+      name: name,
+      email: email,
+      phone: phone,
+      role: role,
+      phoneVerified: phoneVerified,
+      emailVerified: emailVerified,
+      photoUrl: photoUrl,
+      isActive: isActive,
+      createdAt: createdAt,
+    );
+  }
+
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['id'] as String,

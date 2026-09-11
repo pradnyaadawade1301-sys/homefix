@@ -197,6 +197,48 @@ class TechnicianKycProvider extends ChangeNotifier {
     }
   }
 
+  /// Uploads [file] then sets it as the technician's profile photo in one step —
+  /// used by the "Take Photo" / "Choose from Gallery" options in the WhatsApp-style
+  /// avatar editor on the profile screen. Optimistic update with rollback on failure.
+  Future<bool> changePhoto(File file) async {
+    final profile = _profile;
+    if (profile == null) return false;
+    _isUploading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final url = await _kycService.uploadFile(file);
+      await _kycService.updatePhoto(profile.id, url);
+      _profile = profile.copyWith(profilePhotoUrl: url);
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+      return false;
+    } finally {
+      _isUploading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Clears the technician's profile photo — the "Remove Photo" option.
+  Future<bool> removePhoto() async {
+    final profile = _profile;
+    if (profile == null) return false;
+    final previous = profile.profilePhotoUrl;
+    _profile = profile.copyWith(profilePhotoUrl: '');
+    _error = null;
+    notifyListeners();
+    try {
+      await _kycService.updatePhoto(profile.id, null);
+      return true;
+    } catch (e) {
+      _profile = _profile?.copyWith(profilePhotoUrl: previous);
+      _error = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> submit({
     required String categoryId,
     required int experienceYears,
@@ -237,12 +279,14 @@ class UserProvider extends ChangeNotifier {
 
   User? _user;
   bool _isLoading = false;
+  bool _isSavingPhoto = false;
   String? _error;
 
   UserProvider({required UserService userService}) : _userService = userService;
 
   User? get user => _user;
   bool get isLoading => _isLoading;
+  bool get isSavingPhoto => _isSavingPhoto;
   String? get error => _error;
 
   Future<void> fetchProfile() async {
@@ -273,6 +317,46 @@ class UserProvider extends ChangeNotifier {
       _error = e.toString();
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Uploads [file] then sets it as the caller's avatar in one step — used by the
+  /// "Take Photo" / "Choose from Gallery" options in the WhatsApp-style avatar
+  /// editor on the profile screen.
+  Future<bool> changePhoto(File file) async {
+    _isSavingPhoto = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final url = await _userService.uploadPhoto(file);
+      await _userService.updatePhoto(url);
+      _user = _user?.copyWithPhoto(url);
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isSavingPhoto = false;
+      notifyListeners();
+    }
+  }
+
+  /// Clears the caller's avatar — the "Remove Photo" option. The app then falls
+  /// back to the name-initial avatar.
+  Future<bool> removePhoto() async {
+    _isSavingPhoto = true;
+    _error = null;
+    notifyListeners();
+    try {
+      await _userService.updatePhoto(null);
+      _user = _user?.copyWithPhoto(null);
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isSavingPhoto = false;
       notifyListeners();
     }
   }

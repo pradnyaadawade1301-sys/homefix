@@ -152,6 +152,15 @@ class AuthService {
 
   Future<void> logout() async {
     try {
+      // Clear this device's FCM token registration BEFORE the auth token
+      // itself is wiped — otherwise the account being logged out keeps its
+      // old push token on file, and whichever user logs in next on this
+      // same device makes push notifications ambiguous between the two
+      // accounts (customer getting technician's notifications or vice
+      // versa). Best-effort: don't block logout if this call fails.
+      try {
+        await _httpClient.post('/users/me/fcm-token', data: {'token': ''});
+      } catch (_) {}
       await _httpClient.clearTokens();
       await _secureStorage.deleteAll();
     } catch (e) {

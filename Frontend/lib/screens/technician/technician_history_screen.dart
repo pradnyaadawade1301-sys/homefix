@@ -186,12 +186,12 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                  color: _statusColor(c.status).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  c.status.replaceAll('_', ''),
-                  style: const TextStyle(fontSize: 11, color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
+                  _statusLabel(c.status),
+                  style: TextStyle(fontSize: 11, color: _statusColor(c.status), fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -292,4 +292,50 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
   }
 
   String _formatDate(DateTime d) => '${d.day}/${d.month}/${d.year}';
+
+  /// Plain-language label for the technician's own video call history —
+  /// "cancelled" while the call was still ringing reads as a missed call
+  /// from the technician's side (they never answered in time), and
+  /// "rejected" is when the technician explicitly declined it.
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'cancelled':
+        return 'Missed';
+      case 'rejected':
+        return 'Declined';
+      case 'no_technician':
+        return 'No technician found';
+      case 'ended':
+        return 'Completed';
+      case 'ringing':
+        return 'Ringing';
+      case 'in_call':
+        return 'In call';
+      case 'accepted':
+        return 'Accepted';
+      case 'scheduled':
+        return 'Awaiting confirmation';
+      case 'confirmed':
+        return 'Confirmed';
+      case 'searching':
+        return 'Searching';
+      default:
+        return status.replaceAll('_', ' ');
+    }
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'cancelled':
+        return Colors.grey[600]!;
+      case 'rejected':
+        return Colors.red[700]!;
+      case 'no_technician':
+        return Colors.red[700]!;
+      case 'ended':
+        return Colors.grey[700]!;
+      default:
+        return AppTheme.primaryColor;
+    }
+  }
 }

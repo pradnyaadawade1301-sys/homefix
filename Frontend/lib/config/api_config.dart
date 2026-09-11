@@ -31,6 +31,7 @@ class ApiConfig {
   static const String authLogout = '/auth/logout';
 
   static const String userProfile = '/users/me';
+  static const String userPhoto = '/users/me/photo';
   static const String userAddresses = '/users/me/addresses';
   static const String userFcmToken = '/users/me/fcm-token';
 

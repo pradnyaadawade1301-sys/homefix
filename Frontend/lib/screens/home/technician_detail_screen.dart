@@ -168,10 +168,15 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                                 padding: const EdgeInsets.all(3),
                                 child: CircleAvatar(
                                   backgroundColor: _accent.withValues(alpha: 0.12),
-                                  child: Text(
-                                    t.name.isNotEmpty ? t.name[0].toUpperCase() : '?',
-                                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: _accent),
-                                  ),
+                                  backgroundImage: t.profilePhotoUrl != null
+                                      ? NetworkImage(t.profilePhotoUrl!)
+                                      : null,
+                                  child: t.profilePhotoUrl == null
+                                      ? Text(
+                                          t.name.isNotEmpty ? t.name[0].toUpperCase() : '?',
+                                          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: _accent),
+                                        )
+                                      : null,
                                 ),
                               ),
                               if (t.isAvailable)

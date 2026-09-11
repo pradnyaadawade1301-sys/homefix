@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../services/service_locator.dart';
 import 'notification_detail_screen.dart';
+import '../chat/booking_chat_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({Key? key}) : super(key: key);
@@ -38,7 +39,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return Icons.videocam_outlined;
       case 'booking_update':
         return Icons.local_shipping_outlined;
-      case 'chat_message':
+      case 'booking_message':
         return Icons.chat_bubble_outline_rounded;
       default:
         return Icons.notifications_none_rounded;
@@ -65,6 +66,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
 
     if (!mounted) return;
+
+    final type = data?['type'] as String?;
+    final bookingId = data?['booking_id'] as String?;
+    if (type == 'booking_message' && bookingId != null && bookingId.isNotEmpty) {
+      final peerName = (data?['sender_name'] as String?)?.trim();
+      await Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => BookingChatScreen(
+          bookingId: bookingId,
+          peerName: (peerName != null && peerName.isNotEmpty) ? peerName : 'Chat',
+        ),
+      ));
+      if (mounted) _refresh();
+      return;
+    }
+
     await Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => NotificationDetailScreen(title: title, body: body, data: data, createdAt: createdAt),
     ));

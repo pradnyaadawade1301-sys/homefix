@@ -32,6 +32,7 @@ import 'services/signaling_service.dart';
 import 'screens/video_call_screen.dart';
 import 'screens/technician/technician_jobs_screen.dart';
 import 'screens/notifications/notification_detail_screen.dart';
+import 'screens/chat/booking_chat_screen.dart';
 import 'main.dart' as app; // for fcmNotificationService, navigatorKey
 
 /// Sends the current FCM token to the backend via the authenticated endpoint.
@@ -112,10 +113,28 @@ class _MyAppState extends State<MyApp> {
 
     // Wire up notification tap: open that exact notification's message,
     // with a shortcut to the booking when the payload has a booking_id.
+    // A chat message push ("New message" / type: booking_message, sent by
+    // BookingService.SendMessage) is the one case that should skip the
+    // generic detail screen entirely and land straight in that same chat
+    // thread, matching what a normal messaging app does on tap.
     app.fcmNotificationService.onNotificationTap = (payload) {
       final title = (payload['title'] as String?) ?? 'HomeFix';
       final body = (payload['body'] as String?) ?? '';
       debugPrint('[FCM Navigate] title=$title body=$body payload=$payload');
+
+      final type = payload['type'] as String?;
+      final bookingId = payload['booking_id'] as String?;
+      if (type == 'booking_message' && bookingId != null && bookingId.isNotEmpty) {
+        final peerName = (payload['sender_name'] as String?)?.trim();
+        app.navigatorKey.currentState?.push(MaterialPageRoute(
+          builder: (_) => BookingChatScreen(
+            bookingId: bookingId,
+            peerName: (peerName != null && peerName.isNotEmpty) ? peerName : 'Chat',
+          ),
+        ));
+        return;
+      }
+
       app.navigatorKey.currentState?.push(MaterialPageRoute(
         builder: (_) => NotificationDetailScreen(title: title, body: body, data: payload),
       ));

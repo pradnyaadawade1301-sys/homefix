@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
@@ -301,12 +303,25 @@ class _CustomerProfileBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
       children: [
-        _ProfileHeader(
-          name: user.name.isNotEmpty ? user.name : 'Guest',
-          subtitle: user.phone,
-          roleLabel: l10n.profileCustomerRole,
-          photoUrl: (user.photoUrl != null && user.photoUrl!.isNotEmpty) ? user.photoUrl : null,
-          verifiedBadge: user.phoneVerified,
+        Consumer<UserProvider>(
+          builder: (context, userProvider, _) {
+            final current = userProvider.user ?? user;
+            final hasPhoto = current.photoUrl != null && current.photoUrl!.isNotEmpty;
+            return _ProfileHeader(
+              name: current.name.isNotEmpty ? current.name : 'Guest',
+              subtitle: current.phone,
+              roleLabel: l10n.profileCustomerRole,
+              photoUrl: hasPhoto ? current.photoUrl : null,
+              verifiedBadge: current.phoneVerified,
+              isSavingPhoto: userProvider.isSavingPhoto,
+              onEditPhoto: () => showAvatarEditSheet(
+                context,
+                hasPhoto: hasPhoto,
+                onChangePhoto: (file) => userProvider.changePhoto(file),
+                onRemovePhoto: () => userProvider.removePhoto(),
+              ),
+            );
+          },
         ),
         const SizedBox(height: 16),
         _SectionCard(
@@ -549,6 +564,13 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
               roleLabel: categoryName,
               photoUrl: profile.profilePhotoUrl.isNotEmpty ? profile.profilePhotoUrl : null,
               verifiedBadge: profile.isVerified,
+              isSavingPhoto: kycProvider.isUploading,
+              onEditPhoto: () => showAvatarEditSheet(
+                context,
+                hasPhoto: profile.profilePhotoUrl.isNotEmpty,
+                onChangePhoto: (file) => kycProvider.changePhoto(file),
+                onRemovePhoto: () => kycProvider.removePhoto(),
+              ),
               extra: Wrap(
                 alignment: WrapAlignment.center,
                 spacing: 8,
@@ -752,6 +774,8 @@ class _ProfileHeader extends StatelessWidget {
   final String? photoUrl;
   final bool verifiedBadge;
   final Widget? extra;
+  final VoidCallback? onEditPhoto;
+  final bool isSavingPhoto;
 
   const _ProfileHeader({
     required this.name,
@@ -760,6 +784,8 @@ class _ProfileHeader extends StatelessWidget {
     required this.photoUrl,
     required this.verifiedBadge,
     this.extra,
+    this.onEditPhoto,
+    this.isSavingPhoto = false,
   });
 
   static const Color _accent = Color(0xFF0F766E);
@@ -782,25 +808,42 @@ class _ProfileHeader extends StatelessWidget {
       child: Column(
         children: [
           Stack(
+            clipBehavior: Clip.none,
             children: [
-              Container(
-                width: 84,
-                height: 84,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 10, offset: const Offset(0, 4))],
-                ),
-                padding: const EdgeInsets.all(3),
-                child: CircleAvatar(
-                  backgroundColor: _accent.withValues(alpha: 0.1),
-                  backgroundImage: photoUrl != null ? NetworkImage(photoUrl!) : null,
-                  child: photoUrl == null
-                      ? Text(
-                          name.isNotEmpty ? name[0].toUpperCase() : '?',
-                          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: _accent),
-                        )
-                      : null,
+              GestureDetector(
+                onTap: onEditPhoto,
+                child: Container(
+                  width: 84,
+                  height: 84,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 10, offset: const Offset(0, 4))],
+                  ),
+                  padding: const EdgeInsets.all(3),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: _accent.withValues(alpha: 0.1),
+                        backgroundImage: photoUrl != null ? NetworkImage(photoUrl!) : null,
+                        child: photoUrl == null
+                            ? Text(
+                                name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: _accent),
+                              )
+                            : null,
+                      ),
+                      if (isSavingPhoto)
+                        Container(
+                          decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withValues(alpha: 0.35)),
+                          child: const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
               if (verifiedBadge)
@@ -811,6 +854,23 @@ class _ProfileHeader extends StatelessWidget {
                     padding: const EdgeInsets.all(3),
                     decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                     child: const Icon(Icons.verified_rounded, color: _accent, size: 18),
+                  ),
+                ),
+              if (onEditPhoto != null)
+                Positioned(
+                  bottom: -2,
+                  left: -2,
+                  child: GestureDetector(
+                    onTap: onEditPhoto,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: _accent, width: 1.5),
+                      ),
+                      child: const Icon(Icons.camera_alt_rounded, color: _accent, size: 15),
+                    ),
                   ),
                 ),
             ],
@@ -838,6 +898,77 @@ class _ProfileHeader extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Opens a WhatsApp-style bottom sheet ("Take Photo" / "Choose from Gallery" /
+/// "Remove Photo") and drives [onChangePhoto] or [onRemovePhoto] based on the
+/// pick. Shared by the customer and technician profile headers.
+Future<void> showAvatarEditSheet(
+  BuildContext context, {
+  required bool hasPhoto,
+  required Future<bool> Function(File file) onChangePhoto,
+  required Future<bool> Function() onRemovePhoto,
+}) async {
+  final picker = ImagePicker();
+  final action = await showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (sheetContext) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt_rounded, color: AppTheme.primaryColor),
+                title: const Text('Take Photo', style: TextStyle(fontWeight: FontWeight.w600)),
+                onTap: () => Navigator.pop(sheetContext, 'camera'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded, color: AppTheme.primaryColor),
+                title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w600)),
+                onTap: () => Navigator.pop(sheetContext, 'gallery'),
+              ),
+              if (hasPhoto)
+                ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded, color: AppTheme.errorColor),
+                  title: const Text('Remove Photo', style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.errorColor)),
+                  onTap: () => Navigator.pop(sheetContext, 'remove'),
+                ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+
+  if (action == null || !context.mounted) return;
+
+  if (action == 'remove') {
+    final ok = await onRemovePhoto();
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Could not remove photo. Please try again.')));
+    }
+    return;
+  }
+
+  final source = action == 'camera' ? ImageSource.camera : ImageSource.gallery;
+  final picked = await picker.pickImage(source: source, imageQuality: 85);
+  if (picked == null || !context.mounted) return;
+  final ok = await onChangePhoto(File(picked.path));
+  if (!ok && context.mounted) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Could not update photo. Please try again.')));
   }
 }
 

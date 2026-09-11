@@ -592,6 +592,7 @@ class Technician {
   final String categoryId;
   final String categoryName;
   final int experienceYears;
+  final String? profilePhotoUrl;
   final double ratingAvg;
   final int ratingCount;
   final bool isVerified;
@@ -605,6 +606,7 @@ class Technician {
     required this.categoryId,
     required this.categoryName,
     required this.experienceYears,
+    this.profilePhotoUrl,
     required this.ratingAvg,
     required this.ratingCount,
     required this.isVerified,
@@ -620,6 +622,9 @@ class Technician {
       categoryId: (json['category_id'] as String?) ?? '',
       categoryName: (json['category_name'] as String?) ?? '',
       experienceYears: json['experience_years'] as int? ?? 0,
+      profilePhotoUrl: (json['profile_photo_url'] as String?)?.isNotEmpty == true
+          ? json['profile_photo_url'] as String
+          : null,
       ratingAvg: (json['rating_avg'] as num?)?.toDouble() ?? 0.0,
       ratingCount: json['rating_count'] as int? ?? 0,
       isVerified: json['is_verified'] as bool? ?? false,
@@ -657,6 +662,7 @@ class TechnicianNearby {
   final String categoryId;
   final String categoryName;
   final int experienceYears;
+  final String? profilePhotoUrl;
   final double ratingAvg;
   final int ratingCount;
   final bool isAvailable;
@@ -670,6 +676,7 @@ class TechnicianNearby {
     required this.categoryId,
     required this.categoryName,
     required this.experienceYears,
+    this.profilePhotoUrl,
     required this.ratingAvg,
     required this.ratingCount,
     required this.isAvailable,
@@ -687,6 +694,9 @@ class TechnicianNearby {
       categoryId: (json['category_id'] as String?) ?? '',
       categoryName: (json['category_name'] as String?) ?? '',
       experienceYears: json['experience_years'] as int? ?? 0,
+      profilePhotoUrl: (json['profile_photo_url'] as String?)?.isNotEmpty == true
+          ? json['profile_photo_url'] as String
+          : null,
       ratingAvg: (json['rating_avg'] as num?)?.toDouble() ?? 0.0,
       ratingCount: json['rating_count'] as int? ?? 0,
       isAvailable: json['is_available'] as bool? ?? true,
@@ -740,7 +750,7 @@ class TechnicianProfile {
   bool get isApproved => approvalStatus == 'approved';
   bool get isRejected => approvalStatus == 'rejected';
 
-  TechnicianProfile copyWith({bool? isAvailable, Map<String, DayHours?>? workingHours}) {
+  TechnicianProfile copyWith({bool? isAvailable, String? profilePhotoUrl, Map<String, DayHours?>? workingHours}) {
     return TechnicianProfile(
       id: id,
       userId: userId,
@@ -748,7 +758,7 @@ class TechnicianProfile {
       experienceYears: experienceYears,
       address: address,
       governmentIdUrl: governmentIdUrl,
-      profilePhotoUrl: profilePhotoUrl,
+      profilePhotoUrl: profilePhotoUrl ?? this.profilePhotoUrl,
       approvalStatus: approvalStatus,
       rejectionReason: rejectionReason,
       ratingAvg: ratingAvg,
