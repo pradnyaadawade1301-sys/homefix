@@ -1786,6 +1786,24 @@ abstract class AppLocalizations {
   /// **'Video'**
   String get consultTabVideo;
 
+  /// Text for consultTabCall on the Consult screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Call'**
+  String get consultTabCall;
+
+  /// Text for consultNoCallsTitle on the Consult screen.
+  ///
+  /// In en, this message translates to:
+  /// **'No calls yet'**
+  String get consultNoCallsTitle;
+
+  /// Text for consultNoCallsSubtitle on the Consult screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Once a technician is assigned to your booking, you\'ll be able to call them here.'**
+  String get consultNoCallsSubtitle;
+
   /// Text for consultNoChatsTitle on the Consult screen.
   ///
   /// In en, this message translates to:

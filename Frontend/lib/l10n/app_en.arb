@@ -428,6 +428,18 @@
   "@consultTabVideo": {
     "description": "Text for consultTabVideo on the Consult screen."
   },
+  "consultTabCall": "Call",
+  "@consultTabCall": {
+    "description": "Text for consultTabCall on the Consult screen."
+  },
+  "consultNoCallsTitle": "No calls yet",
+  "@consultNoCallsTitle": {
+    "description": "Text for consultNoCallsTitle on the Consult screen."
+  },
+  "consultNoCallsSubtitle": "Once a technician is assigned to your booking, you'll be able to call them here.",
+  "@consultNoCallsSubtitle": {
+    "description": "Text for consultNoCallsSubtitle on the Consult screen."
+  },
   "consultNoChatsTitle": "No chats yet",
   "@consultNoChatsTitle": {
     "description": "Text for consultNoChatsTitle on the Consult screen."

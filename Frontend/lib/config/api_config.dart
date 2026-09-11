@@ -95,6 +95,10 @@ class ApiConfig {
   static const String consultationDeclineScheduled = '/consultations'; // + /:id/decline-scheduled
   static const String consultationUpcoming = '/consultations/upcoming'; // GET (customer) - own call history
 
+  // Real audio-call history (who called, when, missed/received) — shared by
+  // customer Consult>Call tab and technician History>Call tab.
+  static const String callHistory = '/calls/history'; // GET -> {calls: [...]}
+
   // WebRTC signaling (peer-to-peer video/audio call handshake only — see
   // internal/handler/call_handler.go). Auth via ?token= query param since WebSocket
   // upgrades can't reliably carry custom headers on every platform.

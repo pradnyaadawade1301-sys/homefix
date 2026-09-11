@@ -233,7 +233,7 @@ class TechnicianJobDetailScreen extends StatelessWidget {
                             ),
                             const SizedBox(width: 10),
                             Expanded(
-                              child: OutlinedButton.icon(
+                              child: ElevatedButton.icon(
                                 icon: const Icon(Icons.call_outlined, size: 16),
                                 label: const Text('Call'),
                                 onPressed: () => startBookingAudioCall(

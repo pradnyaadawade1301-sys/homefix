@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/booking_call_launcher.dart';
 import '../../core/theme.dart';
 import '../../providers/booking_provider.dart';
 import '../../models/booking_model.dart';
@@ -284,6 +285,15 @@ class _TechnicianTile extends StatelessWidget {
             ),
           ),
 
+          IconButton(
+  icon: const Icon(Icons.call_outlined, color: AppTheme.primaryColor, size: 20),
+  tooltip: 'Call',
+  onPressed: () => startBookingAudioCall(
+    context,
+    bookingId: bookingId,
+    peerDisplayName: technician.name.isNotEmpty ? technician.name : l10n.bookingsTechnicianFallback,
+  ),
+),
           IconButton(
   icon: const Icon(Icons.forum_outlined, color: AppTheme.primaryColor, size: 20),
   tooltip: l10n.bookingsChatTooltip,
