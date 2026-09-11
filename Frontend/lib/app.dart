@@ -172,7 +172,19 @@ class _MyAppState extends State<MyApp> {
 
       try {
         final callInfo = await _bookingService.getCallInfo(bookingId);
+        // Two awaits already happened above (or are about to) — the navigator
+        // can unmount in that gap (screen popped, app backgrounded and torn
+        // down, etc). Using a stale context after that throws a FlutterError,
+        // so re-check .mounted after every await before touching navContext.
+        if (!navContext.mounted) {
+          FlutterRingtonePlayer().stop();
+          return;
+        }
         final token = await navContext.read<AuthProvider>().getValidAccessToken();
+        if (!navContext.mounted) {
+          FlutterRingtonePlayer().stop();
+          return;
+        }
         final myId = navContext.read<AuthProvider>().currentUser?.id ?? '';
 
         if (token == null) {
@@ -188,6 +200,7 @@ class _MyAppState extends State<MyApp> {
         signaling.connect();
 
         FlutterRingtonePlayer().stop();
+        if (!navContext.mounted) return;
         app.navigatorKey.currentState?.push(MaterialPageRoute(
           builder: (_) => VideoCallScreen(
             signaling: signaling,

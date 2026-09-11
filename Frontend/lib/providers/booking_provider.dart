@@ -394,6 +394,13 @@ Future<bool> raiseWarrantyClaim(String bookingId, {String note = ''}) async {
   try {
     final claim = await _bookingService.raiseWarrantyClaim(bookingId, note: note);
     _bookings.insert(0, claim);
+    // If the booking detail screen currently showing is the ORIGINAL booking
+    // this claim was raised against, refresh it too — otherwise it keeps
+    // showing stale state (no sign a claim was raised) until the user
+    // navigates away and back, even though the claim was created server-side.
+    if (_selectedBooking?.id == bookingId) {
+      _selectedBooking = await _bookingService.getBookingDetail(bookingId);
+    }
     _error = null;
     return true;
   } catch (e) {

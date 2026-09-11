@@ -43,10 +43,17 @@ class HttpClient {
             // Unauthorized - try to refresh token
             bool refreshed = await _refreshAccessToken();
             if (refreshed) {
-              // Retry the request
+              // Retry the request. For file uploads, requestOptions.data is a
+              // FormData whose MultipartFile streams get consumed the first
+              // time Dio sends them — reusing the same FormData object here
+              // throws "Stream has already been listened to." FormData.clone()
+              // rebuilds it with fresh, re-readable file streams so the retry
+              // actually works instead of always crashing on upload retries.
+              final originalData = error.requestOptions.data;
+              final retryData = originalData is FormData ? originalData.clone() : originalData;
               return handler.resolve(await _dio.request(
                 error.requestOptions.path,
-                data: error.requestOptions.data,
+                data: retryData,
                 queryParameters: error.requestOptions.queryParameters,
                 options: Options(
                   method: error.requestOptions.method,

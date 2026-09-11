@@ -339,7 +339,17 @@ class ConsultationProvider extends ChangeNotifier {
   Future<void> confirmScheduled(String consultationId) async {
     try {
       await _consultationService.confirmScheduled(consultationId);
-      _upcoming = _upcoming.map((c) => c.id == consultationId ? c.copyWith(status: ConsultationStatus.confirmed) : c).toList();
+      final foundLocally = _upcoming.any((c) => c.id == consultationId);
+      if (foundLocally) {
+        _upcoming = _upcoming.map((c) => c.id == consultationId ? c.copyWith(status: ConsultationStatus.confirmed) : c).toList();
+      } else {
+        // The server has already confirmed it, but it isn't in our local
+        // _upcoming list (e.g. this list hadn't loaded yet, or was stale) —
+        // mapping over the list silently does nothing in that case, leaving
+        // the UI unchanged even though the confirmation succeeded. Re-fetch
+        // from the server instead of just no-op'ing.
+        await fetchUpcomingList();
+      }
       _error = null;
       notifyListeners();
     } catch (e) {

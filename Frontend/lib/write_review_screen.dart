@@ -38,10 +38,13 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
             comment: _commentController.text.trim(),
           );
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      // Must show the SnackBar BEFORE popping — after pop() this screen's
+      // own context is deactivated, and "looking up a deactivated widget's
+      // ancestor" throws.
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Thanks for your feedback!')),
       );
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);

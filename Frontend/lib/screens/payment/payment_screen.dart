@@ -367,7 +367,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         const SizedBox(height: 24),
         SizedBox(
           width: double.infinity,
-          height: 50,
+          height: 56,
           child: ElevatedButton(
             onPressed: _retry,
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, foregroundColor: Colors.white),

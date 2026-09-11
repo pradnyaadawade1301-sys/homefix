@@ -262,6 +262,15 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   @override
   void dispose() {
     _stopRingback();
+    // Null out the callbacks before hangUp()/dispose — if the underlying
+    // service finishes some background work (a late ICE candidate, a stream
+    // event) after this screen is gone, an un-nulled callback would still
+    // fire and call setState() on a disposed State, crashing with
+    // "setState() called on disposed widget."
+    _webrtc.onLocalStream = null;
+    _webrtc.onRemoteStream = null;
+    _webrtc.onCallEnded = null;
+    widget.signaling.onMessage = null;
     _localRenderer.dispose();
     _remoteRenderer.dispose();
     _webrtc.hangUp();

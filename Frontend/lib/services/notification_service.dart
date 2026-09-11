@@ -210,10 +210,16 @@ class FcmNotificationService {
   /// Shows a local notification since FCM doesn't display foreground
   /// notifications automatically.
   Future<void> _onForegroundMessage(RemoteMessage message) async {
-    debugPrint('[FCM Foreground] message: ${message.messageId}');
-    debugPrint('[FCM Foreground] title: ${message.notification?.title}');
-    debugPrint('[FCM Foreground] body: ${message.notification?.body}');
-    debugPrint('[FCM Foreground] data: ${message.data}');
+    // FCM payloads carry sensitive user data — booking IDs, customer phone
+    // numbers, addresses, technician names. Logging them unconditionally
+    // exposes that to anyone reading device logs (ADB, analytics/crash
+    // tools) even in production. Only log in debug builds.
+    if (kDebugMode) {
+      debugPrint('[FCM Foreground] message: ${message.messageId}');
+      debugPrint('[FCM Foreground] title: ${message.notification?.title}');
+      debugPrint('[FCM Foreground] body: ${message.notification?.body}');
+      debugPrint('[FCM Foreground] data: ${message.data}');
+    }
 
     // Incoming consultation request: ring + jump straight to the
     // accept/decline screen immediately, instead of waiting for the user to
@@ -236,7 +242,7 @@ class FcmNotificationService {
 
   /// Handles a notification tap when the app was in the background.
   Future<void> _onNotificationOpenedApp(RemoteMessage message) async {
-    debugPrint('[FCM OpenedApp] data: ${message.data}');
+    if (kDebugMode) debugPrint('[FCM OpenedApp] data: ${message.data}');
     final payload = _toTapPayload(message);
     if (message.data['type'] == 'consultation_request') {
       onIncomingConsultation?.call(payload);

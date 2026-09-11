@@ -39,11 +39,14 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
             comment: _commentController.text.trim(),
           );
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => TaskCompletedScreen(booking: widget.booking, reviewed: true)),
-      );
+      // Must show the SnackBar BEFORE navigating away — after
+      // pushReplacement() this screen's own context is deactivated, and
+      // "looking up a deactivated widget's ancestor" throws.
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Thanks for your feedback!')),
+      );
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => TaskCompletedScreen(booking: widget.booking, reviewed: true)),
       );
     } catch (e) {
       if (!mounted) return;

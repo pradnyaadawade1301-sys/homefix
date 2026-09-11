@@ -46,12 +46,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  String? _formatTimestamp(dynamic raw) {
+  // Date and time are shown in two different places on the card (date top-right
+  // next to the title, time bottom-right next to the sender), so they're
+  // formatted separately rather than as one combined string.
+  DateTime? _parseTimestamp(dynamic raw) {
     if (raw == null) return null;
-    final dt = DateTime.tryParse(raw.toString());
-    if (dt == null) return null;
-    return DateFormat('d MMM yyyy, h:mm a').format(dt.toLocal());
+    return DateTime.tryParse(raw.toString())?.toLocal();
   }
+
+  String? _formatDate(DateTime? dt) => dt == null ? null : DateFormat('d MMM yyyy').format(dt);
+  String? _formatTime(DateTime? dt) => dt == null ? null : DateFormat('h:mm a').format(dt);
 
   Future<void> _openNotification(Map<String, dynamic> n) async {
     final title = n['title']?.toString() ?? 'Notification';
@@ -126,7 +130,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 final type = data?['type'] as String?;
                 final isUnread = n['is_read'] == false;
                 final senderName = (data?['sender_name'] as String?)?.trim();
-                final timestamp = _formatTimestamp(n['created_at']);
+                final dt = _parseTimestamp(n['created_at']);
+                final date = _formatDate(dt);
+                final time = _formatTime(dt);
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -142,6 +148,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     child: Padding(
                       padding: const EdgeInsets.all(14),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
                             width: 38,
@@ -157,14 +164,29 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: isUnread ? FontWeight.w700 : FontWeight.w500,
-                                  ),
+                                // Title on the left, date pinned top-right of the card.
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: isUnread ? FontWeight.w700 : FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                    if (date != null) ...[
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        date,
+                                        style: TextStyle(fontSize: 11, color: Colors.grey[500], fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                                 if (body != null && body.isNotEmpty) ...[
                                   const SizedBox(height: 3),
@@ -175,35 +197,44 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                     style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
                                   ),
                                 ],
-                                if ((senderName != null && senderName.isNotEmpty) || timestamp != null) ...[
+                                if ((senderName != null && senderName.isNotEmpty) || time != null) ...[
                                   const SizedBox(height: 5),
+                                  // Sender pinned left, time pinned bottom-right.
                                   Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      if (senderName != null && senderName.isNotEmpty) ...[
-                                        Icon(Icons.person_outline_rounded, size: 12, color: Colors.grey[500]),
-                                        const SizedBox(width: 3),
+                                      if (senderName != null && senderName.isNotEmpty)
                                         Flexible(
-                                          child: Text(
-                                            senderName,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(fontSize: 11.5, color: Colors.grey[500], fontWeight: FontWeight.w600),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.person_outline_rounded, size: 12, color: Colors.grey[500]),
+                                              const SizedBox(width: 3),
+                                              Flexible(
+                                                child: Text(
+                                                  senderName,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(fontSize: 11.5, color: Colors.grey[500], fontWeight: FontWeight.w600),
+                                                ),
+                                              ),
+                                            ],
                                           ),
+                                        )
+                                      else
+                                        const SizedBox.shrink(),
+                                      if (time != null)
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.schedule_rounded, size: 12, color: Colors.grey[500]),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              time,
+                                              style: TextStyle(fontSize: 11.5, color: Colors.grey[500]),
+                                            ),
+                                          ],
                                         ),
-                                        if (timestamp != null) const SizedBox(width: 8),
-                                      ],
-                                      if (timestamp != null) ...[
-                                        Icon(Icons.schedule_rounded, size: 12, color: Colors.grey[500]),
-                                        const SizedBox(width: 3),
-                                        Flexible(
-                                          child: Text(
-                                            timestamp,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(fontSize: 11.5, color: Colors.grey[500]),
-                                          ),
-                                        ),
-                                      ],
                                     ],
                                   ),
                                 ],
@@ -214,7 +245,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             Container(
                               width: 8,
                               height: 8,
-                              margin: const EdgeInsets.only(left: 8),
+                              margin: const EdgeInsets.only(left: 8, top: 4),
                               decoration: const BoxDecoration(color: AppTheme.primaryColor, shape: BoxShape.circle),
                             ),
                         ],
