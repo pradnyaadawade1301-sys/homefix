@@ -285,10 +285,23 @@ class _RecommendedTechCard extends StatelessWidget {
                 CircleAvatar(
                   radius: 30,
                   backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.15),
-                  child: Text(
-                    technician.name.isNotEmpty ? technician.name[0].toUpperCase() : '?',
-                    style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 22),
-                  ),
+                  child: (technician.profilePhotoUrl?.isNotEmpty ?? false)
+                      ? ClipOval(
+                          child: Image.network(
+                            technician.profilePhotoUrl!,
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Text(
+                              technician.name.isNotEmpty ? technician.name[0].toUpperCase() : '?',
+                              style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 22),
+                            ),
+                          ),
+                        )
+                      : Text(
+                          technician.name.isNotEmpty ? technician.name[0].toUpperCase() : '?',
+                          style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 22),
+                        ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -411,10 +424,23 @@ class _TechCard extends StatelessWidget {
             CircleAvatar(
               radius: 28,
               backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
-              child: Text(
-                technician.name.isNotEmpty ? technician.name[0].toUpperCase() : '?',
-                style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 18),
-              ),
+              child: (technician.profilePhotoUrl?.isNotEmpty ?? false)
+                  ? ClipOval(
+                      child: Image.network(
+                        technician.profilePhotoUrl!,
+                        width: 56,
+                        height: 56,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Text(
+                          technician.name.isNotEmpty ? technician.name[0].toUpperCase() : '?',
+                          style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 18),
+                        ),
+                      ),
+                    )
+                  : Text(
+                      technician.name.isNotEmpty ? technician.name[0].toUpperCase() : '?',
+                      style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
             ),
             const SizedBox(width: 14),
             Expanded(

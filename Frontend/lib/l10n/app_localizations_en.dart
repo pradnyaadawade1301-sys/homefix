@@ -575,7 +575,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get techJobsBottomNavSettlement => 'Settlement';
 
   @override
-  String get techJobsBottomNavHistory => 'History';
+  String get techJobsBottomNavHistory => 'Chat';
 
   @override
   String get techJobsWelcomeBack => 'Welcome back 👋';

@@ -1159,7 +1159,7 @@ abstract class AppLocalizations {
   /// No description provided for @techJobsBottomNavHistory.
   ///
   /// In en, this message translates to:
-  /// **'History'**
+  /// **'Chat'**
   String get techJobsBottomNavHistory;
 
   /// No description provided for @techJobsWelcomeBack.

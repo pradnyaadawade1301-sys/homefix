@@ -575,7 +575,7 @@ class AppLocalizationsHi extends AppLocalizations {
   String get techJobsBottomNavSettlement => 'भुगतान';
 
   @override
-  String get techJobsBottomNavHistory => 'इतिहास';
+  String get techJobsBottomNavHistory => 'चैट';
 
   @override
   String get techJobsWelcomeBack => 'वापसी पर स्वागत है 👋';

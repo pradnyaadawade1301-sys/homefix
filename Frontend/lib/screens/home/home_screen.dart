@@ -994,10 +994,23 @@ class _TechnicianCard extends StatelessWidget {
             CircleAvatar(
               radius: 28,
               backgroundColor: Colors.white.withValues(alpha: 0.2),
-              child: Text(
-                technician.name.isNotEmpty ? technician.name[0].toUpperCase() : '?',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-              ),
+              child: (technician.profilePhotoUrl?.isNotEmpty ?? false)
+                  ? ClipOval(
+                      child: Image.network(
+                        technician.profilePhotoUrl!,
+                        width: 56,
+                        height: 56,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Text(
+                          technician.name.isNotEmpty ? technician.name[0].toUpperCase() : '?',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                        ),
+                      ),
+                    )
+                  : Text(
+                      technician.name.isNotEmpty ? technician.name[0].toUpperCase() : '?',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
             ),
             const SizedBox(width: 14),
             Expanded(

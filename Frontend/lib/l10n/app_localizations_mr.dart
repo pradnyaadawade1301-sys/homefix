@@ -574,7 +574,7 @@ class AppLocalizationsMr extends AppLocalizations {
   String get techJobsBottomNavSettlement => 'सेटलमेंट';
 
   @override
-  String get techJobsBottomNavHistory => 'इतिहास';
+  String get techJobsBottomNavHistory => 'चॅट';
 
   @override
   String get techJobsWelcomeBack => 'परत स्वागत आहे 👋';
