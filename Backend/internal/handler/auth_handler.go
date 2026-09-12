@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -171,8 +172,19 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
-	// Stateless JWT: logout is handled client-side by discarding tokens.
-	// (A refresh-token blocklist table can be added later if server-side revocation is needed.)
+	// Stateless JWT: token invalidation is handled client-side by discarding
+	// tokens. (A refresh-token blocklist table can be added later if
+	// server-side revocation is needed.) The FCM token IS cleared here
+	// though — see AuthService.Logout — since a stale token left behind
+	// after logout can otherwise cause a different account that later logs
+	// in on the same device to receive push notifications meant for this
+	// user.
+	userID := c.GetString("user_id")
+	if userID != "" {
+		if err := h.authService.Logout(c.Request.Context(), userID); err != nil {
+			log.Printf("logout: failed to clear FCM token for user %s: %v", userID, err)
+		}
+	}
 	utils.Success(c, http.StatusOK, gin.H{"message": "logged out"})
 }
 

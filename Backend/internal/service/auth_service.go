@@ -37,7 +37,16 @@ func NewAuthService(userRepo *repository.UserRepository, mailService *MailServic
 	}
 }
 
-// RequestOTP finds-or-creates the user by phone, generates a real random OTP, and persists it
+// Logout clears the user's stored FCM token so it no longer receives push
+// notifications. Without this, if a different account (customer or
+// technician) later logs in on the same physical device without
+// reinstalling the app, the FCM token stays the same and this user's old
+// row would keep matching that device — so pushes meant for THIS user
+// would land on whoever is now logged in there instead.
+func (s *AuthService) Logout(ctx context.Context, userID string) error {
+	return s.userRepo.SetFCMToken(ctx, userID, "")
+}
+
 // with a 5-minute expiry. In production this hands off to an SMS gateway; here it returns the
 // OTP only when ENV=development so the flow is testable without a paid SMS provider wired in yet.
 func (s *AuthService) RequestOTP(ctx context.Context, phone string) (string, error) {
