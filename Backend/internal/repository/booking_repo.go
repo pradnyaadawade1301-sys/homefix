@@ -373,7 +373,11 @@ func (r *BookingRepository) CountPriorBookings(ctx context.Context, customerID, 
 // repeat-customer screen.
 func (r *BookingRepository) ListRepeatCustomersByTechnician(ctx context.Context, technicianID string) ([]models.RepeatCustomer, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT b.customer_id, COALESCE(u.name,''), COALESCE(u.phone,''), COUNT(*) AS total_bookings, MAX(b.created_at) AS last_booking_at
+		SELECT b.customer_id, COALESCE(u.name,''), COALESCE(u.phone,''), COUNT(*) AS total_bookings, MAX(b.created_at) AS last_booking_at,
+			(SELECT ab.id FROM bookings ab
+			 WHERE ab.customer_id = b.customer_id AND ab.technician_id = $1
+			   AND ab.status IN ('accepted','on_the_way','arrived','inspecting','in_progress')
+			 ORDER BY ab.created_at DESC LIMIT 1) AS active_booking_id
 		FROM bookings b
 		JOIN users u ON u.id = b.customer_id
 		WHERE b.technician_id = $1 AND b.status = 'completed' AND b.is_warranty_claim = false
@@ -389,7 +393,7 @@ func (r *BookingRepository) ListRepeatCustomersByTechnician(ctx context.Context,
 	var out []models.RepeatCustomer
 	for rows.Next() {
 		var rc models.RepeatCustomer
-		if err := rows.Scan(&rc.CustomerID, &rc.Name, &rc.Phone, &rc.TotalBookings, &rc.LastBookingAt); err != nil {
+		if err := rows.Scan(&rc.CustomerID, &rc.Name, &rc.Phone, &rc.TotalBookings, &rc.LastBookingAt, &rc.ActiveBookingID); err != nil {
 			return nil, err
 		}
 		out = append(out, rc)

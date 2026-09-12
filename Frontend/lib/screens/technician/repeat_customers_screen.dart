@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme.dart';
-import '../../core/contact_actions.dart';
+import '../../core/booking_call_launcher.dart';
 import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/category_provider.dart' show TechnicianKycProvider;
+import '../chat/booking_chat_screen.dart';
 import 'customer_service_history_screen.dart';
 
 /// Technician-facing "My Customers" screen — lists customers who have booked
@@ -134,13 +135,47 @@ class _RepeatCustomerCard extends StatelessWidget {
                   style: const TextStyle(color: AppTheme.successColor, fontWeight: FontWeight.w600, fontSize: 12),
                 ),
               ),
-              if (customer.phone.isNotEmpty) ...[
+              if (customer.activeBookingId != null) ...[
                 const SizedBox(height: 8),
-                IconButton(
-                  icon: const Icon(Icons.call_outlined, size: 20, color: AppTheme.primaryColor),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  onPressed: () => callContact(context, customer.phone),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chat_bubble_outline, size: 20, color: AppTheme.primaryColor),
+                      tooltip: 'Chat',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => BookingChatScreen(
+                          bookingId: customer.activeBookingId!,
+                          peerName: customer.name.isNotEmpty ? customer.name : 'Customer',
+                        ),
+                      )),
+                    ),
+                    const SizedBox(width: 12),
+                    IconButton(
+                      icon: const Icon(Icons.call_outlined, size: 20, color: AppTheme.primaryColor),
+                      tooltip: 'Call',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () => startBookingAudioCall(
+                        context,
+                        bookingId: customer.activeBookingId!,
+                        peerDisplayName: customer.name.isNotEmpty ? customer.name : 'Customer',
+                      ),
+                    ),
+                  ],
+                ),
+              ] else if (customer.phone.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Tooltip(
+                  message: 'Available once this customer has an active booking with you',
+                  child: Row(
+                    children: [
+                      Icon(Icons.chat_bubble_outline, size: 20, color: Colors.grey[400]),
+                      const SizedBox(width: 12),
+                      Icon(Icons.call_outlined, size: 20, color: Colors.grey[400]),
+                    ],
+                  ),
                 ),
               ],
             ],

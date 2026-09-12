@@ -50,13 +50,9 @@ func (r *ReviewRepository) CreateForConsultation(ctx context.Context, consultati
 	return rv, nil
 }
 
-// ListByTechnician is the technician-facing "My Reviews" list — it joins the
-// customer's name in so the technician can see WHO left each review, not
-// just an anonymous rating + comment.
 func (r *ReviewRepository) ListByTechnician(ctx context.Context, technicianID string) ([]models.Review, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT rv.id, rv.booking_id, rv.customer_id, rv.technician_id, rv.rating, COALESCE(rv.comment,''), rv.created_at,
-		       COALESCE(u.name, '')
+		SELECT rv.id, rv.booking_id, rv.customer_id, rv.technician_id, rv.rating, COALESCE(rv.comment,''), rv.created_at, COALESCE(u.name,'')
 		FROM reviews rv
 		LEFT JOIN users u ON u.id = rv.customer_id
 		WHERE rv.technician_id = $1 ORDER BY rv.created_at DESC
@@ -74,5 +70,5 @@ func (r *ReviewRepository) ListByTechnician(ctx context.Context, technicianID st
 		}
 		out = append(out, rv)
 	}
-	return out, rows.Err()
+	return out, nil
 }

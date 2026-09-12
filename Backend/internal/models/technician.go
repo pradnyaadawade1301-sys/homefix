@@ -63,11 +63,18 @@ type TechnicianNearby struct {
 // RepeatCustomer is a customer who has booked a given technician more than once —
 // powers the technician's "My Customers" / repeat-customer screen.
 type RepeatCustomer struct {
-	CustomerID    string    `json:"customer_id"`
-	Name          string    `json:"name"`
-	Phone         string    `json:"phone"`
-	TotalBookings int       `json:"total_bookings"`
-	LastBookingAt time.Time `json:"last_booking_at"`
+	CustomerID      string    `json:"customer_id"`
+	Name            string    `json:"name"`
+	Phone           string    `json:"phone"`
+	TotalBookings   int       `json:"total_bookings"`
+	LastBookingAt   time.Time `json:"last_booking_at"`
+	// ActiveBookingID is set only when this customer currently has a booking
+	// with this technician in one of the "call/chat allowed" statuses (see
+	// BookingService.InitiateCall) — nil the rest of the time, since most
+	// repeat customers only appear here because their PAST job is already
+	// completed. The frontend uses this to enable/disable the in-app
+	// Call/Chat buttons instead of falling back to the phone dialer.
+	ActiveBookingID *string `json:"active_booking_id"`
 }
 
 // RepeatTechnician is the customer-side mirror of RepeatCustomer — technicians a
