@@ -7,11 +7,14 @@ import '../services/signaling_service.dart';
 import '../screens/video_call_screen.dart';
 
 /// Mirrors the status whitelist in BookingService.InitiateCall on the
-/// backend: a call can only be started once a technician is assigned and
-/// the job is actively underway. Screens should use this to disable/hide
-/// their "Call" button up front, instead of letting the user tap it and
-/// only then surfacing the backend's "a call can only be started while the
-/// job is active" error.
+/// backend: a call is allowed once a technician is assigned and the job has
+/// at least started — and stays allowed even after the job is marked
+/// completed (e.g. the customer following up about the finished work), so
+/// this only excludes the states where there's genuinely no one to call yet
+/// (still just 'requested'/'pending_technician') or the booking is dead
+/// (cancelled). Screens should use this to disable/hide their "Call" button
+/// up front, instead of letting the user tap it and only then surfacing the
+/// backend's "a call can only be started while the job is active" error.
 bool isCallableBookingStatus(String status) {
   switch (status) {
     case 'accepted':
@@ -19,6 +22,7 @@ bool isCallableBookingStatus(String status) {
     case 'arrived':
     case 'inspecting':
     case 'in_progress':
+    case 'completed':
       return true;
     default:
       return false;

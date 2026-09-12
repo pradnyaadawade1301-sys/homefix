@@ -405,8 +405,10 @@ func (s *BookingService) InitiateCall(ctx context.Context, callerUserID, booking
 		return nil, errors.New("no technician is assigned to this booking yet")
 	}
 	switch b.Status {
-	case models.BookingAccepted, models.BookingOnTheWay, models.BookingArrived, models.BookingInspecting, models.BookingInProgress:
-		// ok — an active, ongoing booking
+	case models.BookingAccepted, models.BookingOnTheWay, models.BookingArrived, models.BookingInspecting, models.BookingInProgress, models.BookingCompleted:
+		// ok — an active booking, or a completed one (e.g. following up
+		// about finished work) — calling stays available even after
+		// completion, it's only truly-not-started/cancelled jobs that block it
 	default:
 		return nil, errors.New("a call can only be started while the job is active")
 	}
