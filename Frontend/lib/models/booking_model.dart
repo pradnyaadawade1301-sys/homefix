@@ -125,25 +125,31 @@ class Booking {
   final BookingAddressInfo? address;
   final BookingCustomerInfo? customer;
   final BookingTechnicianInfo? technician;
-  // --- Warranty (technician-controlled, admin-configured — see migration
-  // 022_booking_warranty.sql on the backend) ---
+  // --- Warranty (technician-controlled — see migration
+  // 032_warranty_description.sql on the backend) ---
   // Set once, at completion, by the technician's optional "Warranty: Yes"
-  // choice. warrantyDays used to be restricted to the category's configured
-  // options — that restriction was removed, so this can be any positive
-  // number now. warrantyDescription is an optional free-text note from the
-  // technician on what's actually covered (e.g. "Compressor and gas refill
-  // only"), set alongside warrantyDays at the same time.
+  // choice; warrantyDays is any positive number of days the technician
+  // types — there's no admin-configured whitelist any more.
   final bool warrantyEnabled;
   final int? warrantyDays;
   final DateTime? warrantyExpiresAt;
+  // Free text the technician writes describing what the warranty actually
+  // covers (e.g. "Compressor and gas refill only") — separate from how long
+  // it lasts.
   final String? warrantyDescription;
   // True if this booking is itself a warranty claim raised against an
   // earlier, completed booking (see [warrantyClaimOf]).
   final bool isWarrantyClaim;
   final String? warrantyClaimOf;
   final String? warrantyClaimOfServiceCode;
-  // How many chat messages on this booking the current user hasn't opened
-  // yet — powers the WhatsApp-style badge on the Consult > Chat list.
+  // How this booking originated — 'pool' (open request), 'book_now'
+  // (customer picked this technician directly from their profile), or
+  // 'video_call' (created after an audio/video consultation call). Powers
+  // the technician job screen's filter chips — see backend migration
+  // 031_booking_source.sql.
+  final String source;
+  // Number of chat messages on this booking the current user hasn't read
+  // yet — powers the unread badge on ConsultScreen's booking-chat list.
   final int unreadMessageCount;
 
   Booking({
@@ -175,6 +181,7 @@ class Booking {
     this.isWarrantyClaim = false,
     this.warrantyClaimOf,
     this.warrantyClaimOfServiceCode,
+    this.source = 'pool',
     this.unreadMessageCount = 0,
   });
 
@@ -206,6 +213,17 @@ class Booking {
   /// explicit warranty choice (yes or no) — used to decide whether to show
   /// the warranty section on the invoice/service-details screen at all.
   bool get hasWarrantyDecision => status == 'completed';
+
+  /// True if this booking came from the customer tapping "Book Now" on a
+  /// specific technician's profile (as opposed to the open request pool or a
+  /// video-call consultation).
+  bool get isBookNowSource => source == 'book_now';
+
+  /// True if this booking was created after an audio/video consultation call.
+  bool get isVideoCallSource => source == 'video_call';
+
+  /// True if the customer picked a future date/time slot rather than ASAP.
+  bool get isScheduledForLater => scheduledAt != null && scheduledAt!.isAfter(DateTime.now());
 
   // ---------------------------------------------------------------------
   // Job Brief
@@ -260,7 +278,8 @@ class Booking {
       isWarrantyClaim: json['is_warranty_claim'] as bool? ?? false,
       warrantyClaimOf: json['warranty_claim_of'] as String?,
       warrantyClaimOfServiceCode: json['warranty_claim_of_service_code'] as String?,
-      unreadMessageCount: json['unread_message_count'] as int? ?? 0,
+      source: (json['source'] as String?) ?? 'pool',
+      unreadMessageCount: (json['unread_message_count'] as num?)?.toInt() ?? 0,
     );
   }
 }
@@ -601,9 +620,12 @@ class Technician {
   final int ratingCount;
   final bool isVerified;
   final bool isAvailable;
-  final String? profilePhotoUrl;
   final DateTime createdAt;
   final Map<String, DayHours?> workingHours;
+  // Used by home_screen.dart's "My Technicians" card, technician_detail_screen.dart
+  // and technician_list_screen.dart avatars — same 'profile_photo_url' key the
+  // KYC/admin endpoints already use elsewhere.
+  final String? profilePhotoUrl;
 
   Technician({
     required this.id,
@@ -615,9 +637,9 @@ class Technician {
     required this.ratingCount,
     required this.isVerified,
     required this.isAvailable,
-    this.profilePhotoUrl,
     required this.createdAt,
     this.workingHours = const {},
+    this.profilePhotoUrl,
   });
 
   factory Technician.fromJson(Map<String, dynamic> json) {
@@ -631,11 +653,11 @@ class Technician {
       ratingCount: json['rating_count'] as int? ?? 0,
       isVerified: json['is_verified'] as bool? ?? false,
       isAvailable: json['is_available'] as bool? ?? true,
-      profilePhotoUrl: (json['profile_photo_url'] as String?)?.isNotEmpty == true ? json['profile_photo_url'] as String : null,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
       workingHours: parseWorkingHours(json['working_hours']),
+      profilePhotoUrl: json['profile_photo_url'] as String?,
     );
   }
 
@@ -650,9 +672,9 @@ class Technician {
       'rating_count': ratingCount,
       'is_verified': isVerified,
       'is_available': isAvailable,
-      'profile_photo_url': profilePhotoUrl,
       'created_at': createdAt.toIso8601String(),
       'working_hours': workingHours.map((k, v) => MapEntry(k, v?.toJson())),
+      'profile_photo_url': profilePhotoUrl,
     };
   }
 }
@@ -669,10 +691,12 @@ class TechnicianNearby {
   final double ratingAvg;
   final int ratingCount;
   final bool isAvailable;
-  final String? profilePhotoUrl;
   final double? currentLat;
   final double? currentLng;
   final double? distanceKm;
+  // Same avatar field as [Technician] — technician_list_screen.dart's
+  // recommended-technician card reads this off TechnicianNearby directly.
+  final String? profilePhotoUrl;
 
   TechnicianNearby({
     required this.id,
@@ -683,10 +707,10 @@ class TechnicianNearby {
     required this.ratingAvg,
     required this.ratingCount,
     required this.isAvailable,
-    this.profilePhotoUrl,
     this.currentLat,
     this.currentLng,
     this.distanceKm,
+    this.profilePhotoUrl,
   });
 
   bool get hasLocation => currentLat != null && currentLng != null;
@@ -701,10 +725,10 @@ class TechnicianNearby {
       ratingAvg: (json['rating_avg'] as num?)?.toDouble() ?? 0.0,
       ratingCount: json['rating_count'] as int? ?? 0,
       isAvailable: json['is_available'] as bool? ?? true,
-      profilePhotoUrl: (json['profile_photo_url'] as String?)?.isNotEmpty == true ? json['profile_photo_url'] as String : null,
       currentLat: (json['current_lat'] as num?)?.toDouble(),
       currentLng: (json['current_lng'] as num?)?.toDouble(),
       distanceKm: (json['distance_km'] as num?)?.toDouble(),
+      profilePhotoUrl: json['profile_photo_url'] as String?,
     );
   }
 }
@@ -752,7 +776,11 @@ class TechnicianProfile {
   bool get isApproved => approvalStatus == 'approved';
   bool get isRejected => approvalStatus == 'rejected';
 
-  TechnicianProfile copyWith({bool? isAvailable, Map<String, DayHours?>? workingHours, String? profilePhotoUrl}) {
+  TechnicianProfile copyWith({
+    bool? isAvailable,
+    Map<String, DayHours?>? workingHours,
+    String? profilePhotoUrl,
+  }) {
     return TechnicianProfile(
       id: id,
       userId: userId,
@@ -969,6 +997,10 @@ class Review {
   final int rating;
   final String comment;
   final DateTime createdAt;
+  // Only populated on the technician-facing "My Reviews" list (see
+  // ReviewRepository.ListByTechnician on the backend) — who left this
+  // review, so it isn't just an anonymous rating + comment.
+  final String customerName;
 
   Review({
     required this.id,
@@ -978,6 +1010,7 @@ class Review {
     required this.rating,
     required this.comment,
     required this.createdAt,
+    this.customerName = '',
   });
 
   factory Review.fromJson(Map<String, dynamic> json) {
@@ -989,6 +1022,7 @@ class Review {
       rating: (json['rating'] as num?)?.toInt() ?? 0,
       comment: (json['comment'] as String?) ?? '',
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : DateTime.now(),
+      customerName: (json['customer_name'] as String?) ?? '',
     );
   }
 }
@@ -1023,4 +1057,4 @@ class BookingCallInfo {
       customerName: cust?['name'] as String?,
     );
   }
-}
+}  

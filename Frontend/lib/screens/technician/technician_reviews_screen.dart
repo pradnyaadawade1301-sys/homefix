@@ -126,6 +126,19 @@ class _TechnicianReviewsScreenState extends State<TechnicianReviewsScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
+                                // Customer name (falls back to "Anonymous" if
+                                // the backend ever returns an empty/old
+                                // record without one) on the left, stars on
+                                // the right where they used to sit alone.
+                                Expanded(
+                                  child: Text(
+                                    r.customerName.isNotEmpty ? r.customerName : 'Anonymous',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
                                 Row(
                                   children: List.generate(
                                     5,
@@ -136,11 +149,12 @@ class _TechnicianReviewsScreenState extends State<TechnicianReviewsScreen> {
                                     ),
                                   ),
                                 ),
-                                Text(
-                                  DateFormat('d MMM yyyy').format(r.createdAt.toLocal()),
-                                  style: TextStyle(fontSize: 11.5, color: Colors.grey[500]),
-                                ),
                               ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              DateFormat('d MMM yyyy').format(r.createdAt.toLocal()),
+                              style: TextStyle(fontSize: 11.5, color: Colors.grey[500]),
                             ),
                             if (r.comment.isNotEmpty) ...[
                               const SizedBox(height: 8),

@@ -279,7 +279,7 @@ icon: const Icon(Icons.language_rounded),
           BottomNavigationBarItem(icon: const Icon(Icons.work_outline_rounded), label: l10n.techJobsBottomNavJobs),
           BottomNavigationBarItem(icon: const Icon(Icons.event_available_outlined), label: l10n.techJobsBottomNavUpcoming),
           BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined, key: _settlementNavKey), label: l10n.techJobsBottomNavSettlement),
-BottomNavigationBarItem(icon: const Icon(Icons.chat_bubble_outline_rounded), label: l10n.techJobsBottomNavHistory),        ],
+BottomNavigationBarItem(icon: const Icon(Icons.chat_bubble_outline_rounded), label: l10n.techJobsBottomNavHistory),            ],
       ),
       ),
     );
@@ -738,21 +738,13 @@ class _JobCard extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    icon: Icon(
-                      Icons.call_outlined,
-                      color: isCallableBookingStatus(booking.status) ? AppTheme.primaryColor : Colors.grey[400],
-                      size: 20,
+                    icon: const Icon(Icons.call_outlined, color: AppTheme.primaryColor, size: 20),
+                    tooltip: 'Call',
+                    onPressed: () => startBookingAudioCall(
+                      context,
+                      bookingId: booking.id,
+                      peerDisplayName: customer.name.isNotEmpty ? customer.name : l10n.techJobsCustomerFallback,
                     ),
-                    tooltip: isCallableBookingStatus(booking.status)
-                        ? 'Call'
-                        : 'You can call once the job is active',
-                    onPressed: isCallableBookingStatus(booking.status)
-                        ? () => startBookingAudioCall(
-                              context,
-                              bookingId: booking.id,
-                              peerDisplayName: customer.name.isNotEmpty ? customer.name : l10n.techJobsCustomerFallback,
-                            )
-                        : null,
                   ),
                   IconButton(
                     icon: const Icon(Icons.forum_outlined, color: AppTheme.primaryColor, size: 20),
