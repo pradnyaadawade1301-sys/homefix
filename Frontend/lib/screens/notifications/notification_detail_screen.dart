@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/booking_provider.dart';
 import '../booking/booking_tracking_screen.dart';
+import '../technician/technician_job_detail_screen.dart';
 import '../consultation/post_call_screen.dart';
 
 /// Opened when the user taps a push-notification popup (foreground local
@@ -12,7 +16,7 @@ import '../consultation/post_call_screen.dart';
 /// `consultation_id` (e.g. "Technician's recommendation is ready" — see
 /// ConsultationService.RecommendOnsite on the backend, which sends
 /// type: "consultation_recommendation" with the consultation_id).
-class NotificationDetailScreen extends StatelessWidget {
+class NotificationDetailScreen extends StatefulWidget {
   final String title;
   final String body;
   final Map<String, dynamic>? data;
@@ -26,20 +30,57 @@ class NotificationDetailScreen extends StatelessWidget {
     this.createdAt,
   }) : super(key: key);
 
-  String? _formatTimestamp(String? raw) {
-    if (raw == null) return null;
-    final dt = DateTime.tryParse(raw);
-    if (dt == null) return null;
-    return DateFormat('d MMM yyyy, h:mm a').format(dt.toLocal());
+  @override
+  State<NotificationDetailScreen> createState() => _NotificationDetailScreenState();
+}
+
+class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
+  bool _openingBooking = false;
+
+  /// "View Booking" used to always push the CUSTOMER-facing
+  /// BookingTrackingScreen, regardless of who was actually logged in. A
+  /// technician tapping "New booking request" landed on the customer's own
+  /// tracking view (call/chat-the-technician buttons and all) instead of
+  /// their job screen. Route by role instead, and — since the technician
+  /// screen needs a full Booking object, not just an id — fetch it first.
+  Future<void> _openBooking(String bookingId) async {
+    final role = context.read<AuthProvider>().currentUser?.role;
+    if (role == 'technician') {
+      setState(() => _openingBooking = true);
+      try {
+        final provider = context.read<BookingProvider>();
+        await provider.fetchBookingDetail(bookingId);
+        if (!mounted) return;
+        final booking = provider.selectedBooking;
+        if (booking == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not load this job')),
+          );
+          return;
+        }
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => TechnicianJobDetailScreen(booking: booking),
+        ));
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not load this job: $e')),
+        );
+      } finally {
+        if (mounted) setState(() => _openingBooking = false);
+      }
+    } else {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => BookingTrackingScreen(bookingId: bookingId),
+      ));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final bookingId = data?['booking_id'] as String?;
-    final consultationId = data?['consultation_id'] as String?;
-    final type = data?['type'] as String?;
-    final senderName = (data?['sender_name'] as String?)?.trim();
-    final timestamp = _formatTimestamp(createdAt);
+    final bookingId = widget.data?['booking_id'] as String?;
+    final consultationId = widget.data?['consultation_id'] as String?;
+    final type = widget.data?['type'] as String?;
 
     // Different label depending on what the consultation notification was
     // actually about, so the button reads naturally either way.
@@ -69,52 +110,34 @@ class NotificationDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              title,
+              widget.title,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
             Text(
-              body,
+              widget.body,
               style: TextStyle(fontSize: 14.5, color: Colors.grey[800], height: 1.4),
             ),
-            if ((senderName != null && senderName.isNotEmpty) || timestamp != null) ...[
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 16,
-                runSpacing: 6,
-                children: [
-                  if (senderName != null && senderName.isNotEmpty)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.person_outline_rounded, size: 15, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
-                        Text(senderName, style: TextStyle(fontSize: 13, color: Colors.grey[700], fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  if (timestamp != null)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.schedule_rounded, size: 15, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
-                        Text(timestamp, style: TextStyle(fontSize: 13, color: Colors.grey[700])),
-                      ],
-                    ),
-                ],
-              ),
+            if (widget.createdAt != null && widget.createdAt!.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Builder(builder: (context) {
+                final dt = DateTime.tryParse(widget.createdAt!)?.toLocal();
+                if (dt == null) return const SizedBox.shrink();
+                return Text(
+                  DateFormat('d MMM yyyy, h:mm a').format(dt),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                );
+              }),
             ],
             if (bookingId != null && bookingId.isNotEmpty) ...[
               const SizedBox(height: 28),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => BookingTrackingScreen(bookingId: bookingId),
-                    ));
-                  },
-                  icon: const Icon(Icons.local_shipping_outlined, size: 18),
+                  onPressed: _openingBooking ? null : () => _openBooking(bookingId),
+                  icon: _openingBooking
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.local_shipping_outlined, size: 18),
                   label: const Text('View Booking'),
                   style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
                 ),
