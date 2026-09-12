@@ -50,10 +50,16 @@ func (r *ReviewRepository) CreateForConsultation(ctx context.Context, consultati
 	return rv, nil
 }
 
+// ListByTechnician is the technician-facing "My Reviews" list — it joins the
+// customer's name in so the technician can see WHO left each review, not
+// just an anonymous rating + comment.
 func (r *ReviewRepository) ListByTechnician(ctx context.Context, technicianID string) ([]models.Review, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, booking_id, customer_id, technician_id, rating, COALESCE(comment,''), created_at
-		FROM reviews WHERE technician_id = $1 ORDER BY created_at DESC
+		SELECT rv.id, rv.booking_id, rv.customer_id, rv.technician_id, rv.rating, COALESCE(rv.comment,''), rv.created_at,
+		       COALESCE(u.name, '')
+		FROM reviews rv
+		LEFT JOIN users u ON u.id = rv.customer_id
+		WHERE rv.technician_id = $1 ORDER BY rv.created_at DESC
 	`, technicianID)
 	if err != nil {
 		return nil, err
@@ -63,10 +69,10 @@ func (r *ReviewRepository) ListByTechnician(ctx context.Context, technicianID st
 	var out []models.Review
 	for rows.Next() {
 		var rv models.Review
-		if err := rows.Scan(&rv.ID, &rv.BookingID, &rv.CustomerID, &rv.TechnicianID, &rv.Rating, &rv.Comment, &rv.CreatedAt); err != nil {
+		if err := rows.Scan(&rv.ID, &rv.BookingID, &rv.CustomerID, &rv.TechnicianID, &rv.Rating, &rv.Comment, &rv.CreatedAt, &rv.CustomerName); err != nil {
 			return nil, err
 		}
 		out = append(out, rv)
 	}
-	return out, nil
+	return out, rows.Err()
 }
