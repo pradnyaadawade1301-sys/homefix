@@ -464,9 +464,19 @@ func (s *ConsultationService) PendingForUser(ctx context.Context, userID string)
 	return s.consultRepo.ListPendingForTechnician(ctx, tech.ID)
 }
 
-// MyConsultations is the customer-facing call history (GET /consultations/mine) —
-// every consultation they've ever requested, most recent first.
+// MyConsultations is the call history for GET /consultations/mine — every
+// consultation the caller has ever been part of, most recent first. Used by
+// BOTH sides (see the frontend's ConsultationProvider.loadHistory(), shared
+// by the customer and technician History screens): a customer's userID
+// matches consultations.customer_id directly, but a technician's userID has
+// to first be resolved to their technicians.id row (ListForTechnician takes
+// that, not the user id) — without this branch, a technician's own userID
+// never matches anything as a customer_id and this always came back empty,
+// even though ListForTechnician existed and worked fine on its own.
 func (s *ConsultationService) MyConsultations(ctx context.Context, userID string) ([]models.ConsultationWithDetails, error) {
+	if tech, err := s.techRepo.GetByUserID(ctx, userID); err == nil && tech != nil {
+		return s.consultRepo.ListForTechnician(ctx, tech.ID)
+	}
 	return s.consultRepo.ListForCustomer(ctx, userID)
 }
 
