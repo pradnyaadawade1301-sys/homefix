@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'core/http_client.dart';
 import 'core/theme.dart';
-import 'config/api_config.dart';
 import 'l10n/app_localizations.dart';
 import 'providers/address_provider.dart';
 import 'providers/ai_provider.dart';
@@ -22,6 +21,7 @@ import 'screens/auth/signup_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/consultation/incoming_consultation_screen.dart';
+import 'screens/incoming_booking_call_screen.dart';
 import 'screens/technician/technician_kyc_screen.dart';
 import 'screens/technician/technician_status_screen.dart';
 import 'services/auth_service.dart';
@@ -30,8 +30,6 @@ import 'services/call_log_service.dart';
 import 'services/consultation_service.dart';
 import 'services/location_service.dart';
 import 'services/service_locator.dart';
-import 'services/signaling_service.dart';
-import 'screens/video_call_screen.dart';
 import 'screens/technician/technician_jobs_screen.dart';
 import 'screens/notifications/notification_detail_screen.dart';
 import 'screens/chat/booking_chat_screen.dart';
@@ -160,14 +158,13 @@ class _MyAppState extends State<MyApp> {
     // Wire up an "Audio Call" about an active booking — either side
     // (technician or customer) may have started it (see
     // BookingService.InitiateCall on the backend), so this fires for
-    // whichever one is on the receiving end: ring, fetch ICE servers +
-    // confirm we're actually a participant (see BookingService.getCallInfo
-    // -> GET /bookings/:id/call), then jump straight into the audio-only
-    // call screen — the receiver shouldn't have to tap anything to answer,
-    // same as the consultation flow above, just going directly to the call
-    // instead of a request-list screen since there's nothing to
-    // accept/decline here.
-    app.fcmNotificationService.onIncomingBookingCall = (payload) async {
+    // whichever one is on the receiving end: ring and push the
+    // Answer/Decline screen straight away (whether the app was already
+    // open on some other screen, in the background, or freshly launched
+    // from the tap) — the call room itself is only joined once the user
+    // taps Answer there (see IncomingBookingCallScreen), so nothing here
+    // auto-connects the receiver into a live call.
+    app.fcmNotificationService.onIncomingBookingCall = (payload) {
       debugPrint('[FCM] Incoming booking audio call: $payload');
       final bookingId = payload['booking_id'] as String?;
       if (bookingId == null) return;
@@ -177,58 +174,18 @@ class _MyAppState extends State<MyApp> {
 
       FlutterRingtonePlayer().playRingtone(looping: true, volume: 1.0, asAlarm: false);
 
-      try {
-        final callInfo = await _bookingService.getCallInfo(bookingId);
-        // Two awaits already happened above (or are about to) — the navigator
-        // can unmount in that gap (screen popped, app backgrounded and torn
-        // down, etc). Using a stale context after that throws a FlutterError,
-        // so re-check .mounted after every await before touching navContext.
-        if (!navContext.mounted) {
-          FlutterRingtonePlayer().stop();
-          return;
-        }
-        final token = await navContext.read<AuthProvider>().getValidAccessToken();
-        if (!navContext.mounted) {
-          FlutterRingtonePlayer().stop();
-          return;
-        }
-        final myId = navContext.read<AuthProvider>().currentUser?.id ?? '';
-
-        if (token == null) {
-          FlutterRingtonePlayer().stop();
-          return;
-        }
-
-        final signaling = SignalingService(
-          serverUrl: ApiConfig.wsCallUrl(bookingId, token),
-          userId: myId,
-          isDirectUrl: true,
-        );
-        signaling.connect();
-
-        FlutterRingtonePlayer().stop();
-        if (!navContext.mounted) return;
-        app.navigatorKey.currentState?.push(MaterialPageRoute(
-          builder: (_) => VideoCallScreen(
-            signaling: signaling,
-            myId: myId,
-            peerId: bookingId, // room only ever has 2 sockets — exact id unused by the relay
-            isCaller: false,
-            audioOnly: true,
-            iceServers: callInfo.iceServers,
-            // The push payload only ever carries ONE of these two fields —
-            // whichever name matches who's actually calling (see
-            // BookingService.InitiateCall) — so it tells us unambiguously
-            // whose name to show, unlike callInfo which always has both
-            // (a booking always has both a customer and a technician).
-            peerDisplayName: (payload['technician_name'] as String?) ??
-                (payload['customer_name'] as String?),
-          ),
-        ));
-      } catch (e) {
-        debugPrint('[FCM] Failed to join booking call: $e');
-        FlutterRingtonePlayer().stop();
-      }
+      app.navigatorKey.currentState?.push(MaterialPageRoute(
+        builder: (_) => IncomingBookingCallScreen(
+          bookingId: bookingId,
+          // The push payload only ever carries ONE of these two fields —
+          // whichever name matches who's actually calling (see
+          // BookingService.InitiateCall) — so it tells us unambiguously
+          // whose name to show, unlike callInfo which always has both
+          // (a booking always has both a customer and a technician).
+          peerDisplayName: (payload['technician_name'] as String?) ??
+              (payload['customer_name'] as String?),
+        ),
+      ));
     };
   }
 
