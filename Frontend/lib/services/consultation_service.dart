@@ -105,6 +105,18 @@ class ConsultationService {
     }
   }
 
+  /// Call this the moment the WebRTC peer actually connects (not when the
+  /// call screen opens) — the backend stamps started_at server-side and uses
+  /// it to compute the real duration at /end. Skipping this call is why
+  /// duration used to always show as 0 min.
+  Future<void> start(String id) async {
+    try {
+      await _httpClient.post('${ApiConfig.consultationStart}/$id/start');
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
   Future<void> end(String id, {required int durationSeconds, required double amount}) async {
     try {
       await _httpClient.post(

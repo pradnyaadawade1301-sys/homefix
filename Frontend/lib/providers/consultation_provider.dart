@@ -178,6 +178,18 @@ class ConsultationProvider extends ChangeNotifier {
     }
   }
 
+  /// Called the moment the WebRTC media connection actually comes up (remote
+  /// stream received), so the backend can stamp started_at and compute a real
+  /// duration at endCall — skipping this is why call history used to always
+  /// show "0 min".
+  Future<void> startCall(String consultationId) async {
+    try {
+      await _consultationService.start(consultationId);
+    } catch (e) {
+      // Non-fatal: worst case duration shows 0 for this call, same as before.
+    }
+  }
+
   /// Called when the call ends (either side) to report duration + amount for
   /// billing, then clears the local error state.
   Future<void> endCall(String consultationId, {required int durationSeconds, required double amount}) async {

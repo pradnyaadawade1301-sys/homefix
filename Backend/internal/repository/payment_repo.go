@@ -263,9 +263,9 @@ func (r *PaymentRepository) GetInvoiceDetail(ctx context.Context, paymentID stri
 		       b.service_code, COALESCE(b.problem_description,''),
 		       b.warranty_enabled, b.warranty_days, b.warranty_expires_at,
 		       c.name AS category_name,
-		       cu.name AS customer_name, cu.phone AS customer_phone,
+		       COALESCE(cu.name,'') AS customer_name, COALESCE(cu.phone,'') AS customer_phone,
 		       COALESCE(tu.name,''), COALESCE(tu.phone,''),
-		       a.line1, COALESCE(a.line2,''), a.city, a.state, a.pincode
+		       COALESCE(a.line1,''), COALESCE(a.line2,''), COALESCE(a.city,''), COALESCE(a.state,''), COALESCE(a.pincode,'')
 		FROM payments p
 		JOIN bookings b ON b.id = p.booking_id
 		JOIN categories c ON c.id = b.category_id

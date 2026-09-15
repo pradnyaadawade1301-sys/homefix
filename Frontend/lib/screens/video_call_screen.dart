@@ -115,6 +115,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     _webrtc.onRemoteStream = (stream) {
       _remoteRenderer.srcObject = stream;
       _stopRingback();
+      if (_connectedAt == null && widget.consultationId != null) {
+        // Real call-connected moment — tell the backend so it can stamp
+        // started_at and compute a real duration when the call ends.
+        context.read<ConsultationProvider>().startCall(widget.consultationId!);
+      }
       _connectedAt ??= DateTime.now();
       if (mounted) setState(() => _connecting = false);
     };

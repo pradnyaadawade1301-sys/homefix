@@ -437,7 +437,7 @@ class _CustomerProfileBody extends StatefulWidget {
 }
 
 class _CustomerProfileBodyState extends State<_CustomerProfileBody> {
-  bool _uploadingPhoto = false;
+  final bool _uploadingPhoto = false;
 
   @override
   Widget build(BuildContext context) {

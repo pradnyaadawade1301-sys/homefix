@@ -490,6 +490,31 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
               ),
             ),
             const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: _isTranscribing ? null : _toggleRecording,
+              icon: _isTranscribing
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      _isRecording ? Icons.stop_circle_rounded : Icons.mic_none_rounded,
+                      color: _isRecording ? AppTheme.errorColor : null,
+                    ),
+              label: Text(
+                _isTranscribing
+                    ? 'Transcribing...'
+                    : _isRecording
+                        ? 'Stop recording (${_recordingElapsed.inSeconds}s)'
+                        : 'Record voice description',
+                style: TextStyle(color: _isRecording ? AppTheme.errorColor : null),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: _isRecording ? const BorderSide(color: AppTheme.errorColor) : null,
+              ),
+            ),
+            const SizedBox(height: 20),
             const Text('A few quick questions', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
             Text('Helps the technician come prepared', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
             const SizedBox(height: 10),
@@ -590,31 +615,6 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
                       )),
                   if (_canAddMore) _addMediaTile(),
                 ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            OutlinedButton.icon(
-              onPressed: _isTranscribing ? null : _toggleRecording,
-              icon: _isTranscribing
-                  ? const SizedBox(
-                      height: 16,
-                      width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(
-                      _isRecording ? Icons.stop_circle_rounded : Icons.mic_none_rounded,
-                      color: _isRecording ? AppTheme.errorColor : null,
-                    ),
-              label: Text(
-                _isTranscribing
-                    ? 'Transcribing...'
-                    : _isRecording
-                        ? 'Stop recording (${_recordingElapsed.inSeconds}s)'
-                        : 'Record voice description',
-                style: TextStyle(color: _isRecording ? AppTheme.errorColor : null),
-              ),
-              style: OutlinedButton.styleFrom(
-                side: _isRecording ? const BorderSide(color: AppTheme.errorColor) : null,
               ),
             ),
             const SizedBox(height: 32),

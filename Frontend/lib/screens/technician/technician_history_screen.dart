@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../../core/booking_call_launcher.dart';
 import '../../core/theme.dart';
 import '../../models/booking_model.dart';
-import '../../models/call_log_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/consultation_provider.dart';
 import '../../providers/call_log_provider.dart';

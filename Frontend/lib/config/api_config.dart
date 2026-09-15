@@ -83,6 +83,7 @@ class ApiConfig {
   static const String consultationReject = '/consultations'; // + /:id/reject -> POST (technician)
   static const String consultationCancel = '/consultations'; // + /:id/cancel -> POST (customer, while searching)
   static const String consultationCall = '/consultations'; // + /:id/call -> GET {consultation, room_id, ice_servers}
+  static const String consultationStart = '/consultations'; // + /:id/start -> POST, sets started_at server-side
   static const String consultationEnd = '/consultations'; // + /:id/end -> POST {status, duration_seconds, amount}
   static const String consultationOnsite = '/consultations'; // + /:id/recommend-onsite -> POST (technician) {summary, price?}
   static const String consultationRecommendDecline = '/consultations'; // + /:id/recommend-onsite/decline -> POST (customer)
