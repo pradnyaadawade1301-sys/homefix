@@ -213,7 +213,7 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                             ],
                           ),
                           const SizedBox(height: 2),
-                          Text('${t.categoryName} Technician', style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.85))),
+                          Text('${t.categoryNames.isNotEmpty ? t.categoryNames.join(' • ') : t.categoryName} Technician', style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.85))),
                           const SizedBox(height: 10),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -312,7 +312,7 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                             ),
                             const SizedBox(height: 10),
                             Text(
-                              'I am a professional ${t.categoryName} technician with ${t.experienceYears}+ years '
+                              'I am a professional ${t.categoryNames.isNotEmpty ? t.categoryNames.join(' & ') : t.categoryName} technician with ${t.experienceYears}+ years '
                               'of experience. Quality service and customer satisfaction is my priority.',
                               style: TextStyle(fontSize: 13, color: Colors.grey[700], height: 1.45),
                             ),

@@ -223,5 +223,26 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 		log.Printf("startup migration: failed to ensure call_logs table exists: %v", err)
 	}
 
+	// 034_technician_categories — same "Render never applies migrations/
+	// files" issue as above. Lets a technician serve more than one category
+	// (e.g. Plumbing + Painting); technicians.category_id stays as their
+	// "primary" one. Safe no-op once it exists. Backfills existing
+	// technicians' current single category as their first row so nobody
+	// already live loses visibility in search/matching.
+	if _, err := pool.Exec(ctx,
+		`CREATE TABLE IF NOT EXISTS technician_categories (
+			technician_id UUID NOT NULL REFERENCES technicians(id) ON DELETE CASCADE,
+			category_id   UUID NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+			created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+			PRIMARY KEY (technician_id, category_id)
+		 );
+		 CREATE INDEX IF NOT EXISTS idx_technician_categories_category ON technician_categories(category_id);
+		 CREATE INDEX IF NOT EXISTS idx_technician_categories_technician ON technician_categories(technician_id);
+		 INSERT INTO technician_categories (technician_id, category_id)
+		 SELECT id, category_id FROM technicians
+		 ON CONFLICT DO NOTHING;`); err != nil {
+		log.Printf("startup migration: failed to ensure technician_categories table exists: %v", err)
+	}
+
 	log.Println("startup migrations: done")
 }

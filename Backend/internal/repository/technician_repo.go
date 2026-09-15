@@ -162,7 +162,13 @@ func (r *TechnicianRepository) ListAvailableByCategory(ctx context.Context, cate
 func (r *TechnicianRepository) ListPublic(ctx context.Context, categoryID string) ([]models.TechnicianPublic, error) {
 	query := `
 		SELECT t.id, COALESCE(u.name,''), t.category_id, c.name, t.experience_years,
-		       t.rating_avg, t.rating_count, t.is_verified, t.is_available, COALESCE(t.profile_photo_url,''), t.working_hours, t.created_at
+		       t.rating_avg, t.rating_count, t.is_verified, t.is_available, COALESCE(t.profile_photo_url,''), t.working_hours, t.created_at,
+		       COALESCE((
+		           SELECT array_agg(c2.name ORDER BY c2.name)
+		           FROM technician_categories tc2
+		           JOIN categories c2 ON c2.id = tc2.category_id
+		           WHERE tc2.technician_id = t.id
+		       ), ARRAY[c.name])
 		FROM technicians t
 		JOIN users u ON u.id = t.user_id
 		JOIN categories c ON c.id = t.category_id`
@@ -189,7 +195,8 @@ func (r *TechnicianRepository) ListPublic(ctx context.Context, categoryID string
 	for rows.Next() {
 		var t models.TechnicianPublic
 		if err := rows.Scan(&t.ID, &t.Name, &t.CategoryID, &t.CategoryName, &t.ExperienceYears,
-			&t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.ProfilePhotoURL, &t.WorkingHours, &t.CreatedAt); err != nil {
+			&t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.ProfilePhotoURL, &t.WorkingHours, &t.CreatedAt,
+			&t.CategoryNames); err != nil {
 			return nil, err
 		}
 		out = append(out, t)
@@ -197,19 +204,28 @@ func (r *TechnicianRepository) ListPublic(ctx context.Context, categoryID string
 	return out, nil
 }
 
-// GetPublicByID returns a single technician's public profile, joined with name + category.
+// GetPublicByID returns a single technician's public profile, joined with name + category,
+// plus category_names — every category this technician serves (technician_categories) —
+// so the technician detail screen can show the full skill list, not just one category.
 func (r *TechnicianRepository) GetPublicByID(ctx context.Context, id string) (*models.TechnicianPublic, error) {
 	var t models.TechnicianPublic
 	err := r.db.QueryRow(ctx, `
 		SELECT t.id, COALESCE(u.name,''), t.category_id, c.name, t.experience_years,
 		       t.rating_avg, t.rating_count, t.is_verified, t.is_available,
-		       COALESCE(t.profile_photo_url,''), t.working_hours, t.created_at
+		       COALESCE(t.profile_photo_url,''), t.working_hours, t.created_at,
+		       COALESCE((
+		           SELECT array_agg(c2.name ORDER BY c2.name)
+		           FROM technician_categories tc2
+		           JOIN categories c2 ON c2.id = tc2.category_id
+		           WHERE tc2.technician_id = t.id
+		       ), ARRAY[c.name])
 		FROM technicians t
 		JOIN users u ON u.id = t.user_id
 		JOIN categories c ON c.id = t.category_id
 		WHERE t.id = $1
 	`, id).Scan(&t.ID, &t.Name, &t.CategoryID, &t.CategoryName, &t.ExperienceYears,
-		&t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.ProfilePhotoURL, &t.WorkingHours, &t.CreatedAt)
+		&t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.ProfilePhotoURL, &t.WorkingHours, &t.CreatedAt,
+		&t.CategoryNames)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil

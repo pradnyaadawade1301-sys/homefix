@@ -596,6 +596,11 @@ class Technician {
   final String name;
   final String categoryId;
   final String categoryName;
+  // Every service this technician offers (technician_categories), e.g.
+  // ["Plumbing", "Painting"] — categoryName above is just one of them
+  // (whichever the search was filtered by). Falls back to [categoryName]
+  // if the backend didn't send this (older responses).
+  final List<String> categoryNames;
   final int experienceYears;
   final double ratingAvg;
   final int ratingCount;
@@ -610,6 +615,7 @@ class Technician {
     required this.name,
     required this.categoryId,
     required this.categoryName,
+    this.categoryNames = const [],
     required this.experienceYears,
     required this.ratingAvg,
     required this.ratingCount,
@@ -621,11 +627,14 @@ class Technician {
   });
 
   factory Technician.fromJson(Map<String, dynamic> json) {
+    final categoryName = (json['category_name'] as String?) ?? '';
     return Technician(
       id: json['id'] as String,
       name: (json['name'] as String?) ?? '',
       categoryId: (json['category_id'] as String?) ?? '',
-      categoryName: (json['category_name'] as String?) ?? '',
+      categoryName: categoryName,
+      categoryNames: (json['category_names'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+          (categoryName.isNotEmpty ? [categoryName] : const []),
       experienceYears: json['experience_years'] as int? ?? 0,
       ratingAvg: (json['rating_avg'] as num?)?.toDouble() ?? 0.0,
       ratingCount: json['rating_count'] as int? ?? 0,
@@ -645,6 +654,7 @@ class Technician {
       'name': name,
       'category_id': categoryId,
       'category_name': categoryName,
+      'category_names': categoryNames,
       'experience_years': experienceYears,
       'rating_avg': ratingAvg,
       'rating_count': ratingCount,

@@ -35,6 +35,10 @@ type TechnicianPublic struct {
 	// ProfilePhotoURL lets the customer see who they're booking/talking to —
 	// same photo the technician sets/changes in their own profile.
 	ProfilePhotoURL string `json:"profile_photo_url,omitempty"`
+	// CategoryNames is every service this technician offers (technician_categories),
+	// e.g. ["Plumbing", "Painting"] — CategoryName above is just the one matched by
+	// the current search/filter. Powers the technician detail screen's full skill list.
+	CategoryNames []string `json:"category_names,omitempty"`
 	// WorkingHours is the technician's self-set weekly schedule (display-only).
 	WorkingHours WorkingHours `json:"working_hours,omitempty"`
 	CreatedAt    time.Time    `json:"created_at"`
@@ -45,17 +49,19 @@ type TechnicianPublic struct {
 // (like TechnicianPublic) but also carries live lat/lng and distance from the customer,
 // since that's the whole point of this endpoint.
 type TechnicianNearby struct {
-	ID              string   `json:"id"`
-	Name            string   `json:"name"`
-	CategoryID      string   `json:"category_id"`
-	CategoryName    string   `json:"category_name"`
-	ExperienceYears int      `json:"experience_years"`
-	RatingAvg       float64  `json:"rating_avg"`
-	RatingCount     int      `json:"rating_count"`
-	IsAvailable     bool     `json:"is_available"`
-	ProfilePhotoURL string   `json:"profile_photo_url,omitempty"`
-	CurrentLat      *float64 `json:"current_lat,omitempty"`
-	CurrentLng      *float64 `json:"current_lng,omitempty"`
+	ID              string  `json:"id"`
+	Name            string  `json:"name"`
+	CategoryID      string  `json:"category_id"`
+	CategoryName    string  `json:"category_name"`
+	ExperienceYears int     `json:"experience_years"`
+	RatingAvg       float64 `json:"rating_avg"`
+	RatingCount     int     `json:"rating_count"`
+	IsAvailable     bool    `json:"is_available"`
+	ProfilePhotoURL string  `json:"profile_photo_url,omitempty"`
+	// CategoryNames is every service this technician offers — see TechnicianPublic.
+	CategoryNames []string `json:"category_names,omitempty"`
+	CurrentLat    *float64 `json:"current_lat,omitempty"`
+	CurrentLng    *float64 `json:"current_lng,omitempty"`
 	// DistanceKm is nil when the caller didn't supply lat/lng (results are then sorted by rating instead).
 	DistanceKm *float64 `json:"distance_km,omitempty"`
 }
