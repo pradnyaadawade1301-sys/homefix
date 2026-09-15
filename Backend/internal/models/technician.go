@@ -23,15 +23,15 @@ type Category struct {
 // endpoints — joins in the technician's name (from users) and service category name,
 // and omits internal fields (exact lat/lng, raw ids the UI doesn't need).
 type TechnicianPublic struct {
-	ID              string    `json:"id"`
-	Name            string    `json:"name"`
-	CategoryID      string    `json:"category_id"`
-	CategoryName    string    `json:"category_name"`
-	ExperienceYears int       `json:"experience_years"`
-	RatingAvg       float64   `json:"rating_avg"`
-	RatingCount     int       `json:"rating_count"`
-	IsVerified      bool      `json:"is_verified"`
-	IsAvailable     bool      `json:"is_available"`
+	ID              string  `json:"id"`
+	Name            string  `json:"name"`
+	CategoryID      string  `json:"category_id"`
+	CategoryName    string  `json:"category_name"`
+	ExperienceYears int     `json:"experience_years"`
+	RatingAvg       float64 `json:"rating_avg"`
+	RatingCount     int     `json:"rating_count"`
+	IsVerified      bool    `json:"is_verified"`
+	IsAvailable     bool    `json:"is_available"`
 	// ProfilePhotoURL lets the customer see who they're booking/talking to —
 	// same photo the technician sets/changes in their own profile.
 	ProfilePhotoURL string `json:"profile_photo_url,omitempty"`
@@ -63,11 +63,11 @@ type TechnicianNearby struct {
 // RepeatCustomer is a customer who has booked a given technician more than once —
 // powers the technician's "My Customers" / repeat-customer screen.
 type RepeatCustomer struct {
-	CustomerID      string    `json:"customer_id"`
-	Name            string    `json:"name"`
-	Phone           string    `json:"phone"`
-	TotalBookings   int       `json:"total_bookings"`
-	LastBookingAt   time.Time `json:"last_booking_at"`
+	CustomerID    string    `json:"customer_id"`
+	Name          string    `json:"name"`
+	Phone         string    `json:"phone"`
+	TotalBookings int       `json:"total_bookings"`
+	LastBookingAt time.Time `json:"last_booking_at"`
 	// ActiveBookingID is set only when this customer currently has a booking
 	// with this technician in one of the "call/chat allowed" statuses (see
 	// BookingService.InitiateCall) — nil the rest of the time, since most
@@ -101,18 +101,23 @@ type Technician struct {
 	ProfilePhotoURL string `json:"profile_photo_url,omitempty"`
 	// ApprovalStatus is one of "pending", "approved", "rejected" — the source of truth
 	// for admin approval. IsVerified is kept in sync for backward-compatible queries.
-	ApprovalStatus  string    `json:"approval_status"`
-	RejectionReason string    `json:"rejection_reason,omitempty"`
-	RatingAvg       float64   `json:"rating_avg"`
-	RatingCount     int       `json:"rating_count"`
-	IsVerified      bool      `json:"is_verified"`
-	IsAvailable     bool      `json:"is_available"`
-	CurrentLat      *float64  `json:"current_lat,omitempty"`
-	CurrentLng      *float64  `json:"current_lng,omitempty"`
+	ApprovalStatus  string   `json:"approval_status"`
+	RejectionReason string   `json:"rejection_reason,omitempty"`
+	RatingAvg       float64  `json:"rating_avg"`
+	RatingCount     int      `json:"rating_count"`
+	IsVerified      bool     `json:"is_verified"`
+	IsAvailable     bool     `json:"is_available"`
+	CurrentLat      *float64 `json:"current_lat,omitempty"`
+	CurrentLng      *float64 `json:"current_lng,omitempty"`
 	// WorkingHours is the technician's self-set weekly schedule (display-only).
 	WorkingHours WorkingHours `json:"working_hours,omitempty"`
-	CreatedAt    time.Time    `json:"created_at"`
-	UpdatedAt    time.Time    `json:"updated_at"`
+	// CategoryIDs is every category this technician serves (technician_categories) —
+	// CategoryID above is just CategoryIDs[0], the "primary" one, kept for anywhere
+	// still expecting a single category. Populated by TechnicianService for Me/GetByID;
+	// not a DB column on this table.
+	CategoryIDs []string  `json:"category_ids,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // TechnicianWithUser adds the user's own name/phone and the category's display

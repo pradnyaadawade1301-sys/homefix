@@ -22,7 +22,7 @@ class _TechnicianKycScreenState extends State<TechnicianKycScreen> {
   final _addressController = TextEditingController();
   final _picker = ImagePicker();
 
-  String? _selectedCategoryId;
+  final Set<String> _selectedCategoryIds = {};
   File? _governmentIdFile;
   File? _profilePhotoFile;
   String? _localError;
@@ -57,8 +57,8 @@ class _TechnicianKycScreenState extends State<TechnicianKycScreen> {
   Future<void> _handleSubmit() async {
     setState(() => _localError = null);
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedCategoryId == null) {
-      setState(() => _localError = 'Please select a service category');
+    if (_selectedCategoryIds.isEmpty) {
+      setState(() => _localError = 'Please select at least one service category');
       return;
     }
     if (_governmentIdFile == null) {
@@ -84,7 +84,10 @@ class _TechnicianKycScreenState extends State<TechnicianKycScreen> {
     }
 
     final success = await kyc.submit(
-      categoryId: _selectedCategoryId!,
+      // First selected category becomes the "primary" one on the backend;
+      // order doesn't otherwise matter — a technician shows up in search
+      // results for every category they picked.
+      categoryIds: _selectedCategoryIds.toList(),
       experienceYears: int.tryParse(_experienceController.text.trim()) ?? 0,
       address: _addressController.text.trim(),
       governmentIdUrl: govIdUrl,
@@ -125,7 +128,12 @@ class _TechnicianKycScreenState extends State<TechnicianKycScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                Text('Service category', style: Theme.of(context).textTheme.labelLarge),
+                Text('Service categories', style: Theme.of(context).textTheme.labelLarge),
+                const SizedBox(height: 4),
+                Text(
+                  'Select every service you offer — e.g. Plumbing and Painting both.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                ),
                 const SizedBox(height: 8),
                 Consumer<CategoryProvider>(
                   builder: (context, catProvider, _) {
@@ -135,16 +143,29 @@ class _TechnicianKycScreenState extends State<TechnicianKycScreen> {
                         child: LinearProgressIndicator(),
                       );
                     }
-                    return DropdownButtonFormField<String>(
-                      initialValue: _selectedCategoryId,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.category_outlined),
-                      ),
-                      hint: const Text('Select your primary category'),
-                      items: catProvider.categories
-                          .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
-                          .toList(),
-                      onChanged: (v) => setState(() => _selectedCategoryId = v),
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: catProvider.categories.map((c) {
+                        final selected = _selectedCategoryIds.contains(c.id);
+                        return FilterChip(
+                          label: Text(c.name),
+                          selected: selected,
+                          onSelected: (v) => setState(() {
+                            if (v) {
+                              _selectedCategoryIds.add(c.id);
+                            } else {
+                              _selectedCategoryIds.remove(c.id);
+                            }
+                          }),
+                          selectedColor: AppTheme.primaryColor.withValues(alpha: 0.15),
+                          checkmarkColor: AppTheme.primaryColor,
+                          labelStyle: TextStyle(
+                            color: selected ? AppTheme.primaryColor : null,
+                            fontWeight: selected ? FontWeight.w600 : null,
+                          ),
+                        );
+                      }).toList(),
                     );
                   },
                 ),

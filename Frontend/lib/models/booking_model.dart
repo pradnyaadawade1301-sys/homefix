@@ -717,6 +717,10 @@ class TechnicianProfile {
   final String id;
   final String userId;
   final String categoryId;
+  // Every category this technician serves (technician_categories) — categoryId
+  // above is just categoryIds.first, the "primary" one, kept for anywhere still
+  // expecting a single category.
+  final List<String> categoryIds;
   final int experienceYears;
   final String address;
   final String governmentIdUrl;
@@ -734,6 +738,7 @@ class TechnicianProfile {
     required this.id,
     required this.userId,
     required this.categoryId,
+    this.categoryIds = const [],
     required this.experienceYears,
     required this.address,
     required this.governmentIdUrl,
@@ -757,6 +762,7 @@ class TechnicianProfile {
       id: id,
       userId: userId,
       categoryId: categoryId,
+      categoryIds: categoryIds,
       experienceYears: experienceYears,
       address: address,
       governmentIdUrl: governmentIdUrl,
@@ -777,6 +783,7 @@ class TechnicianProfile {
       id: json['id'] as String,
       userId: (json['user_id'] as String?) ?? '',
       categoryId: (json['category_id'] as String?) ?? '',
+      categoryIds: (json['category_ids'] as List<dynamic>?)?.map((e) => e as String).toList() ?? const [],
       experienceYears: json['experience_years'] as int? ?? 0,
       address: (json['address'] as String?) ?? '',
       governmentIdUrl: (json['government_id_url'] as String?) ?? '',

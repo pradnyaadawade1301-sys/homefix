@@ -103,6 +103,9 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.POST("/technicians", h.Technician.Register)
 		authed.GET("/technicians/me", h.Technician.Me)
 		authed.PUT("/technicians/me/photo", middleware.RequireRole("technician"), h.Technician.UpdatePhoto)
+		// Add/remove categories a technician serves (e.g. Plumbing + Painting)
+		// from their profile — see TechnicianService.UpdateCategories.
+		authed.PUT("/technicians/me/categories", middleware.RequireRole("technician"), h.Technician.UpdateCategories)
 		authed.GET("/technicians/available", h.Technician.FindAvailable)
 		authed.GET("/technicians/:id/reviews", h.Technician.Reviews)
 		authed.PATCH("/technicians/:id/availability", middleware.RequireRole("technician"), h.Technician.SetAvailability)

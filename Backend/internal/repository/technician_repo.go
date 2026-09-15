@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -99,7 +100,7 @@ func (r *TechnicianRepository) ListAvailableByCategory(ctx context.Context, cate
 			SELECT id, name, category_id, category_name, experience_years,
 			       rating_avg, rating_count, is_available, profile_photo_url, current_lat, current_lng, distance_km
 			FROM (
-				SELECT t.id, COALESCE(u.name,'') AS name, t.category_id, c.name AS category_name, t.experience_years,
+				SELECT t.id, COALESCE(u.name,'') AS name, tc.category_id, c.name AS category_name, t.experience_years,
 				       t.rating_avg, t.rating_count, t.is_available, COALESCE(t.profile_photo_url,'') AS profile_photo_url,
 				       t.current_lat, t.current_lng,
 				       (6371 * acos(LEAST(1.0, GREATEST(-1.0,
@@ -109,8 +110,14 @@ func (r *TechnicianRepository) ListAvailableByCategory(ctx context.Context, cate
 				       )))) AS distance_km
 				FROM technicians t
 				JOIN users u ON u.id = t.user_id
-				JOIN categories c ON c.id = t.category_id
-				WHERE t.category_id = $1 AND t.is_available = true AND t.approval_status = 'approved'
+				-- A technician can serve more than one category (technician_categories),
+				-- so matching joins on that table rather than technicians.category_id —
+				-- see 034_technician_categories.sql. category_id shown here is the
+				-- specific one being searched for, not necessarily the technician's
+				-- primary/first category.
+				JOIN technician_categories tc ON tc.technician_id = t.id AND tc.category_id = $1
+				JOIN categories c ON c.id = tc.category_id
+				WHERE t.is_available = true AND t.approval_status = 'approved'
 			) matched`
 		args := []interface{}{categoryID, *lat, *lng}
 		if radiusKm != nil {
@@ -121,13 +128,14 @@ func (r *TechnicianRepository) ListAvailableByCategory(ctx context.Context, cate
 		rows, err = r.db.Query(ctx, query, args...)
 	} else {
 		rows, err = r.db.Query(ctx, `
-			SELECT t.id, COALESCE(u.name,''), t.category_id, c.name, t.experience_years,
+			SELECT t.id, COALESCE(u.name,''), tc.category_id, c.name, t.experience_years,
 			       t.rating_avg, t.rating_count, t.is_available, COALESCE(t.profile_photo_url,''), t.current_lat, t.current_lng,
 			       NULL::float8 AS distance_km
 			FROM technicians t
 			JOIN users u ON u.id = t.user_id
-			JOIN categories c ON c.id = t.category_id
-			WHERE t.category_id = $1 AND t.is_available = true AND t.approval_status = 'approved'
+			JOIN technician_categories tc ON tc.technician_id = t.id AND tc.category_id = $1
+			JOIN categories c ON c.id = tc.category_id
+			WHERE t.is_available = true AND t.approval_status = 'approved'
 			ORDER BY t.rating_avg DESC
 			LIMIT 20
 		`, categoryID)
@@ -157,12 +165,17 @@ func (r *TechnicianRepository) ListPublic(ctx context.Context, categoryID string
 		       t.rating_avg, t.rating_count, t.is_verified, t.is_available, COALESCE(t.profile_photo_url,''), t.working_hours, t.created_at
 		FROM technicians t
 		JOIN users u ON u.id = t.user_id
-		JOIN categories c ON c.id = t.category_id
-		WHERE t.is_verified = true`
+		JOIN categories c ON c.id = t.category_id`
 	args := []interface{}{}
 	if categoryID != "" {
-		query += " AND t.category_id = $1"
+		// A technician can serve more than one category — match against
+		// technician_categories, not just the primary technicians.category_id.
+		query += ` WHERE t.is_verified = true AND EXISTS (
+			SELECT 1 FROM technician_categories tc WHERE tc.technician_id = t.id AND tc.category_id = $1
+		)`
 		args = append(args, categoryID)
+	} else {
+		query += " WHERE t.is_verified = true"
 	}
 	query += " ORDER BY t.rating_avg DESC LIMIT 50"
 
@@ -288,4 +301,58 @@ func (r *TechnicianRepository) SetApprovalStatus(ctx context.Context, id, status
 		WHERE id = $3
 	`, status, reason, id, status)
 	return err
+}
+
+// SetCategories replaces the full set of categories a technician can serve —
+// used at signup and from profile edit so a technician who does, say, both
+// plumbing and painting shows up in searches/matching for either category
+// (see ListPublic / ListAvailableByCategory, which join on this table).
+// technicians.category_id is kept pointing at categoryIDs[0] as the
+// "primary" category for places that still display/sort by a single one
+// (admin queue, repeat-customer cards, etc).
+func (r *TechnicianRepository) SetCategories(ctx context.Context, technicianID string, categoryIDs []string) error {
+	if len(categoryIDs) == 0 {
+		return errors.New("at least one category is required")
+	}
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `UPDATE technicians SET category_id = $1, updated_at = now() WHERE id = $2`, categoryIDs[0], technicianID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM technician_categories WHERE technician_id = $1`, technicianID); err != nil {
+		return err
+	}
+	for _, catID := range categoryIDs {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO technician_categories (technician_id, category_id) VALUES ($1, $2)
+			ON CONFLICT (technician_id, category_id) DO NOTHING
+		`, technicianID, catID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
+}
+
+// GetCategoryIDs returns every category this technician is registered for —
+// powers the technician's profile screen ("which services I offer") and the
+// pre-filled selection when editing it.
+func (r *TechnicianRepository) GetCategoryIDs(ctx context.Context, technicianID string) ([]string, error) {
+	rows, err := r.db.Query(ctx, `SELECT category_id FROM technician_categories WHERE technician_id = $1 ORDER BY created_at ASC`, technicianID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
 }

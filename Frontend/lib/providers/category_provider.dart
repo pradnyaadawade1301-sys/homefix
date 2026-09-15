@@ -226,7 +226,7 @@ class TechnicianKycProvider extends ChangeNotifier {
   }
 
   Future<bool> submit({
-    required String categoryId,
+    required List<String> categoryIds,
     required int experienceYears,
     required String address,
     required String governmentIdUrl,
@@ -237,7 +237,7 @@ class TechnicianKycProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _profile = await _kycService.register(
-        categoryId: categoryId,
+        categoryIds: categoryIds,
         experienceYears: experienceYears,
         address: address,
         governmentIdUrl: governmentIdUrl,

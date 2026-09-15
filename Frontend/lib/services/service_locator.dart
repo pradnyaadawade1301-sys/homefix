@@ -172,8 +172,10 @@ class TechnicianKycService {
   }
 
   /// Submits the technician KYC profile. Starts as approval_status = "pending".
+  /// categoryIds lets a technician register for more than one service (e.g.
+  /// Plumbing + Painting); the first entry is stored as the "primary" category.
   Future<TechnicianProfile> register({
-    required String categoryId,
+    required List<String> categoryIds,
     required int experienceYears,
     required String address,
     required String governmentIdUrl,
@@ -183,7 +185,7 @@ class TechnicianKycService {
       final response = await _httpClient.post(
         ApiConfig.technicianRegister,
         data: {
-          'category_id': categoryId,
+          'category_ids': categoryIds,
           'experience_years': experienceYears,
           'address': address,
           'government_id_url': governmentIdUrl,

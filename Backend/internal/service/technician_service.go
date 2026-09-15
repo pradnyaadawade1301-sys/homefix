@@ -18,16 +18,30 @@ func NewTechnicianService(techRepo *repository.TechnicianRepository, catRepo *re
 	return &TechnicianService{techRepo: techRepo, catRepo: catRepo, revRepo: revRepo}
 }
 
-// RegisterTechnician creates the technician KYC profile (category, experience, address,
-// government ID, profile photo). The row starts life as approval_status = "pending" and
-// only becomes bookable once an admin approves it via Verify.
-func (s *TechnicianService) RegisterTechnician(ctx context.Context, userID, categoryID string, experienceYears int, address, governmentIDURL, profilePhotoURL string) (*models.Technician, error) {
-	cat, err := s.catRepo.GetByID(ctx, categoryID)
-	if err != nil {
-		return nil, err
+// RegisterTechnician creates the technician KYC profile (categories, experience,
+// address, government ID, profile photo). A technician may serve more than one
+// category (e.g. Plumbing + Painting) — categoryIDs[0] is stored as the
+// "primary" category, and the full set is saved to technician_categories via
+// SetCategories so search/matching finds this technician under any of them.
+// The row starts life as approval_status = "pending" and only becomes
+// bookable once an admin approves it via Verify.
+func (s *TechnicianService) RegisterTechnician(ctx context.Context, userID string, categoryIDs []string, experienceYears int, address, governmentIDURL, profilePhotoURL string) (*models.Technician, error) {
+	if len(categoryIDs) == 0 {
+		return nil, errors.New("select at least one category")
 	}
-	if cat == nil {
-		return nil, errors.New("category not found")
+	seen := map[string]bool{}
+	for _, id := range categoryIDs {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		cat, err := s.catRepo.GetByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if cat == nil {
+			return nil, errors.New("category not found")
+		}
 	}
 	existing, err := s.techRepo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -38,7 +52,7 @@ func (s *TechnicianService) RegisterTechnician(ctx context.Context, userID, cate
 	}
 	t := &models.Technician{
 		UserID:          userID,
-		CategoryID:      categoryID,
+		CategoryID:      categoryIDs[0],
 		ExperienceYears: experienceYears,
 		Address:         address,
 		GovernmentIDURL: governmentIDURL,
@@ -48,6 +62,10 @@ func (s *TechnicianService) RegisterTechnician(ctx context.Context, userID, cate
 	if err != nil {
 		return nil, err
 	}
+	if err := s.techRepo.SetCategories(ctx, created.ID, categoryIDs); err != nil {
+		return nil, err
+	}
+	created.CategoryIDs = categoryIDs
 
 	// DEV-ONLY: auto-approve every new technician so local testing doesn't
 	// require manually visiting the admin panel each time. REMOVE this block
@@ -62,12 +80,43 @@ func (s *TechnicianService) RegisterTechnician(ctx context.Context, userID, cate
 	return created, nil
 }
 
+// UpdateCategories lets an existing technician change which categories they
+// serve (profile edit) — same validation and storage as at signup.
+func (s *TechnicianService) UpdateCategories(ctx context.Context, technicianID string, categoryIDs []string) ([]string, error) {
+	if len(categoryIDs) == 0 {
+		return nil, errors.New("select at least one category")
+	}
+	for _, id := range categoryIDs {
+		cat, err := s.catRepo.GetByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if cat == nil {
+			return nil, errors.New("category not found")
+		}
+	}
+	if err := s.techRepo.SetCategories(ctx, technicianID, categoryIDs); err != nil {
+		return nil, err
+	}
+	return categoryIDs, nil
+}
+
 func (s *TechnicianService) GetProfile(ctx context.Context, technicianID string) (*models.Technician, error) {
-	return s.techRepo.GetByID(ctx, technicianID)
+	t, err := s.techRepo.GetByID(ctx, technicianID)
+	if err != nil || t == nil {
+		return t, err
+	}
+	t.CategoryIDs, err = s.techRepo.GetCategoryIDs(ctx, t.ID)
+	return t, err
 }
 
 func (s *TechnicianService) GetByUser(ctx context.Context, userID string) (*models.Technician, error) {
-	return s.techRepo.GetByUserID(ctx, userID)
+	t, err := s.techRepo.GetByUserID(ctx, userID)
+	if err != nil || t == nil {
+		return t, err
+	}
+	t.CategoryIDs, err = s.techRepo.GetCategoryIDs(ctx, t.ID)
+	return t, err
 }
 
 // FindAvailable powers the customer-facing nearby/tracking screen — returns available,

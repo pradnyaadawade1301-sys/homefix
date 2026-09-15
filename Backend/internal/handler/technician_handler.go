@@ -20,11 +20,20 @@ func NewTechnicianHandler(techService *service.TechnicianService) *TechnicianHan
 }
 
 type registerTechBody struct {
-	CategoryID      string `json:"category_id" binding:"required"`
-	ExperienceYears int    `json:"experience_years"`
-	Address         string `json:"address" binding:"required"`
-	GovernmentIDURL string `json:"government_id_url" binding:"required"`
-	ProfilePhotoURL string `json:"profile_photo_url" binding:"required"`
+	// CategoryIDs is the new multi-category field — a technician can select more
+	// than one service (e.g. Plumbing + Painting). CategoryID (singular) is still
+	// accepted for backward compatibility with any client not yet updated; if
+	// CategoryIDs is empty it's used as a single-item fallback.
+	CategoryIDs     []string `json:"category_ids"`
+	CategoryID      string   `json:"category_id"`
+	ExperienceYears int      `json:"experience_years"`
+	Address         string   `json:"address" binding:"required"`
+	GovernmentIDURL string   `json:"government_id_url" binding:"required"`
+	ProfilePhotoURL string   `json:"profile_photo_url" binding:"required"`
+}
+
+type updateTechCategoriesBody struct {
+	CategoryIDs []string `json:"category_ids" binding:"required"`
 }
 
 // List is the public, unauthenticated technician browse endpoint — optionally filtered
@@ -64,13 +73,48 @@ func (h *TechnicianHandler) Register(c *gin.Context) {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	t, err := h.techService.RegisterTechnician(c.Request.Context(), userID, body.CategoryID, body.ExperienceYears,
+	categoryIDs := body.CategoryIDs
+	if len(categoryIDs) == 0 && body.CategoryID != "" {
+		categoryIDs = []string{body.CategoryID}
+	}
+	if len(categoryIDs) == 0 {
+		utils.Error(c, http.StatusBadRequest, "select at least one category")
+		return
+	}
+	t, err := h.techService.RegisterTechnician(c.Request.Context(), userID, categoryIDs, body.ExperienceYears,
 		body.Address, body.GovernmentIDURL, body.ProfilePhotoURL)
 	if err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	utils.Success(c, http.StatusCreated, t)
+}
+
+// UpdateCategories - PUT /technicians/me/categories. Lets an already-registered
+// technician change which categories they serve (e.g. add Painting to an
+// existing Plumbing profile) from their profile screen.
+func (h *TechnicianHandler) UpdateCategories(c *gin.Context) {
+	userID := c.GetString("user_id")
+	me, err := h.techService.GetByUser(c.Request.Context(), userID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if me == nil {
+		utils.Error(c, http.StatusNotFound, "technician profile not found")
+		return
+	}
+	var body updateTechCategoriesBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	categoryIDs, err := h.techService.UpdateCategories(c.Request.Context(), me.ID, body.CategoryIDs)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"category_ids": categoryIDs})
 }
 
 func (h *TechnicianHandler) Me(c *gin.Context) {
