@@ -182,7 +182,19 @@ class HomeScreenState extends State<HomeScreen> {
           return InkWell(
             key: _navKeys[i],
             borderRadius: BorderRadius.circular(24),
-            onTap: () => setState(() => _selectedIndex = i),
+            onTap: () {
+              setState(() => _selectedIndex = i);
+              // BookingsScreen lives inside an IndexedStack, so its
+              // initState (and the one-time fetchUserBookings it does)
+              // only ever runs once for the whole app lifetime. Without
+              // this, a booking made just now — especially a "schedule for
+              // later" one that isn't shown on any confirmation screen
+              // afterwards — silently never appears until the app is
+              // fully restarted. Re-fetch every time this tab is opened.
+              if (i == 1) {
+                context.read<BookingProvider>().fetchUserBookings();
+              }
+            },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),

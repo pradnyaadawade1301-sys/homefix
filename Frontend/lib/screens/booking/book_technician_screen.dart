@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
@@ -944,6 +945,9 @@ class _AddAddressSheetState extends State<_AddAddressSheet> {
           TextField(
             controller: _pincodeController,
             keyboardType: TextInputType.number,
+            maxLength: 6,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
             decoration: const InputDecoration(labelText: 'Pincode'),
           ),
           const SizedBox(height: 20),

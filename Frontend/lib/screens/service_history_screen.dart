@@ -65,7 +65,8 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> with Single
                 }
                 final closed = provider.bookings
                     .where((b) => b.status == 'completed' || b.status == 'cancelled')
-                    .toList();
+                    .toList()
+                  ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
                 if (closed.isEmpty) {
                   return const _EmptyState(
                     icon: Icons.history_rounded,
@@ -76,7 +77,7 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> with Single
                 return ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: closed.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, index) => _HistoryCard(booking: closed[index]),
                 );
               },
@@ -91,7 +92,8 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> with Single
                 }
                 final closed = provider.history
                     .where((c) => c.status == ConsultationStatus.ended || c.status == ConsultationStatus.cancelled)
-                    .toList();
+                    .toList()
+                  ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
                 if (closed.isEmpty) {
                   return const _EmptyState(
                     icon: Icons.videocam_off_rounded,
@@ -102,7 +104,7 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> with Single
                 return ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: closed.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, index) => _ConsultationCard(consultation: closed[index]),
                 );
               },
@@ -124,24 +126,31 @@ class _ConsultationCard extends StatelessWidget {
     final minutes = consultation.durationSeconds != null ? (consultation.durationSeconds! / 60).ceil() : null;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.lightOutline),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 46,
+            height: 46,
             decoration: BoxDecoration(
               color: (ended ? AppTheme.successColor : AppTheme.errorColor).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(13),
             ),
             child: Icon(
               ended ? Icons.videocam_rounded : Icons.videocam_off_rounded,
               color: ended ? AppTheme.successColor : AppTheme.errorColor,
+              size: 22,
             ),
           ),
           const SizedBox(width: 12),
@@ -151,24 +160,31 @@ class _ConsultationCard extends StatelessWidget {
               children: [
                 Text(
                   consultation.categoryName.isNotEmpty ? consultation.categoryName : 'Video consultation',
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5),
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, letterSpacing: -0.2),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 4),
                 Text(
                   '${consultation.createdAt.day}/${consultation.createdAt.month}/${consultation.createdAt.year}'
                   '${consultation.technicianName != null && consultation.technicianName!.isNotEmpty ? ' • ${consultation.technicianName}' : ''}'
                   '${minutes != null ? ' • $minutes min' : ''}',
-                  style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 12.5, color: Colors.grey[500], fontWeight: FontWeight.w500),
                 ),
               ],
             ),
           ),
-          Text(
-            ended ? 'Completed' : 'Cancelled',
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
-              color: ended ? AppTheme.successColor : AppTheme.errorColor,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: (ended ? AppTheme.successColor : AppTheme.errorColor).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              ended ? 'Completed' : 'Cancelled',
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: ended ? AppTheme.successColor : AppTheme.errorColor,
+              ),
             ),
           ),
         ],
@@ -211,27 +227,35 @@ class _HistoryCard extends StatelessWidget {
     final tech = booking.technician;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.lightOutline),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 46,
+                height: 46,
                 decoration: BoxDecoration(
                   color: (completed ? AppTheme.successColor : AppTheme.errorColor).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(13),
                 ),
                 child: Icon(
-                  completed ? Icons.check_circle_outline_rounded : Icons.cancel_outlined,
+                  completed ? Icons.check_circle_rounded : Icons.cancel_rounded,
                   color: completed ? AppTheme.successColor : AppTheme.errorColor,
+                  size: 22,
                 ),
               ),
               const SizedBox(width: 12),
@@ -241,30 +265,38 @@ class _HistoryCard extends StatelessWidget {
                   children: [
                     Text(
                       booking.categoryName.isNotEmpty ? booking.categoryName : 'Service booking',
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5),
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, letterSpacing: -0.2),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 4),
                     Text(
                       '${booking.createdAt.day}/${booking.createdAt.month}/${booking.createdAt.year}'
                       '${tech != null ? ' • ${tech.name}' : ''}',
-                      style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
+                      style: TextStyle(fontSize: 12.5, color: Colors.grey[500], fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   if (completed && booking.finalPrice != null)
                     Text('₹${booking.finalPrice!.toStringAsFixed(0)}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  const SizedBox(height: 3),
-                  Text(
-                    completed ? 'Completed' : 'Cancelled',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: completed ? AppTheme.successColor : AppTheme.errorColor,
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: (completed ? AppTheme.successColor : AppTheme.errorColor).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      completed ? 'Completed' : 'Cancelled',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: completed ? AppTheme.successColor : AppTheme.errorColor,
+                      ),
                     ),
                   ),
                 ],
@@ -272,138 +304,88 @@ class _HistoryCard extends StatelessWidget {
             ],
           ),
           if (completed && tech != null) ...[
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              height: 40,
-              child: Material(
-                color: AppTheme.primaryColor,
-                borderRadius: BorderRadius.circular(10),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: () => _bookAgain(context, tech),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.replay_rounded, size: 16, color: Colors.white),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Book ${tech.name} again',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13.5),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: SizedBox(
+                    height: 40,
+                    child: Material(
+                      color: AppTheme.primaryColor,
+                      borderRadius: BorderRadius.circular(11),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(11),
+                        onTap: () => _bookAgain(context, tech),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.replay_rounded, size: 15, color: Colors.white),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                'Book Again',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              height: 38,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => WriteReviewScreen(booking: booking),
-                  ));
-                },
-                icon: const Icon(Icons.star_outline_rounded, size: 16),
-                label: const Text('Rate this Service'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.primaryColor,
-                  side: const BorderSide(color: AppTheme.primaryColor),
-                  // The app's default OutlinedButton theme has generous
-                  // vertical/horizontal padding (see theme.dart) meant for
-                  // full-size buttons. Squeezed into this button's fixed
-                  // 38px height, that padding left no room for the icon +
-                  // label, clipping the text down to barely-visible slivers.
-                  // Overriding it here keeps this specific compact button
-                  // readable without touching the shared theme.
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: SizedBox(
+                    height: 40,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => WriteReviewScreen(booking: booking),
+                        ));
+                      },
+                      icon: const Icon(Icons.star_outline_rounded, size: 15),
+                      label: const Text('Rate'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primaryColor,
+                        side: BorderSide(color: AppTheme.primaryColor.withValues(alpha: 0.4)),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+                        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ],
           if (booking.isWarrantyClaim) ...[
             const SizedBox(height: 10),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.verified_outlined, size: 14, color: AppTheme.primaryColor),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      booking.warrantyClaimOfServiceCode != null
-                          ? 'Warranty claim for ${booking.warrantyClaimOfServiceCode}'
-                          : 'Warranty claim',
-                      style: const TextStyle(fontSize: 11.5, color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
+            _InlineBanner(
+              icon: Icons.verified_rounded,
+              color: AppTheme.primaryColor,
+              text: booking.warrantyClaimOfServiceCode != null
+                  ? 'Warranty claim for ${booking.warrantyClaimOfServiceCode}'
+                  : 'Warranty claim',
             ),
           ] else if (completed && booking.warrantyEnabled) ...[
             const SizedBox(height: 10),
-            if (booking.canClaimWarranty) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppTheme.successColor.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.shield_outlined, size: 14, color: AppTheme.successColor),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Under warranty until ${booking.warrantyExpiresAt!.day}/${booking.warrantyExpiresAt!.month}/${booking.warrantyExpiresAt!.year}',
-                        style: const TextStyle(fontSize: 11.5, color: AppTheme.successColor, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                height: 38,
-                child: OutlinedButton.icon(
-                  onPressed: () => _claimWarranty(context),
-                  icon: const Icon(Icons.build_outlined, size: 16),
-                  label: const Text('Claim Warranty — Free Revisit'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.successColor,
-                    side: const BorderSide(color: AppTheme.successColor),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-            ] else
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.grey.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.shield_outlined, size: 14, color: Colors.grey[600]),
-                    const SizedBox(width: 6),
-                    Text('Warranty expired', style: TextStyle(fontSize: 11.5, color: Colors.grey[600], fontWeight: FontWeight.w600)),
-                  ],
-                ),
+            if (booking.canClaimWarranty)
+              _InlineBanner(
+                icon: Icons.shield_rounded,
+                color: AppTheme.successColor,
+                text: 'Under warranty till ${booking.warrantyExpiresAt!.day}/${booking.warrantyExpiresAt!.month}/${booking.warrantyExpiresAt!.year}',
+                actionLabel: 'Claim',
+                onAction: () => _claimWarranty(context),
+              )
+            else
+              _InlineBanner(
+                icon: Icons.shield_outlined,
+                color: Colors.grey[500]!,
+                text: 'Warranty expired',
               ),
           ],
         ],
@@ -452,6 +434,63 @@ class _HistoryCard extends StatelessWidget {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(ok ? 'Warranty claim raised — check My Bookings' : (provider.error ?? 'Could not raise claim'))),
+    );
+  }
+}
+
+/// Compact single-line status banner (used for warranty state) — replaces
+/// the old pattern of a full block plus a separate full-width button below
+/// it, which made cards feel tall and busy.
+class _InlineBanner extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String text;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  const _InlineBanner({
+    required this.icon,
+    required this.color,
+    required this.text,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 11.5, color: color, fontWeight: FontWeight.w600),
+            ),
+          ),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: onAction,
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Text(
+                  actionLabel!,
+                  style: TextStyle(fontSize: 11.5, color: color, fontWeight: FontWeight.w800, decoration: TextDecoration.underline),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

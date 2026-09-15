@@ -76,19 +76,9 @@ class _PlacesAutocompleteFieldState extends State<PlacesAutocompleteField> {
   @override
   Widget build(BuildContext context) {
     if (!_placesService.isConfigured) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.orange.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-        ),
-        child: const Text(
-          'Google Places API key not configured (lib/config/api_config.dart). '
-          'Address search is disabled — fill the fields manually below.',
-          style: TextStyle(fontSize: 12.5, color: Colors.orange),
-        ),
-      );
+      // Places API key isn't configured — just fall back to manual entry
+      // silently instead of showing a dev-facing warning to the user.
+      return const SizedBox.shrink();
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

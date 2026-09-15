@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import '../models/user_model.dart';
@@ -348,7 +349,14 @@ class _AddAddressSheetState extends State<_AddAddressSheet> {
                     controller: _pincodeController,
                     decoration: const InputDecoration(labelText: 'Pincode'),
                     keyboardType: TextInputType.number,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    maxLength: 6,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Required';
+                      if (v.trim().length != 6) return 'Enter a valid 6-digit pincode';
+                      return null;
+                    },
                   ),
                 ],
                 const SizedBox(height: 8),
