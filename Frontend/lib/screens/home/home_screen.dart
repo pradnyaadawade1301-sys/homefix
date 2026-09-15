@@ -20,7 +20,15 @@ import '../issue/issue_details_screen.dart';
 import '../../widgets/guided_tour.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  // True when a technician has tapped "Book a Service" from their own app to
+  // book something for themselves (see TechnicianJobsScreen) — same account,
+  // same booking flow, just entered from a different starting point. Backend
+  // has no role restriction on POST /bookings, so this is purely a UI nicety:
+  // it swaps the "press back twice to exit" behaviour for a normal back-pop
+  // (so it returns to the technician app) and shows a small banner so it's
+  // clear which "hat" they're wearing right now.
+  final bool guestMode;
+  const HomeScreen({Key? key, this.guestMode = false}) : super(key: key);
 
   @override
   State<HomeScreen> createState() => HomeScreenState();
@@ -132,6 +140,13 @@ class HomeScreenState extends State<HomeScreen> {
   /// - on the Home tab, back must be pressed twice within 2s to exit.
   void _handleBack(bool didPop) {
     if (didPop) return;
+    if (widget.guestMode) {
+      // Entered from the technician app to book something for themselves —
+      // back should just return there, not run the "press twice to exit"
+      // flow (that's only for the real customer-app root).
+      Navigator.of(context).pop();
+      return;
+    }
     if (_selectedIndex != 0) {
       setState(() => _selectedIndex = 0);
       return;
@@ -153,8 +168,45 @@ class HomeScreenState extends State<HomeScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) => _handleBack(didPop),
       child: Scaffold(
-        body: IndexedStack(index: _selectedIndex, children: _tabs),
+        body: Stack(
+          children: [
+            IndexedStack(index: _selectedIndex, children: _tabs),
+            if (widget.guestMode) _buildGuestModeBanner(context),
+          ],
+        ),
         bottomNavigationBar: _buildBottomNav(),
+      ),
+    );
+  }
+
+  /// Shown only when booking as a technician for themselves (see HomeScreen.guestMode)
+  /// — keeps it clear which "hat" they're wearing and gives an obvious way back.
+  Widget _buildGuestModeBanner(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Material(
+          color: AppTheme.primaryColor,
+          borderRadius: BorderRadius.circular(24),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(24),
+            onTap: () => Navigator.of(context).pop(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Booking as yourself — tap to go back',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12.5),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

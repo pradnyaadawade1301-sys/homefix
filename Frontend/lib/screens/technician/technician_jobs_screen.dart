@@ -14,6 +14,7 @@ import '../../widgets/guided_tour.dart';
 import '../consultation/incoming_consultation_screen.dart';
 import '../consultation/upcoming_consultations_screen.dart';
 import '../profile/profile_screen.dart';
+import '../home/home_screen.dart';
 import 'technician_settlement_screen.dart';
 import 'technician_history_screen.dart';
 import 'repeat_customers_screen.dart';
@@ -244,6 +245,13 @@ icon: const Icon(Icons.language_rounded),
             tooltip: l10n.techJobsMyCustomersTooltip,
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const RepeatCustomersScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.shopping_bag_outlined),
+            tooltip: 'Book a service for yourself',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const HomeScreen(guestMode: true)),
             ),
           ),
           IconButton(
