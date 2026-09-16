@@ -215,9 +215,9 @@ class AuthProvider extends ChangeNotifier {
 
   /// Verifies the code sent by forgotPassword and sets a new password.
   /// Returns an error message on failure, or null on success.
-  Future<String?> resetPassword(String email, String otp, String newPassword) async {
+  Future<String?> resetPassword(String email, String otp, String newPassword, {bool skipOtp = false}) async {
     try {
-      await _authService.resetPassword(email, otp, newPassword);
+      await _authService.resetPassword(email, otp, newPassword, skipOtp: skipOtp);
       return null;
     } catch (e) {
       return e.toString().replaceFirst('Exception: ', '');

@@ -107,6 +107,35 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     }
   }
 
+  /// TEMPORARY, same reason as VerifyEmailScreen's "Skip for now" — Render's
+  /// free tier blocks outbound SMTP so the code email can't be delivered in
+  /// production. Sets the new password directly via the skip_otp bypass.
+  /// Remove once email sending moves off Render's free tier / to an
+  /// HTTPS-based provider.
+  Future<void> _skipOtp() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    final authProvider = context.read<AuthProvider>();
+    final err = await authProvider.resetPassword(widget.email, '', _newPasswordController.text, skipOtp: true);
+    if (!mounted) return;
+    setState(() => _submitting = false);
+
+    if (err == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password reset — sign in with your new password')),
+      );
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    } else {
+      setState(() => _error = err);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -231,6 +260,15 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
+                Center(
+                  child: TextButton(
+                    onPressed: _submitting ? null : _skipOtp,
+                    child: const Text(
+                      'Skip for now (email not arriving?)',
+                      style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

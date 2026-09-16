@@ -153,6 +153,28 @@ func (s *AuthService) ResetPassword(ctx context.Context, email, otp, newPassword
 	return s.userRepo.ClearEmailOTP(ctx, u.ID)
 }
 
+// ResetPasswordSkipOTP is the TEMPORARY bypass used while Render's free tier
+// blocks outbound SMTP — see resetPasswordBody.SkipOTP for the full reason.
+// Unlike ResetPassword it doesn't check the emailed code at all, only that
+// the account exists; remove this method once email delivery is fixed.
+func (s *AuthService) ResetPasswordSkipOTP(ctx context.Context, email, newPassword string) error {
+	u, err := s.userRepo.GetByEmail(ctx, email)
+	if err != nil {
+		return err
+	}
+	if u == nil {
+		return errors.New("no account found with this email")
+	}
+	hash, err := utils.HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+	if err := s.userRepo.SetPasswordHash(ctx, u.ID, hash); err != nil {
+		return err
+	}
+	return s.userRepo.ClearEmailOTP(ctx, u.ID)
+}
+
 // LoginWithPassword supports login via either email or phone (identifier) + password,// used by both customer and technician login screens.
 func (s *AuthService) LoginWithPassword(ctx context.Context, identifier, password string) (*models.User, string, string, error) {
 	u, err := s.userRepo.GetByIdentifier(ctx, identifier)

@@ -256,8 +256,15 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 
 type resetPasswordBody struct {
 	Email       string `json:"email" binding:"required,email"`
-	OTP         string `json:"otp" binding:"required"`
+	OTP         string `json:"otp"`
 	NewPassword string `json:"new_password" binding:"required,min=6"`
+	// SkipOTP: TEMPORARY, same reason as VerifyEmailScreen's "Skip for now" —
+	// Render's free tier blocks outbound SMTP (port 587), so the reset-code
+	// email currently can't be delivered in production, which otherwise
+	// locks every user out of "Forgot password" entirely. Remove once email
+	// sending moves to an HTTPS-based provider (Resend/SendGrid) or off
+	// Render's free tier. Still requires knowing the account's email.
+	SkipOTP bool `json:"skip_otp"`
 }
 
 func (h *AuthHandler) ResetPassword(c *gin.Context) {
@@ -266,7 +273,17 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := h.authService.ResetPassword(c.Request.Context(), body.Email, body.OTP, body.NewPassword); err != nil {
+	if !body.SkipOTP && body.OTP == "" {
+		utils.Error(c, http.StatusBadRequest, "otp is required")
+		return
+	}
+	var err error
+	if body.SkipOTP {
+		err = h.authService.ResetPasswordSkipOTP(c.Request.Context(), body.Email, body.NewPassword)
+	} else {
+		err = h.authService.ResetPassword(c.Request.Context(), body.Email, body.OTP, body.NewPassword)
+	}
+	if err != nil {
 		utils.Error(c, http.StatusUnauthorized, err.Error())
 		return
 	}

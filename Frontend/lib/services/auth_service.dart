@@ -104,11 +104,11 @@ class AuthService {
     }
   }
 
-  Future<void> resetPassword(String email, String otp, String newPassword) async {
+  Future<void> resetPassword(String email, String otp, String newPassword, {bool skipOtp = false}) async {
     try {
       await _httpClient.post(
         ApiConfig.authResetPassword,
-        data: {'email': email, 'otp': otp, 'new_password': newPassword},
+        data: {'email': email, 'otp': otp, 'new_password': newPassword, 'skip_otp': skipOtp},
       );
     } catch (e) {
       throw Exception(ApiEnvelope.errorMessage(e));
