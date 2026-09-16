@@ -19,13 +19,31 @@ func NewDisputeRepository(db *pgxpool.Pool) *DisputeRepository {
 
 const disputeColumns = `d.id, d.booking_id, d.consultation_id, d.raised_by, d.reason, d.status,
 	       d.refund_amount, d.admin_notes, d.resolved_by, d.resolved_at, d.created_at, d.updated_at,
-	       COALESCE(u.name, '')`
+	       COALESCE(u.name, ''),
+	       COALESCE(c.name, ''),
+	       COALESCE(p.amount, b.final_price, b.estimated_price),
+	       COALESCE(ev.count, 0)`
+
+// disputeJoins is shared by GetByID and list() — LEFT JOINs so a dispute
+// with no linked booking (consultation-only) or no evidence yet still
+// returns a row instead of being silently dropped by an inner join.
+const disputeJoins = `
+	FROM disputes d
+	JOIN users u ON u.id = d.raised_by
+	LEFT JOIN bookings b ON b.id = d.booking_id
+	LEFT JOIN categories c ON c.id = b.category_id
+	LEFT JOIN LATERAL (
+		SELECT amount FROM payments WHERE booking_id = b.id AND status = 'paid' ORDER BY created_at DESC LIMIT 1
+	) p ON TRUE
+	LEFT JOIN LATERAL (
+		SELECT COUNT(*) AS count FROM dispute_evidence WHERE dispute_id = d.id
+	) ev ON TRUE`
 
 func scanDispute(row pgx.Row) (*models.Dispute, error) {
 	var d models.Dispute
 	err := row.Scan(&d.ID, &d.BookingID, &d.ConsultationID, &d.RaisedBy, &d.Reason, &d.Status,
 		&d.RefundAmount, &d.AdminNotes, &d.ResolvedBy, &d.ResolvedAt, &d.CreatedAt, &d.UpdatedAt,
-		&d.RaisedByName)
+		&d.RaisedByName, &d.CategoryName, &d.BookingAmount, &d.EvidenceCount)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +97,7 @@ func (r *DisputeRepository) ListEvidence(ctx context.Context, disputeID string) 
 
 func (r *DisputeRepository) GetByID(ctx context.Context, id string) (*models.Dispute, error) {
 	d, err := scanDispute(r.db.QueryRow(ctx, `
-		SELECT `+disputeColumns+` FROM disputes d JOIN users u ON u.id = d.raised_by WHERE d.id = $1
+		SELECT `+disputeColumns+disputeJoins+` WHERE d.id = $1
 	`, id))
 	if err == pgx.ErrNoRows {
 		return nil, nil
@@ -101,8 +119,7 @@ func (r *DisputeRepository) ListAll(ctx context.Context, status string) ([]model
 
 func (r *DisputeRepository) list(ctx context.Context, where string, args ...interface{}) ([]models.Dispute, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT `+disputeColumns+`
-		FROM disputes d JOIN users u ON u.id = d.raised_by
+		SELECT `+disputeColumns+disputeJoins+`
 		WHERE `+where+` ORDER BY d.created_at DESC
 	`, args...)
 	if err != nil {

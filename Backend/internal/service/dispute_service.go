@@ -145,6 +145,19 @@ func (s *DisputeService) ListForUser(ctx context.Context, userID string) ([]mode
 	return s.disputeRepo.ListByUser(ctx, userID)
 }
 
+// GetForAdmin — no "must be a party to it" check, since an admin/ops user
+// reviewing the queue legitimately needs to open any dispute (that's the
+// whole point of ListAll above). Includes evidence, unlike ListAll's rows,
+// since photos only make sense in a single-dispute detail view, not a table.
+func (s *DisputeService) GetForAdmin(ctx context.Context, id string) (*models.Dispute, []models.DisputeEvidence, error) {
+	d, err := s.disputeRepo.GetByID(ctx, id)
+	if err != nil || d == nil {
+		return d, nil, err
+	}
+	evidence, err := s.disputeRepo.ListEvidence(ctx, id)
+	return d, evidence, err
+}
+
 // ListAll + workflow below are admin-only (see internal/admin).
 
 func (s *DisputeService) ListAll(ctx context.Context, status string) ([]models.Dispute, error) {

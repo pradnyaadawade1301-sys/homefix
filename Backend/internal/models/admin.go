@@ -28,6 +28,13 @@ type Dispute struct {
 
 	// Joined display fields
 	RaisedByName string `json:"raised_by_name,omitempty"`
+	// Admin-panel display only — populated by ListAll/GetByID via LEFT JOINs
+	// so the admin doesn't have to open the booking separately just to see
+	// what's actually at stake. BookingAmount is the booking's paid amount
+	// if one exists, else its estimated/final price.
+	CategoryName  string   `json:"category_name,omitempty"`
+	BookingAmount *float64 `json:"booking_amount,omitempty"`
+	EvidenceCount int      `json:"evidence_count"`
 }
 
 type DisputeEvidence struct {

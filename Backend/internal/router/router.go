@@ -224,6 +224,7 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 			adminAPI.GET("/bookings", h.AdminAPI.Bookings)
 			adminAPI.GET("/technicians", h.AdminAPI.Technicians)
 			adminAPI.GET("/disputes", h.AdminAPI.Disputes)
+			adminAPI.GET("/disputes/:id/evidence", h.AdminAPI.DisputeDetail)
 			adminAPI.PATCH("/disputes/:id/review", h.AdminAPI.ReviewDispute)
 			adminAPI.PATCH("/disputes/:id/resolve", h.AdminAPI.ResolveDispute)
 		}

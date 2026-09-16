@@ -197,3 +197,20 @@ func (h *AdminAPIHandler) ReviewDispute(c *gin.Context) {
 	}
 	utils.Success(c, http.StatusOK, gin.H{"id": id, "status": "under_review"})
 }
+
+// DisputeDetail — GET /admin/disputes/:id/evidence
+// The list view (Disputes above) can't reasonably embed photo evidence per
+// row, so the React panel fetches it here only when an admin opens/expands
+// a specific dispute.
+func (h *AdminAPIHandler) DisputeDetail(c *gin.Context) {
+	d, evidence, err := h.disputeService.GetForAdmin(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if d == nil {
+		utils.Error(c, http.StatusNotFound, "dispute not found")
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"dispute": d, "evidence": evidence})
+}

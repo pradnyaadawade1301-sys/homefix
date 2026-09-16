@@ -80,9 +80,17 @@ class _MyDisputesScreenState extends State<MyDisputesScreen> {
                   separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (context, i) {
                     final b = bookings[i];
+                    final counterpart = b.technician?.name ?? b.customer?.name;
                     return ListTile(
-                      title: Text(b.categoryName.isNotEmpty ? b.categoryName : 'Service booking'),
-                      subtitle: Text('${b.createdAt.day}/${b.createdAt.month}/${b.createdAt.year}'),
+                      title: Text(
+                        '${b.categoryName.isNotEmpty ? b.categoryName : 'Service'}'
+                        '${counterpart != null && counterpart.isNotEmpty ? ' \u2022 $counterpart' : ''}',
+                      ),
+                      subtitle: Text(
+                        '#${b.id.length >= 8 ? b.id.substring(0, 8) : b.id} \u2022 '
+                        '${b.createdAt.day}/${b.createdAt.month}/${b.createdAt.year}'
+                        '${b.finalPrice != null ? ' \u2022 \u20b9${b.finalPrice!.toStringAsFixed(0)}' : ''}',
+                      ),
                       onTap: () => Navigator.of(sheetContext).pop(b.id),
                     );
                   },
