@@ -235,6 +235,27 @@ func (h *TechnicianHandler) SetAvailability(c *gin.Context) {
 	utils.Success(c, http.StatusOK, gin.H{"message": "availability updated"})
 }
 
+type verifiedBadgeBody struct {
+	Verified bool `json:"verified"`
+}
+
+// SetVerifiedBadge — PATCH /technicians/:id/verified-badge, admin-only.
+// Unlike SetAvailability this has no "must be your own row" check since
+// only an admin (RequireRole("admin")) can reach it at all.
+func (h *TechnicianHandler) SetVerifiedBadge(c *gin.Context) {
+	technicianID := c.Param("id")
+	var body verifiedBadgeBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.techService.SetVerifiedBadge(c.Request.Context(), technicianID, body.Verified); err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"message": "verified badge updated"})
+}
+
 type workingHoursBody struct {
 	WorkingHours models.WorkingHours `json:"working_hours" binding:"required"`
 }

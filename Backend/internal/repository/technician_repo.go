@@ -240,6 +240,14 @@ func (r *TechnicianRepository) SetAvailability(ctx context.Context, id string, a
 	return err
 }
 
+// SetVerifiedBadge lets an admin toggle the "Verified" checkmark shown next
+// to a technician's name (technicians.is_verified — separate from
+// approval_status, which gates whether they can take bookings at all).
+func (r *TechnicianRepository) SetVerifiedBadge(ctx context.Context, id string, verified bool) error {
+	_, err := r.db.Exec(ctx, `UPDATE technicians SET is_verified = $1, updated_at = now() WHERE id = $2`, verified, id)
+	return err
+}
+
 // UpdateProfilePhoto lets a technician change or remove (photoURL == "") the
 // profile photo they set during KYC registration — RegisterTechnician only
 // sets it once at signup, so without this there's no way to ever change it

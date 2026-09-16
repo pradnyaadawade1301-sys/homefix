@@ -48,12 +48,14 @@ class HomeScreenState extends State<HomeScreen> {
   final _consultNavKey = GlobalKey();
   final _profileNavKey = GlobalKey();
 
-  static const _tabs = [
-  _HomeTab(),
-  BookingsScreen(),
-  IssueDetailsScreen(),
-  ConsultScreen(),
-  ProfileScreen(),
+  // Was `static const` — needed to become an instance getter so guestMode
+  // can be threaded into ProfileScreen (see ProfileScreen.forceCustomerView).
+  List<Widget> get _tabs => [
+  const _HomeTab(),
+  const BookingsScreen(),
+  const IssueDetailsScreen(),
+  const ConsultScreen(),
+  ProfileScreen(forceCustomerView: widget.guestMode),
 ];
 
  List<_NavItemData> _navItems(BuildContext context) {

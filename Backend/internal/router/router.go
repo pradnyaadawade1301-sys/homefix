@@ -37,15 +37,9 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 	r.Use(corsMiddleware())
 	r.Use(secureHeaders())
 
-	// Registered for both GET and HEAD — uptime monitors (UptimeRobot etc.)
-	// send HEAD requests by default, and Gin does NOT auto-serve HEAD from a
-	// GET-only route, so without this a monitor pinging /health gets a 404
-	// and reports the service as down even though it's perfectly healthy.
-	healthCheck := func(c *gin.Context) {
+	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok", "service": "homefix-backend"})
-	}
-	r.GET("/health", healthCheck)
-	r.HEAD("/health", healthCheck)
+	})
 
 	// Serves files saved by UploadHandler (technician government ID / profile photo,
 	// review images, etc.) — swap for a real S3/CDN URL when AWS storage is configured.
@@ -119,6 +113,7 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.PATCH("/technicians/:id/availability", middleware.RequireRole("technician"), h.Technician.SetAvailability)
 		authed.PATCH("/technicians/:id/location", middleware.RequireRole("technician"), h.Technician.UpdateLocation)
 		authed.PATCH("/technicians/:id/verify", middleware.RequireRole("admin"), h.Technician.Verify)
+		authed.PATCH("/technicians/:id/verified-badge", middleware.RequireRole("admin"), h.Technician.SetVerifiedBadge)
 		authed.GET("/technicians/:id/bookings", middleware.RequireRole("technician", "admin"), h.Booking.TechnicianBookings)
 		authed.GET("/technicians/:id/repeat-customers", middleware.RequireRole("technician", "admin"), h.Booking.RepeatCustomers)
 		authed.GET("/technicians/:id/customers/:customerId/history", middleware.RequireRole("technician", "admin"), h.Booking.ServiceHistory)
@@ -228,6 +223,9 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 			adminAPI.GET("/customers", h.AdminAPI.Customers)
 			adminAPI.GET("/bookings", h.AdminAPI.Bookings)
 			adminAPI.GET("/technicians", h.AdminAPI.Technicians)
+			adminAPI.GET("/disputes", h.AdminAPI.Disputes)
+			adminAPI.PATCH("/disputes/:id/review", h.AdminAPI.ReviewDispute)
+			adminAPI.PATCH("/disputes/:id/resolve", h.AdminAPI.ResolveDispute)
 		}
 
 		// ---- New React Finance Panel (JSON API) ----

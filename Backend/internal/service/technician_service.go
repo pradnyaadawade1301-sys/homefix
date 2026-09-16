@@ -136,6 +136,12 @@ func (s *TechnicianService) SetAvailability(ctx context.Context, technicianID st
 	return s.techRepo.SetAvailability(ctx, technicianID, available)
 }
 
+// SetVerifiedBadge — admin-only (see AdminAPIHandler in the React admin
+// panel's routes) — toggles the "Verified" checkmark on a technician.
+func (s *TechnicianService) SetVerifiedBadge(ctx context.Context, technicianID string, verified bool) error {
+	return s.techRepo.SetVerifiedBadge(ctx, technicianID, verified)
+}
+
 // UpdateProfilePhoto lets a technician change or remove (photoURL == "") the
 // photo they set once during KYC registration — resolves the technician
 // row from their user id so they can only ever touch their own profile.

@@ -95,7 +95,15 @@ class ProfileScreen extends StatefulWidget {
   /// the profile is still loading.
   final GlobalKey? tourKey;
 
-  const ProfileScreen({Key? key, this.tourKey}) : super(key: key);
+  /// True when reached from a technician's "book a service for myself"
+  /// guest-mode HomeScreen (see HomeScreen.guestMode). The logged-in user's
+  /// role is still "technician" in that case, but this screen should show
+  /// the plain customer profile — not their Service Radius / Manage
+  /// Categories / Online-Offline technician settings — since they're acting
+  /// as a customer for this session, not managing their technician account.
+  final bool forceCustomerView;
+
+  const ProfileScreen({Key? key, this.tourKey, this.forceCustomerView = false}) : super(key: key);
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -110,7 +118,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await userProvider.fetchProfile();
       if (!mounted) return;
 
-      if (userProvider.user?.isTechnician == true) {
+      if (userProvider.user?.isTechnician == true && !widget.forceCustomerView) {
         context.read<TechnicianKycProvider>().loadMyProfile();
       }
       final categoryProvider = context.read<CategoryProvider>();
@@ -247,7 +255,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           return RefreshIndicator(
             onRefresh: userProvider.fetchProfile,
-            child: user.isTechnician
+            child: (user.isTechnician && !widget.forceCustomerView)
                 ? _TechnicianProfileBody(
                     user: user,
                     onLogout: () => _confirmLogout(context),
