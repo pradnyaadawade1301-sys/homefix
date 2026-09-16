@@ -449,10 +449,13 @@ class _CustomerProfileBodyState extends State<_CustomerProfileBody> {
       children: [
         _ProfileHeader(
           name: user.name.isNotEmpty ? user.name : 'Guest',
-          subtitle: user.phone,
+          // Login/signup are email-based now (no phone collected), so show
+          // email here instead — falls back to phone only for older
+          // accounts created back when phone signup still existed.
+          subtitle: (user.email != null && user.email!.isNotEmpty) ? user.email! : user.phone,
           roleLabel: l10n.profileCustomerRole,
           photoUrl: (user.photoUrl != null && user.photoUrl!.isNotEmpty) ? user.photoUrl : null,
-          verifiedBadge: user.phoneVerified,
+          verifiedBadge: (user.email != null && user.email!.isNotEmpty) ? user.emailVerified : user.phoneVerified,
           isUploading: _uploadingPhoto,
         ),
         const SizedBox(height: 16),
@@ -633,10 +636,10 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
             children: [
               _ProfileHeader(
                 name: widget.user.name.isNotEmpty ? widget.user.name : l10n.profileTechnicianDefaultName,
-                subtitle: widget.user.phone,
+                subtitle: (widget.user.email != null && widget.user.email!.isNotEmpty) ? widget.user.email! : widget.user.phone,
                 roleLabel: l10n.profileTechnicianRole,
                 photoUrl: (widget.user.photoUrl != null && widget.user.photoUrl!.isNotEmpty) ? widget.user.photoUrl : null,
-                verifiedBadge: widget.user.phoneVerified,
+                verifiedBadge: (widget.user.email != null && widget.user.email!.isNotEmpty) ? widget.user.emailVerified : widget.user.phoneVerified,
               ),
               const SizedBox(height: 20),
               Container(
@@ -708,7 +711,7 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
           children: [
             _ProfileHeader(
               name: widget.user.name.isNotEmpty ? widget.user.name : l10n.profileTechnicianDefaultName,
-              subtitle: widget.user.phone,
+              subtitle: (widget.user.email != null && widget.user.email!.isNotEmpty) ? widget.user.email! : widget.user.phone,
               roleLabel: categoryName,
               photoUrl: profile.profilePhotoUrl.isNotEmpty ? profile.profilePhotoUrl : null,
               verifiedBadge: profile.isVerified,

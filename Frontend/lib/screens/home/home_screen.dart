@@ -61,7 +61,7 @@ class HomeScreenState extends State<HomeScreen> {
    return [
      _NavItemData(icon: Icons.home_rounded, label: l10n.navHome),
      _NavItemData(icon: Icons.history_rounded, label: l10n.navBooking),
-     _NavItemData(icon: Icons.psychology_outlined, label: l10n.navAI),
+     _NavItemData(icon: Icons.auto_awesome_rounded, label: l10n.navAI),
      _NavItemData(icon: Icons.chat_bubble_outline_rounded, label: l10n.navChat),
      _NavItemData(icon: Icons.person_rounded, label: l10n.navProfile),
    ];
@@ -105,7 +105,7 @@ class HomeScreenState extends State<HomeScreen> {
         ),
         GuidedTourStep(
           targetKey: _aiAssessmentNavKey,
-          icon: Icons.psychology_outlined,
+          icon: Icons.auto_awesome_rounded,
           title: l10n.guidedTourAiTitle,
           description: l10n.guidedTourAiDesc,
         ),
