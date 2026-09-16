@@ -214,6 +214,19 @@ class TechnicianKycService {
     }
   }
 
+  /// Lets an already-approved technician add/remove categories they serve
+  /// (e.g. add Painting to an existing Plumbing profile) — PUT
+  /// /technicians/me/categories. Returns the resulting full category id list.
+  Future<List<String>> updateCategories(List<String> categoryIds) async {
+    try {
+      final response = await _httpClient.put(ApiConfig.technicianMeCategories, data: {'category_ids': categoryIds});
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return ((data['category_ids'] as List<dynamic>?) ?? const []).map((e) => e as String).toList();
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
   /// Online/offline master toggle — PATCH /technicians/:id/availability.
   /// This is what actually flips `is_available` in the DB; without calling
   /// this, the customer-facing "nearest available technician" match (and

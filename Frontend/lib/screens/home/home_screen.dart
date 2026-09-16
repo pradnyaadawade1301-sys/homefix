@@ -168,12 +168,14 @@ class HomeScreenState extends State<HomeScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) => _handleBack(didPop),
       child: Scaffold(
-        body: Stack(
-          children: [
-            IndexedStack(index: _selectedIndex, children: _tabs),
-            if (widget.guestMode) _buildGuestModeBanner(context),
-          ],
-        ),
+        body: widget.guestMode
+            ? Column(
+                children: [
+                  _buildGuestModeBanner(context),
+                  Expanded(child: IndexedStack(index: _selectedIndex, children: _tabs)),
+                ],
+              )
+            : IndexedStack(index: _selectedIndex, children: _tabs),
         bottomNavigationBar: _buildBottomNav(),
       ),
     );

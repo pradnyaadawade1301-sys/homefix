@@ -128,6 +128,19 @@ func (h *TechnicianHandler) Me(c *gin.Context) {
 		utils.Error(c, http.StatusNotFound, "technician profile not found")
 		return
 	}
+	// The base Technician scan doesn't include the technician_categories
+	// join, so the Manage Categories screen (which needs to pre-check the
+	// technician's current categories, not just show names) can't rely on
+	// it — fetch the id list separately and attach it as an extra field.
+	// Populated here only (not persisted/scanned from the DB row), and kept
+	// on the same flat object so this stays a drop-in-compatible response
+	// for every existing caller of GET /technicians/me.
+	categoryIDs, err := h.techService.GetCategoryIDs(c.Request.Context(), t.ID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	t.CategoryIDs = categoryIDs
 	utils.Success(c, http.StatusOK, t)
 }
 

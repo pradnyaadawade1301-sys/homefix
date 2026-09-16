@@ -145,6 +145,29 @@ class TechnicianKycProvider extends ChangeNotifier {
   } catch (_) {}
 }
 
+  /// Adds/removes categories on an already-approved technician's profile
+  /// (Manage Categories screen). Optimistic UI update with rollback on
+  /// failure, same pattern as setAvailability below.
+  Future<bool> updateCategories(List<String> categoryIds) async {
+    final profile = _profile;
+    if (profile == null) return false;
+    final previous = profile.categoryIds;
+    _profile = profile.copyWith(categoryIds: categoryIds);
+    _error = null;
+    notifyListeners();
+    try {
+      final saved = await _kycService.updateCategories(categoryIds);
+      _profile = _profile?.copyWith(categoryIds: saved);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _profile = _profile?.copyWith(categoryIds: previous);
+      _error = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Online/offline master toggle. This is the ONLY thing that actually
   /// flips `is_available` in the DB — without calling this, a technician
   /// never shows up in the customer-facing "nearest available" match, and

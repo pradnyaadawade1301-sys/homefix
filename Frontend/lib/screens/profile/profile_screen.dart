@@ -12,6 +12,7 @@ import '../../services/service_locator.dart' show UploadService;
 import '../booking/bookings_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../technician/technician_jobs_screen.dart';
+import '../technician/manage_categories_screen.dart';
 import '../technician/repeat_customers_screen.dart';
 import '../technician/technician_reviews_screen.dart';
 import '../personal_info_screen.dart';
@@ -683,6 +684,21 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
             break;
           }
         }
+        // Show every category the technician serves in their own profile
+        // header, not just the primary one — mirrors what customers see on
+        // the Technician Detail screen.
+        if (profile.categoryIds.length > 1) {
+          final names = profile.categoryIds
+              .map((id) {
+                for (final c in categoryProvider.categories) {
+                  if (c.id == id) return c.name;
+                }
+                return null;
+              })
+              .whereType<String>()
+              .toList();
+          if (names.isNotEmpty) categoryName = names.join(' • ');
+        }
 
         final isOnline = profile.isAvailable;
         final canGoOnline = profile.isApproved;
@@ -785,6 +801,13 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
             _SectionCard(
               title: l10n.profileSectionWork,
               children: [
+                _ActionTile(
+                  icon: Icons.category_outlined,
+                  label: 'Manage Categories',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ManageCategoriesScreen()),
+                  ),
+                ),
                 _ActionTile(
                   icon: Icons.work_outline_rounded,
                   label: l10n.techJobsNavTitleJobs,

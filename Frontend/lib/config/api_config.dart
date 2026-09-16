@@ -41,6 +41,7 @@ class ApiConfig {
   static const String technicianDetail = '/technicians'; // + /:id
   static const String technicianRegister = '/technicians';
   static const String technicianMe = '/technicians/me';
+  static const String technicianMeCategories = '/technicians/me/categories';
   static const String technicianAvailable = '/technicians/available';
   static const String technicianBookings = '/technicians'; // + /:id/bookings
   static const String technicianReviews = '/technicians'; // + /:id/reviews

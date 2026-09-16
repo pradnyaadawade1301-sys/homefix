@@ -101,6 +101,12 @@ func (s *TechnicianService) UpdateCategories(ctx context.Context, technicianID s
 	return categoryIDs, nil
 }
 
+// GetCategoryIDs returns every category this technician currently serves —
+// used to pre-check the right boxes on the Manage Categories screen.
+func (s *TechnicianService) GetCategoryIDs(ctx context.Context, technicianID string) ([]string, error) {
+	return s.techRepo.GetCategoryIDs(ctx, technicianID)
+}
+
 func (s *TechnicianService) GetProfile(ctx context.Context, technicianID string) (*models.Technician, error) {
 	t, err := s.techRepo.GetByID(ctx, technicianID)
 	if err != nil || t == nil {

@@ -321,6 +321,7 @@ class ConsultationProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _upcoming = await _consultationService.getUpcoming();
+      _upcoming.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       _error = null;
     } catch (e) {
       _error = e.toString();
@@ -337,6 +338,7 @@ class ConsultationProvider extends ChangeNotifier {
   Future<List<Consultation>> fetchUpcomingList() async {
     try {
       final list = await _consultationService.getUpcoming();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       _upcoming = list;
       _error = null;
       notifyListeners();

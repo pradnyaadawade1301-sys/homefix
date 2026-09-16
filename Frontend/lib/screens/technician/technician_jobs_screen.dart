@@ -248,7 +248,7 @@ icon: const Icon(Icons.language_rounded),
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.shopping_bag_outlined),
+            icon: const Icon(Icons.swap_horiz_rounded),
             tooltip: 'Book a service for yourself',
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const HomeScreen(guestMode: true)),

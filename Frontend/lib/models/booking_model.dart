@@ -767,12 +767,12 @@ class TechnicianProfile {
   bool get isApproved => approvalStatus == 'approved';
   bool get isRejected => approvalStatus == 'rejected';
 
-  TechnicianProfile copyWith({bool? isAvailable, Map<String, DayHours?>? workingHours, String? profilePhotoUrl}) {
+  TechnicianProfile copyWith({bool? isAvailable, Map<String, DayHours?>? workingHours, String? profilePhotoUrl, List<String>? categoryIds}) {
     return TechnicianProfile(
       id: id,
       userId: userId,
       categoryId: categoryId,
-      categoryIds: categoryIds,
+      categoryIds: categoryIds ?? this.categoryIds,
       experienceYears: experienceYears,
       address: address,
       governmentIdUrl: governmentIdUrl,
