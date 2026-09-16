@@ -28,6 +28,7 @@ import 'services/auth_service.dart';
 import 'services/booking_service.dart';
 import 'services/call_log_service.dart';
 import 'services/consultation_service.dart';
+import 'services/dispute_service.dart';
 import 'services/location_service.dart';
 import 'services/service_locator.dart';
 import 'screens/technician/technician_jobs_screen.dart';
@@ -71,6 +72,7 @@ class _MyAppState extends State<MyApp> {
   late PaymentService _paymentService;
   late AddressService _addressService;
   late ReviewService _reviewService;
+  late DisputeService _disputeService;
   late LocaleProvider _localeProvider;
 
   @override
@@ -97,6 +99,7 @@ class _MyAppState extends State<MyApp> {
     _paymentService = PaymentService(httpClient: _httpClient);
     _addressService = AddressService(httpClient: _httpClient);
     _reviewService = ReviewService(httpClient: _httpClient);
+    _disputeService = DisputeService(httpClient: _httpClient);
 
     // Wire up FCM token registration: whenever Firebase issues a new token,
     // send it to the backend.
@@ -239,6 +242,7 @@ class _MyAppState extends State<MyApp> {
           create: (_) => LocationProvider(locationService: LocationService()),
         ),
         Provider<ReviewService>.value(value: _reviewService),
+        Provider<DisputeService>.value(value: _disputeService),
       ],
       child: Consumer<LocaleProvider>(
         builder: (context, localeProvider, _) => MaterialApp(

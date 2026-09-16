@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../models/dispute_model.dart';
+import '../../providers/booking_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/category_provider.dart';
 import '../../services/dispute_service.dart';
 import 'dispute_detail_screen.dart';
+import 'raise_dispute_screen.dart';
 
 /// Entry point for "My Disputes" — reachable from booking/consultation detail
 /// ("Raise a dispute" button) and from account settings. GET /disputes/me.
@@ -32,10 +36,79 @@ class _MyDisputesScreenState extends State<MyDisputesScreen> {
     await _future;
   }
 
+  /// The only entry point into RaiseDisputeScreen anywhere in the app —
+  /// picks which booking the dispute is about first, since a dispute must
+  /// be tied to exactly one booking/consultation.
+  Future<void> _startNewDispute() async {
+    final bookingProvider = context.read<BookingProvider>();
+    final isTechnician = context.read<AuthProvider>().currentUser?.isTechnician == true;
+    if (bookingProvider.bookings.isEmpty) {
+      if (isTechnician) {
+        final technicianId = context.read<TechnicianKycProvider>().profile?.id;
+        if (technicianId != null) {
+          await bookingProvider.fetchTechnicianBookings(technicianId);
+        }
+      } else {
+        await bookingProvider.fetchUserBookings();
+      }
+    }
+    if (!mounted) return;
+    final bookings = bookingProvider.bookings.where((b) => b.status == 'completed').toList();
+    if (bookings.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No completed bookings yet to raise a dispute about')),
+      );
+      return;
+    }
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Which booking is this about?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 12),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: bookings.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, i) {
+                    final b = bookings[i];
+                    return ListTile(
+                      title: Text(b.categoryName.isNotEmpty ? b.categoryName : 'Service booking'),
+                      subtitle: Text('${b.createdAt.day}/${b.createdAt.month}/${b.createdAt.year}'),
+                      onTap: () => Navigator.of(sheetContext).pop(b.id),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => RaiseDisputeScreen(bookingId: picked),
+    ));
+    if (mounted) _refresh();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('My Disputes')),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _startNewDispute,
+        icon: const Icon(Icons.add),
+        label: const Text('Raise Dispute'),
+      ),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: FutureBuilder<List<Dispute>>(
