@@ -322,54 +322,10 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                       const SizedBox(height: 16),
                       _WorkingHoursCard(hours: t.workingHours),
                       const SizedBox(height: 16),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10)],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.star_outline_rounded, size: 18, color: AppTheme.primaryColor),
-                                const SizedBox(width: 8),
-                                Text('Reviews (${t.ratingCount})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5)),
-                              ],
-                            ),
-                            const SizedBox(height: 14),
-                            if (_loadingReviews)
-                              const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2)))
-                            else if (_reviews.isEmpty)
-                              Text('No reviews yet', style: TextStyle(fontSize: 13, color: Colors.grey[500]))
-                            else
-                              ..._reviews.take(5).map((r) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: List.generate(
-                                            5,
-                                            (i) => Icon(
-                                              i < r.rating ? Icons.star_rounded : Icons.star_border_rounded,
-                                              size: 16,
-                                              color: const Color(0xFFF5A623),
-                                            ),
-                                          ),
-                                        ),
-                                        if (r.comment.isNotEmpty) ...[
-                                          const SizedBox(height: 4),
-                                          Text(r.comment, style: TextStyle(fontSize: 13, color: Colors.grey[700])),
-                                        ],
-                                      ],
-                                    ),
-                                  )),
-                          ],
-                        ),
+                      _ReviewsCard(
+                        ratingCount: t.ratingCount,
+                        loading: _loadingReviews,
+                        reviews: _reviews,
                       ),
                       const SizedBox(height: 16),
                       Container(
@@ -497,6 +453,104 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
 /// Collapsible weekly-schedule card. Collapsed, it shows just today's hours and
 /// a live "Open now / Opens…" pill; tapping expands the full week with today
 /// highlighted. Display-only — the customer can still book outside these hours.
+class _ReviewsCard extends StatefulWidget {
+  final int ratingCount;
+  final bool loading;
+  final List<Review> reviews;
+  const _ReviewsCard({required this.ratingCount, required this.loading, required this.reviews});
+
+  @override
+  State<_ReviewsCard> createState() => _ReviewsCardState();
+}
+
+class _ReviewsCardState extends State<_ReviewsCard> {
+  // Collapsed by default, same as Working Hours — a technician with dozens
+  // of reviews would otherwise push the booking buttons far down the page.
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10)],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          InkWell(
+            onTap: widget.reviews.isEmpty ? null : () => setState(() => _expanded = !_expanded),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Icon(Icons.star_outline_rounded, size: 18, color: AppTheme.primaryColor),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text('Reviews (${widget.ratingCount})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5)),
+                  ),
+                  if (widget.loading)
+                    const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  else if (widget.reviews.isNotEmpty)
+                    AnimatedRotation(
+                      turns: _expanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(Icons.keyboard_arrow_down_rounded, color: Colors.grey[500]),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            alignment: Alignment.topCenter,
+            child: (!_expanded && widget.reviews.isNotEmpty)
+                ? const SizedBox(width: double.infinity)
+                : Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Divider(height: 1, color: Colors.grey[200]),
+                        const SizedBox(height: 12),
+                        if (widget.reviews.isEmpty)
+                          Text(widget.loading ? '' : 'No reviews yet', style: TextStyle(fontSize: 13, color: Colors.grey[500]))
+                        else
+                          ...widget.reviews.take(5).map((r) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: List.generate(
+                                        5,
+                                        (i) => Icon(
+                                          i < r.rating ? Icons.star_rounded : Icons.star_border_rounded,
+                                          size: 16,
+                                          color: const Color(0xFFF5A623),
+                                        ),
+                                      ),
+                                    ),
+                                    if (r.comment.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(r.comment, style: TextStyle(fontSize: 13, color: Colors.grey[700])),
+                                    ],
+                                  ],
+                                ),
+                              )),
+                      ],
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _WorkingHoursCard extends StatefulWidget {
   final Map<String, DayHours?> hours;
   const _WorkingHoursCard({required this.hours});
