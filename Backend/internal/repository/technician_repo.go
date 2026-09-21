@@ -278,7 +278,7 @@ func (r *TechnicianRepository) UpdateLocation(ctx context.Context, id string, la
 // status == "" lists every technician regardless of approval state.
 func (r *TechnicianRepository) ListByApprovalStatus(ctx context.Context, status string) ([]models.TechnicianWithUser, error) {
 	query := `
-		SELECT t.id, t.user_id, COALESCE(u.name,''), u.phone, t.category_id, COALESCE(c.name,''),
+		SELECT t.id, t.user_id, COALESCE(u.name,''), COALESCE(u.phone,''), t.category_id, COALESCE(c.name,''),
 		       t.experience_years, COALESCE(t.address,''), COALESCE(t.government_id_url,''),
 		       COALESCE(t.profile_photo_url,''), t.approval_status, COALESCE(t.rejection_reason,''),
 		       t.rating_avg, t.rating_count, t.is_verified, t.is_available, t.created_at
