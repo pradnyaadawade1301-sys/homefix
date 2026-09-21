@@ -476,7 +476,13 @@ class _VideoRow extends StatelessWidget {
     final peerName = (consultation.technicianName != null && consultation.technicianName!.isNotEmpty)
         ? consultation.technicianName!
         : l10n.consultTechnicianFallback;
-    final minutes = consultation.durationSeconds != null ? (consultation.durationSeconds! / 60).ceil() : null;
+    final durationLabel = consultation.durationSeconds != null
+        ? (() {
+            final mins = consultation.durationSeconds! ~/ 60;
+            final secs = consultation.durationSeconds! % 60;
+            return mins > 0 ? '${mins}m ${secs}s' : '${secs}s';
+          })()
+        : null;
     final ended = consultation.status == ConsultationStatus.ended;
     final helper = _helperText(context);
     final color = _statusColor();
@@ -526,7 +532,7 @@ class _VideoRow extends StatelessWidget {
                         Text(
                           '${consultation.categoryName.isNotEmpty ? consultation.categoryName : l10n.consultVideoConsultationFallback}'
                           '${consultation.scheduledAt != null ? ' • ${_formatSlot(consultation.scheduledAt!)}' : ' • ${consultation.createdAt.day}/${consultation.createdAt.month}/${consultation.createdAt.year}'}'
-                          '${minutes != null ? ' • ${l10n.consultMinutesShort('$minutes')}' : ''}',
+                          '${durationLabel != null ? ' • $durationLabel' : ''}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
