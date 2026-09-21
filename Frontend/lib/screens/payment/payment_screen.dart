@@ -111,7 +111,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       'amount': order.amountPaise,
       'currency': order.currency,
       'order_id': order.razorpayOrderId,
-      'name': 'HomeFix Live',
+      'name': 'OneFix Live',
       'description': widget.bookingTitle,
       'timeout': 300, // seconds before Checkout auto-closes
     };

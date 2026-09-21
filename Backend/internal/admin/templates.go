@@ -55,7 +55,7 @@ input[type=text],input[type=password],input[type=number],textarea,select{width:1
 
 const navHTML = `
 <div class="nav">
-  <div class="brand">HomeFix Admin</div>
+  <div class="brand">OneFix Admin</div>
   <a href="/admin" class="{{if eq .Active "dashboard"}}active{{end}}">Dashboard</a>
   <a href="/admin/users" class="{{if eq .Active "users"}}active{{end}}">Users</a>
   <a href="/admin/technicians" class="{{if eq .Active "technicians"}}active{{end}}">Technicians</a>
@@ -76,7 +76,7 @@ const navHTML = `
 // since that would make its {{if eq .Active ...}} actions part of THIS template,
 // evaluated against data that has no .Active field at all, and fail mid-render.
 const pageShell = `<!doctype html>
-<html><head><meta charset="utf-8"><title>{{.Title}} · HomeFix Admin</title>
+<html><head><meta charset="utf-8"><title>{{.Title}} · OneFix Admin</title>
 <style>` + baseCSS + `</style></head>
 <body>{{.Nav}}<div class="wrap"><h1>{{.Title}}</h1>{{.Content}}</div></body></html>`
 
@@ -152,7 +152,7 @@ func renderPage(c *gin.Context, title, active, contentTpl string, data interface
 func renderLogin(c *gin.Context, errMsg string) {
 	const content = `
 <div class="login-wrap">
-  <h1 style="text-align:center">HomeFix Admin</h1>
+  <h1 style="text-align:center">OneFix Admin</h1>
   {{if .Error}}<div class="error">{{.Error}}</div>{{end}}
   <form method="post" action="/admin/login">
     <div class="field"><label>Email or phone</label><input type="text" name="identifier" required autofocus></div>
@@ -160,7 +160,7 @@ func renderLogin(c *gin.Context, errMsg string) {
     <button class="btn btn-primary" type="submit" style="width:100%">Sign in</button>
   </form>
 </div>`
-	tpl := template.Must(template.New("login").Parse(`<!doctype html><html><head><meta charset="utf-8"><title>Admin Login · HomeFix</title><style>` + baseCSS + `</style></head><body>` + content + `</body></html>`))
+	tpl := template.Must(template.New("login").Parse(`<!doctype html><html><head><meta charset="utf-8"><title>Admin Login · OneFix</title><style>` + baseCSS + `</style></head><body>` + content + `</body></html>`))
 	c.Header("Content-Type", "text/html; charset=utf-8")
 	c.Header("X-Frame-Options", "DENY")
 	_ = tpl.Execute(c.Writer, struct{ Error string }{Error: errMsg})

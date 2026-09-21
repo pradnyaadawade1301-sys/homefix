@@ -21,7 +21,7 @@ class _LiveChatScreenState extends State<LiveChatScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   final List<_ChatMessage> _messages = [
-    _ChatMessage('Hi! I\'m the HomeFix support assistant. How can I help you today?', false),
+    _ChatMessage('Hi! I\'m the OneFix support assistant. How can I help you today?', false),
   ];
   bool _agentTyping = false;
 

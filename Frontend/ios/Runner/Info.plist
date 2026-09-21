@@ -3,15 +3,15 @@
 <plist version="1.0">
 	<dict>
 		<key>NSCameraUsageDescription</key>
-		<string>HomeFix needs camera access to let you take a profile photo.</string>
+		<string>OneFix needs camera access to let you take a profile photo.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
-		<string>HomeFix needs photo library access to let you choose a profile photo.</string>
+		<string>OneFix needs photo library access to let you choose a profile photo.</string>
 		<key>CADisableMinimumFrameDurationOnPhone</key>
 		<true/>
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>CFBundleDisplayName</key>
-		<string>Homefix Live</string>
+		<string>Onefix Live</string>
 		<key>CFBundleExecutable</key>
 		<string>$(EXECUTABLE_NAME)</string>
 		<key>CFBundleIdentifier</key>

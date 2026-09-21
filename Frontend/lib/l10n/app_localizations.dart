@@ -103,7 +103,7 @@ abstract class AppLocalizations {
   /// App name shown on splash/login.
   ///
   /// In en, this message translates to:
-  /// **'HomeFix'**
+  /// **'OneFix'**
   String get appName;
 
   /// No description provided for @navHome.
@@ -517,7 +517,7 @@ abstract class AppLocalizations {
   /// No description provided for @signupJoinSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Join HomeFix Live as a customer or technician'**
+  /// **'Join OneFix Live as a customer or technician'**
   String get signupJoinSubtitle;
 
   /// No description provided for @signupIAmA.
@@ -871,7 +871,7 @@ abstract class AppLocalizations {
   /// No description provided for @guidedTourWelcomeTitle.
   ///
   /// In en, this message translates to:
-  /// **'Welcome to HomeFix!'**
+  /// **'Welcome to OneFix!'**
   String get guidedTourWelcomeTitle;
 
   /// No description provided for @guidedTourWelcomeDesc.

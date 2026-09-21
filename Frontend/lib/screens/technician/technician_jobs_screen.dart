@@ -69,7 +69,7 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
       GuidedTourStep(
         targetKey: _overviewKey,
         icon: Icons.pending_actions_rounded,
-        title: 'Welcome to HomeFix!',
+        title: 'Welcome to OneFix!',
         description: 'Here\'s a quick overview of your active and completed jobs at a glance.',
       ),
       GuidedTourStep(

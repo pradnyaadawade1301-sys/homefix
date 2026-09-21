@@ -128,7 +128,7 @@ type groqResponse struct {
 // context only (so the model knows photos were attached and can factor that
 // into its confidence score), not analyzed pixel-by-pixel. Swap GROQ_MODEL to
 // a vision-capable model later if real image analysis is needed.
-const systemPrompt = `You are HomeFix Live's AI diagnosis assistant. Customers describe home repair
+const systemPrompt = `You are OneFix Live's AI diagnosis assistant. Customers describe home repair
 problems (plumbing, electrical, appliance, carpentry, AC, roofing, painting, etc), optionally with
 photo URLs attached (you cannot see the photos themselves, only that they exist).
 

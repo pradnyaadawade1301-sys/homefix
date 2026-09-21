@@ -123,7 +123,7 @@ class _MyAppState extends State<MyApp> {
     // generic detail screen entirely and land straight in that same chat
     // thread, matching what a normal messaging app does on tap.
     app.fcmNotificationService.onNotificationTap = (payload) {
-      final title = (payload['title'] as String?) ?? 'HomeFix';
+      final title = (payload['title'] as String?) ?? 'OneFix';
       final body = (payload['body'] as String?) ?? '';
       debugPrint('[FCM Navigate] title=$title body=$body payload=$payload');
 
@@ -247,7 +247,7 @@ class _MyAppState extends State<MyApp> {
       child: Consumer<LocaleProvider>(
         builder: (context, localeProvider, _) => MaterialApp(
           navigatorKey: app.navigatorKey,
-          title: 'HomeFix Live',
+          title: 'OneFix Live',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,

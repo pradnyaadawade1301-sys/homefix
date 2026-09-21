@@ -137,7 +137,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text('HomeFix Live', style: const pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: teal)),
+                      pw.Text('OneFix Live', style: const pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: teal)),
                       pw.SizedBox(height: 2),
                       pw.Text('Smart Home Services, Trusted Professionals', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
                     ],

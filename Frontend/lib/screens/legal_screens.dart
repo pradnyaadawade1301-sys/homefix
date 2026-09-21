@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 class TermsScreen extends StatelessWidget {
   const TermsScreen({Key? key}) : super(key: key);
@@ -14,14 +14,14 @@ class TermsScreen extends StatelessWidget {
           _PolicySection(
             title: '1. Acceptance of Terms',
             body:
-                'By creating an account or using HomeFix Live, you agree to be bound by these Terms & Conditions. '
+                'By creating an account or using OneFix Live, you agree to be bound by these Terms & Conditions. '
                 'If you do not agree, please do not use the app.',
           ),
           _PolicySection(
             title: '2. Services Provided',
             body:
-                'HomeFix Live connects customers with independent technicians for home repair and maintenance '
-                'services. HomeFix Live acts as a platform facilitating these connections and is not itself the '
+                'OneFix Live connects customers with independent technicians for home repair and maintenance '
+                'services. OneFix Live acts as a platform facilitating these connections and is not itself the '
                 'service provider.',
           ),
           _PolicySection(
@@ -52,7 +52,7 @@ class TermsScreen extends StatelessWidget {
           _PolicySection(
             title: '7. Limitation of Liability',
             body:
-                'HomeFix Live is not liable for damages arising from services performed by independent technicians. '
+                'OneFix Live is not liable for damages arising from services performed by independent technicians. '
                 'Disputes regarding service quality should be raised through the in-app dispute process.',
           ),
           _PolicySection(

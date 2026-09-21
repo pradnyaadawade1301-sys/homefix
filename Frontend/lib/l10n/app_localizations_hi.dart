@@ -9,7 +9,7 @@ class AppLocalizationsHi extends AppLocalizations {
   AppLocalizationsHi([String locale = 'hi']) : super(locale);
 
   @override
-  String get appName => 'होमफिक्स';
+  String get appName => 'वनफिक्स';
 
   @override
   String get navHome => 'होम';
@@ -226,7 +226,7 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get signupJoinSubtitle =>
-      'ग्राहक या तकनीशियन के रूप में HomeFix Live से जुड़ें';
+      'ग्राहक या तकनीशियन के रूप में OneFix Live से जुड़ें';
 
   @override
   String get signupIAmA => 'मैं हूं एक';
@@ -415,7 +415,7 @@ class AppLocalizationsHi extends AppLocalizations {
   String get homeQualityGuaranteed => 'गुणवत्ता की\nगारंटी';
 
   @override
-  String get guidedTourWelcomeTitle => 'HomeFix में आपका स्वागत है!';
+  String get guidedTourWelcomeTitle => 'OneFix में आपका स्वागत है!';
 
   @override
   String get guidedTourWelcomeDesc =>

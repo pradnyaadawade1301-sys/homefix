@@ -1,6 +1,6 @@
 {
   "@@locale": "en",
-  "appName": "HomeFix",
+  "appName": "OneFix",
   "@appName": {
     "description": "App name shown on splash/login."
   },
@@ -88,7 +88,7 @@
   "signupPasswordTooShort": "Password must be at least 8 characters",
   "signupPasswordNeedsLetterSpecial": "Add a letter and a special character (not just numbers)",
   "signupCreateYourAccount": "Create your account",
-  "signupJoinSubtitle": "Join HomeFix Live as a customer or technician",
+  "signupJoinSubtitle": "Join OneFix Live as a customer or technician",
   "signupIAmA": "I am a",
   "signupRoleCustomer": "Customer",
   "signupRoleTechnician": "Technician",
@@ -179,7 +179,7 @@
   "homeTrustedExperts": "Trusted\nExperts",
   "homeOnTimeService": "On-Time\nService",
   "homeQualityGuaranteed": "Quality\nGuaranteed",
-  "guidedTourWelcomeTitle": "Welcome to HomeFix!",
+  "guidedTourWelcomeTitle": "Welcome to OneFix!",
   "guidedTourWelcomeDesc": "Start your home service right here — electrician, plumber, AC repair, and much more.",
   "guidedTourBookingsTitle": "Bookings",
   "guidedTourBookingsDesc": "Track your upcoming and past bookings here.",

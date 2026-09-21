@@ -397,7 +397,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             ),
             const SizedBox(height: 20),
             Text(
-              name != null && name.isNotEmpty ? name : 'HomeFix',
+              name != null && name.isNotEmpty ? name : 'OneFix',
               style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 10),

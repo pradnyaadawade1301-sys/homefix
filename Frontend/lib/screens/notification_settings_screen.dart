@@ -81,7 +81,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           _PrefTile(
             icon: Icons.campaign_outlined,
             title: 'Promotions & offers',
-            subtitle: 'Occasional updates about HomeFix offers for technicians',
+            subtitle: 'Occasional updates about OneFix offers for technicians',
             value: _promotions,
             onChanged: (v) {
               setState(() => _promotions = v);

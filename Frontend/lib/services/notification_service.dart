@@ -74,7 +74,7 @@ class FcmNotificationService {
       // 2. Android notification channels (required for Android 8+)
       const androidChannel = AndroidNotificationChannel(
         'homefix_notifications',
-        'HomeFix Notifications',
+        'OneFix Notifications',
         description: 'Notifications about bookings, payments, and consultations',
         importance: Importance.high,
         playSound: true,
@@ -259,7 +259,7 @@ class FcmNotificationService {
   /// single payload shape [onNotificationTap] expects.
   Map<String, dynamic> _toTapPayload(RemoteMessage message) {
     return {
-      'title': message.notification?.title ?? 'HomeFix',
+      'title': message.notification?.title ?? 'OneFix',
       'body': message.notification?.body ?? '',
       ...message.data,
     };
@@ -288,13 +288,13 @@ class FcmNotificationService {
 
   /// Displays a local notification for a foreground FCM message.
   Future<void> _showLocalNotification(RemoteMessage message) async {
-    final title = message.notification?.title ?? 'HomeFix';
+    final title = message.notification?.title ?? 'OneFix';
     final body = message.notification?.body ?? '';
     final payload = jsonEncode(_toTapPayload(message));
 
     const androidDetails = AndroidNotificationDetails(
       'homefix_notifications',
-      'HomeFix Notifications',
+      'OneFix Notifications',
       channelDescription: 'Notifications about bookings, payments, and consultations',
       importance: Importance.high,
       priority: Priority.high,

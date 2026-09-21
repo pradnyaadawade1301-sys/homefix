@@ -43,7 +43,7 @@ func (m *MailService) SendOTPEmail(to, otp string) error {
 		return nil
 	}
 
-	subject := "Your HomeFix Live verification code"
+	subject := "Your OneFix Live verification code"
 	body := fmt.Sprintf(
 		"Your verification code is: %s\r\n\r\nThis code expires in 10 minutes. If you didn't request this, you can ignore this email.",
 		otp,
