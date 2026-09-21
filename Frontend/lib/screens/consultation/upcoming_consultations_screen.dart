@@ -275,6 +275,39 @@ class _UpcomingCard extends StatelessWidget {
               ],
             ),
           ),
+          if ((consultation.note ?? '').trim().isNotEmpty || (consultation.area ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if ((consultation.note ?? '').trim().isNotEmpty) ...[
+                    Text('Issue',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.grey[600])),
+                    const SizedBox(height: 2),
+                    Text(consultation.note!.trim(), style: const TextStyle(fontSize: 13, color: Colors.black87)),
+                  ],
+                  if ((consultation.area ?? '').trim().isNotEmpty) ...[
+                    if ((consultation.note ?? '').trim().isNotEmpty) const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on_outlined, size: 14, color: Colors.grey[600]),
+                        const SizedBox(width: 4),
+                        Text(consultation.area!.trim(), style: TextStyle(fontSize: 12.5, color: Colors.grey[700])),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           if (_isAwaitingConfirmation)
             Row(
