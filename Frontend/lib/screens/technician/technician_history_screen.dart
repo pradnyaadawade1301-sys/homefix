@@ -323,6 +323,17 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
                       c.scheduledAt != null ? 'Scheduled on ${_formatDate(c.scheduledAt!)}' : _formatDate(c.createdAt),
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
+                    if (c.durationSeconds != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        () {
+                          final mins = c.durationSeconds! ~/ 60;
+                          final secs = c.durationSeconds! % 60;
+                          return mins > 0 ? '${mins}m ${secs}s' : '${secs}s';
+                        }(),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
                   ],
                 ),
               ),
