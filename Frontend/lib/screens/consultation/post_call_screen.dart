@@ -56,6 +56,11 @@ class _PostCallScreenState extends State<PostCallScreen> {
   // get a definitive status (a pending recommendation, or a decline).
   Timer? _pollTimer;
   bool _skippedWaiting = false;
+  // True only when the 2-minute wait for a recommendation timed out on its
+  // own — distinct from the customer tapping "Book a visit slot myself
+  // instead" — so we can show an explanatory banner ("technician didn't
+  // respond in time") instead of silently dropping into the manual form.
+  bool _timedOut = false;
 
   @override
   void initState() {
@@ -95,7 +100,10 @@ class _PostCallScreenState extends State<PostCallScreen> {
     final endedRecently =
         consultation.endTime == null || DateTime.now().difference(consultation.endTime!) < const Duration(minutes: 2);
     if (!endedRecently) {
-      setState(() => _skippedWaiting = true);
+      setState(() {
+        _skippedWaiting = true;
+        _timedOut = true;
+      });
       return;
     }
 
@@ -388,9 +396,28 @@ class _PostCallScreenState extends State<PostCallScreen> {
                 ),
               ),
             ] else ...[
-              // Either the technician's recommendation was declined, or the
-              // customer chose not to wait — full manual self-serve flow.
-              if (_consultation?.recommendationStatus == 'declined') ...[
+              // Either the technician's recommendation was declined, the
+              // 2-minute wait timed out, or the customer chose not to wait —
+              // full manual self-serve flow.
+              if (_timedOut) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: AppTheme.warningColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.timer_off_outlined, size: 16, color: AppTheme.warningColor),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "The technician didn't respond in time. You can book a visit slot yourself below, or find another technician.",
+                          style: TextStyle(fontSize: 12, color: AppTheme.warningColor),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+              ] else if (_consultation?.recommendationStatus == 'declined') ...[
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(12)),

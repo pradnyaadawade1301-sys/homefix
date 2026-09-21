@@ -449,6 +449,11 @@ class _VideoRow extends StatelessWidget {
         return l10n.consultHelperConfirmed;
       case ConsultationStatus.noTechnician:
         return l10n.consultHelperNoTechnician;
+      case ConsultationStatus.ended:
+        if ((consultation.recommendationSummary ?? '').trim().isEmpty && consultation.recommendationStatus == null) {
+          return 'Technician did not send a summary after this call.';
+        }
+        return null;
       default:
         return null;
     }
