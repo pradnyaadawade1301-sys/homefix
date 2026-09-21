@@ -307,7 +307,27 @@ MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),                
                         ],
                       ),
                     ),
-                    const SizedBox(height: 28),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(l10n.loginNoAccount, style: TextStyle(color: Colors.grey[600])),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => const SignupScreen()),
+                              );
+                            },
+                            child: Text(
+                              l10n.loginSignUp,
+                              style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.primaryColor),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
@@ -329,26 +349,6 @@ MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),                
                                   style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                                 ),
                               ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(l10n.loginNoAccount, style: TextStyle(color: Colors.grey[600])),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(builder: (_) => const SignupScreen()),
-                              );
-                            },
-                            child: Text(
-                              l10n.loginSignUp,
-                              style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.primaryColor),
                             ),
                           ),
                         ],
