@@ -153,12 +153,10 @@ class TechnicianJobDetailScreen extends StatelessWidget {
                             : 'Booked ${_formatDateTime(current.createdAt)}',
                         style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
                       ),
-                      if (current.displayPrice != null) ...[
+                      if (current.displayPrice != null && current.finalPrice != null) ...[
                         const SizedBox(height: 6),
                         Text(
-                          current.finalPrice != null
-                              ? 'Final amount: \u20b9${current.displayPrice!.toStringAsFixed(0)} (${current.isPaid ? "paid" : "payment pending"})'
-                              : 'Estimated: \u20b9${current.displayPrice!.toStringAsFixed(0)}',
+                          'Final amount: \u20b9${current.displayPrice!.toStringAsFixed(0)} (${current.isPaid ? "paid" : "payment pending"})',
                           style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
                         ),
                       ],
@@ -196,8 +194,6 @@ class TechnicianJobDetailScreen extends StatelessWidget {
                                 children: [
                                   Text(customer.name.isNotEmpty ? customer.name : 'Customer',
                                       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                                  if (customer.phone.isNotEmpty)
-                                    Text(customer.phone, style: TextStyle(fontSize: 12.5, color: Colors.grey[600])),
                                 ],
                               ),
                             ),
