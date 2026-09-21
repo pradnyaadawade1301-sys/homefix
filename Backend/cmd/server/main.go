@@ -117,7 +117,7 @@ func main() {
 		Review:       handler.NewReviewHandler(reviewService),
 		AI:           handler.NewAIHandler(groqService),
 		Notification: handler.NewNotificationHandler(notifRepo),
-		Upload:       handler.NewUploadHandler(cfg.UploadDir, cfg.PublicBaseURL),
+		Upload:       handler.NewUploadHandlerWithCloudinary(cfg.UploadDir, cfg.PublicBaseURL, cfg.CloudinaryCloudName, cfg.CloudinaryAPIKey, cfg.CloudinaryAPISecret),
 		Call:         handler.NewCallHandler(bookingRepo, techRepo, consultRepo, callLogRepo, cfg.JWTAccessSecret),
 		CallLog:      handler.NewCallLogHandler(callLogRepo),
 		Consultation: handler.NewConsultationHandler(consultService, cfg.StunURLs, cfg.TurnURL, cfg.TurnSecret, cfg.TurnTTLSecond),

@@ -89,11 +89,20 @@ type Config struct {
 	FirebaseProjectID       string
 
 	// Local-disk file storage for technician KYC uploads (government ID, profile photo).
-	// Swap-in point for AWS S3 / S3-compatible storage: replace UploadDir handling in
-	// internal/handler/upload_handler.go with an S3 PutObject call and set PublicBaseURL
-	// to the bucket's public/CDN URL — no other code needs to change.
+	// Kept as a fallback path (see internal/handler/upload_handler.go) for local dev
+	// when Cloudinary credentials aren't set — Render's disk is ephemeral, so
+	// production uploads go through Cloudinary instead.
 	UploadDir     string
 	PublicBaseURL string
+
+	// Cloudinary — persistent storage for uploaded files (technician KYC docs,
+	// profile photos, dispute evidence). Render's filesystem resets on every
+	// restart/redeploy, which was wiping locally-saved uploads; Cloudinary's
+	// free tier gives permanent CDN-backed URLs instead. Upload falls back to
+	// local disk if these are unset (e.g. local dev without a Cloudinary account).
+	CloudinaryCloudName string
+	CloudinaryAPIKey    string
+	CloudinaryAPISecret string
 
 	// WebRTC ICE servers for the peer-to-peer video call (see internal/handler/call_handler.go
 	// for the signaling relay, internal/utils/turn_credentials.go for how TURN creds are minted).
@@ -211,6 +220,10 @@ func Load() *Config {
 
 		UploadDir:     getOr("UPLOAD_DIR", "./uploads"),
 		PublicBaseURL: getOr("PUBLIC_BASE_URL", "http://localhost:8080"),
+
+		CloudinaryCloudName: getOr("CLOUDINARY_CLOUD_NAME", ""),
+		CloudinaryAPIKey:    getOr("CLOUDINARY_API_KEY", ""),
+		CloudinaryAPISecret: getOr("CLOUDINARY_API_SECRET", ""),
 
 		StunURLs:      strings.Split(getOr("STUN_URLS", "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302"), ","),
 		TurnURL:       getOr("TURN_URL", ""),
