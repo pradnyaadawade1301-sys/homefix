@@ -141,6 +141,20 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
                     ],
                   ),
                 ),
+                if (b.unreadMessageCount > 0) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '${b.unreadMessageCount}',
+                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 IconButton(
                   icon: const Icon(Icons.forum_outlined, color: AppTheme.primaryColor),
                   tooltip: 'Open chat',
