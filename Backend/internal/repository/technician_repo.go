@@ -168,7 +168,13 @@ func (r *TechnicianRepository) ListPublic(ctx context.Context, categoryID string
 		           FROM technician_categories tc2
 		           JOIN categories c2 ON c2.id = tc2.category_id
 		           WHERE tc2.technician_id = t.id
-		       ), ARRAY[c.name])
+		       ), ARRAY[c.name]),
+		       COALESCE((
+		           SELECT array_agg(c2.id ORDER BY c2.name)
+		           FROM technician_categories tc2
+		           JOIN categories c2 ON c2.id = tc2.category_id
+		           WHERE tc2.technician_id = t.id
+		       ), ARRAY[c.id])
 		FROM technicians t
 		JOIN users u ON u.id = t.user_id
 		JOIN categories c ON c.id = t.category_id`
@@ -196,7 +202,7 @@ func (r *TechnicianRepository) ListPublic(ctx context.Context, categoryID string
 		var t models.TechnicianPublic
 		if err := rows.Scan(&t.ID, &t.Name, &t.CategoryID, &t.CategoryName, &t.ExperienceYears,
 			&t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.ProfilePhotoURL, &t.WorkingHours, &t.CreatedAt,
-			&t.CategoryNames); err != nil {
+			&t.CategoryNames, &t.CategoryIDs); err != nil {
 			return nil, err
 		}
 		out = append(out, t)
@@ -205,7 +211,7 @@ func (r *TechnicianRepository) ListPublic(ctx context.Context, categoryID string
 }
 
 // GetPublicByID returns a single technician's public profile, joined with name + category,
-// plus category_names — every category this technician serves (technician_categories) —
+// plus category_names/category_ids — every category this technician serves (technician_categories) —
 // so the technician detail screen can show the full skill list, not just one category.
 func (r *TechnicianRepository) GetPublicByID(ctx context.Context, id string) (*models.TechnicianPublic, error) {
 	var t models.TechnicianPublic
@@ -218,14 +224,20 @@ func (r *TechnicianRepository) GetPublicByID(ctx context.Context, id string) (*m
 		           FROM technician_categories tc2
 		           JOIN categories c2 ON c2.id = tc2.category_id
 		           WHERE tc2.technician_id = t.id
-		       ), ARRAY[c.name])
+		       ), ARRAY[c.name]),
+		       COALESCE((
+		           SELECT array_agg(c2.id ORDER BY c2.name)
+		           FROM technician_categories tc2
+		           JOIN categories c2 ON c2.id = tc2.category_id
+		           WHERE tc2.technician_id = t.id
+		       ), ARRAY[c.id])
 		FROM technicians t
 		JOIN users u ON u.id = t.user_id
 		JOIN categories c ON c.id = t.category_id
 		WHERE t.id = $1
 	`, id).Scan(&t.ID, &t.Name, &t.CategoryID, &t.CategoryName, &t.ExperienceYears,
 		&t.RatingAvg, &t.RatingCount, &t.IsVerified, &t.IsAvailable, &t.ProfilePhotoURL, &t.WorkingHours, &t.CreatedAt,
-		&t.CategoryNames)
+		&t.CategoryNames, &t.CategoryIDs)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil

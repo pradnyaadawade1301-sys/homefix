@@ -39,6 +39,10 @@ type TechnicianPublic struct {
 	// e.g. ["Plumbing", "Painting"] — CategoryName above is just the one matched by
 	// the current search/filter. Powers the technician detail screen's full skill list.
 	CategoryNames []string `json:"category_names,omitempty"`
+	// CategoryIDs is CategoryNames' matching id list (same order) — lets the
+	// customer app book any of this technician's services, not just the
+	// single primary CategoryID above.
+	CategoryIDs []string `json:"category_ids,omitempty"`
 	// WorkingHours is the technician's self-set weekly schedule (display-only).
 	WorkingHours WorkingHours `json:"working_hours,omitempty"`
 	CreatedAt    time.Time    `json:"created_at"`
@@ -60,7 +64,9 @@ type TechnicianNearby struct {
 	ProfilePhotoURL string  `json:"profile_photo_url,omitempty"`
 	// CategoryNames is every service this technician offers — see TechnicianPublic.
 	CategoryNames []string `json:"category_names,omitempty"`
-	CurrentLat    *float64 `json:"current_lat,omitempty"`
+	// CategoryIDs is CategoryNames' matching id list (same order) — see TechnicianPublic.
+	CategoryIDs []string `json:"category_ids,omitempty"`
+	CurrentLat  *float64 `json:"current_lat,omitempty"`
 	CurrentLng    *float64 `json:"current_lng,omitempty"`
 	// DistanceKm is nil when the caller didn't supply lat/lng (results are then sorted by rating instead).
 	DistanceKm *float64 `json:"distance_km,omitempty"`

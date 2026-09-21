@@ -38,9 +38,60 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
     _controller.forward();
     _loadReviews();
   }
+  /// If this technician serves more than one category, lets the customer pick
+  /// which one to book/call about — otherwise just returns the primary
+  /// category straight away. Returns null if the sheet was dismissed.
+  Future<(String, String)?> _pickCategory(BuildContext context) async {
+    final t = widget.technician;
+    if (t.categoryIds.length <= 1 || t.categoryIds.length != t.categoryNames.length) {
+      return (t.categoryId, t.categoryName);
+    }
+    return showModalBottomSheet<(String, String)>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const Text('Which service do you need?', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                const SizedBox(height: 4),
+                Text('${t.name} offers ${t.categoryNames.length} services',
+                    style: TextStyle(fontSize: 12.5, color: Colors.grey[600])),
+                const SizedBox(height: 12),
+                for (var i = 0; i < t.categoryIds.length; i++)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.build_outlined, color: _accent),
+                    title: Text(t.categoryNames[i], style: const TextStyle(fontWeight: FontWeight.w600)),
+                    onTap: () => Navigator.of(sheetContext).pop((t.categoryIds[i], t.categoryNames[i])),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _pickScheduleTime(BuildContext context) async {
   final t = widget.technician;
   final now = DateTime.now();
+
+  final category = await _pickCategory(context);
+  if (category == null || !context.mounted) return;
 
   final preCheck = await showVideoCallPreCheckSheet(context, initialDescription: widget.problemDescription);
   if (preCheck == null || !context.mounted) return;
@@ -71,8 +122,8 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
   if (!context.mounted) return;
   Navigator.of(context).push(MaterialPageRoute(
     builder: (_) => SearchingTechnicianScreen(
-      categoryId: t.categoryId,
-      categoryName: t.categoryName,
+      categoryId: category.$1,
+      categoryName: category.$2,
       note: preCheck.note,
       area: preCheck.area,
       aiDiagnosisSessionId: preCheck.aiDiagnosisSessionId,
@@ -351,12 +402,14 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: t.isAvailable
-                              ? () {
+                              ? () async {
+                                  final category = await _pickCategory(context);
+                                  if (category == null || !context.mounted) return;
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (_) => BookTechnicianScreen(
-                                        categoryId: t.categoryId,
-                                        categoryName: t.categoryName,
+                                        categoryId: category.$1,
+                                        categoryName: category.$2,
                                         problemDescription: widget.problemDescription,
                                         preferredTechnician: t,
                                       ),
@@ -384,6 +437,8 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                         child: OutlinedButton(
                           onPressed: t.isAvailable
                               ? () async {
+                                  final category = await _pickCategory(context);
+                                  if (category == null || !context.mounted) return;
                                   final preCheck = await showVideoCallPreCheckSheet(
                                     context,
                                     initialDescription: widget.problemDescription,
@@ -392,8 +447,8 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (_) => SearchingTechnicianScreen(
-                                        categoryId: t.categoryId,
-                                        categoryName: t.categoryName,
+                                        categoryId: category.$1,
+                                        categoryName: category.$2,
                                         note: preCheck.note,
                                         area: preCheck.area,
                                         aiDiagnosisSessionId: preCheck.aiDiagnosisSessionId,

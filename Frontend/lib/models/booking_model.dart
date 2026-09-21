@@ -601,6 +601,10 @@ class Technician {
   // (whichever the search was filtered by). Falls back to [categoryName]
   // if the backend didn't send this (older responses).
   final List<String> categoryNames;
+  // categoryNames' matching id list, same order/length — lets the customer
+  // pick which of this technician's services to actually book, instead of
+  // always defaulting to categoryId (their primary category).
+  final List<String> categoryIds;
   final int experienceYears;
   final double ratingAvg;
   final int ratingCount;
@@ -616,6 +620,7 @@ class Technician {
     required this.categoryId,
     required this.categoryName,
     this.categoryNames = const [],
+    this.categoryIds = const [],
     required this.experienceYears,
     required this.ratingAvg,
     required this.ratingCount,
@@ -635,6 +640,8 @@ class Technician {
       categoryName: categoryName,
       categoryNames: (json['category_names'] as List<dynamic>?)?.map((e) => e as String).toList() ??
           (categoryName.isNotEmpty ? [categoryName] : const []),
+      categoryIds: (json['category_ids'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+          ((json['category_id'] as String?)?.isNotEmpty == true ? [json['category_id'] as String] : const []),
       experienceYears: json['experience_years'] as int? ?? 0,
       ratingAvg: (json['rating_avg'] as num?)?.toDouble() ?? 0.0,
       ratingCount: json['rating_count'] as int? ?? 0,
@@ -655,6 +662,7 @@ class Technician {
       'category_id': categoryId,
       'category_name': categoryName,
       'category_names': categoryNames,
+      'category_ids': categoryIds,
       'experience_years': experienceYears,
       'rating_avg': ratingAvg,
       'rating_count': ratingCount,
