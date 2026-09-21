@@ -255,13 +255,6 @@ icon: const Icon(Icons.language_rounded),
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.person_outline),
-            key: _profileNavKey,
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ProfileScreen()),
-            ),
-          ),
-          IconButton(
   icon: const Icon(Icons.notifications_none_rounded),
   tooltip: l10n.profileNotifications,
   onPressed: () => Navigator.of(context).push(
@@ -282,12 +275,25 @@ icon: const Icon(Icons.language_rounded),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: _navIndex,
-        onTap: (i) => setState(() => _navIndex = i),
+        onTap: (i) {
+          // "Profile" isn't a tab in the IndexedStack (ProfileScreen owns its
+          // own Scaffold/AppBar, like the pushed-route version this replaced)
+          // — so tapping it pushes a route instead of switching _navIndex.
+          if (i == 4) {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+            );
+            return;
+          }
+          setState(() => _navIndex = i);
+        },
         items: [
           BottomNavigationBarItem(icon: const Icon(Icons.work_outline_rounded), label: l10n.techJobsBottomNavJobs),
           BottomNavigationBarItem(icon: const Icon(Icons.event_available_outlined), label: l10n.techJobsBottomNavUpcoming),
           BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined, key: _settlementNavKey), label: l10n.techJobsBottomNavSettlement),
-BottomNavigationBarItem(icon: const Icon(Icons.chat_bubble_outline_rounded), label: l10n.techJobsBottomNavHistory),            ],
+          BottomNavigationBarItem(icon: const Icon(Icons.chat_bubble_outline_rounded), label: l10n.techJobsBottomNavHistory),
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline, key: _profileNavKey), label: l10n.profileTitle),
+        ],
       ),
       ),
     );
