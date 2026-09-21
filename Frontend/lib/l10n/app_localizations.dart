@@ -409,13 +409,13 @@ abstract class AppLocalizations {
   /// No description provided for @loginIdentifierHint.
   ///
   /// In en, this message translates to:
-  /// **'Email or phone number'**
+  /// **'Email'**
   String get loginIdentifierHint;
 
   /// No description provided for @loginIdentifierRequired.
   ///
   /// In en, this message translates to:
-  /// **'Email or phone number required'**
+  /// **'Email required'**
   String get loginIdentifierRequired;
 
   /// No description provided for @loginPasswordHint.

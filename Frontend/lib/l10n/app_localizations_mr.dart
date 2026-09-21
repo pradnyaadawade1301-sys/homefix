@@ -165,10 +165,10 @@ class AppLocalizationsMr extends AppLocalizations {
       'विश्वासार्ह होम सर्व्हिसेस बुक करण्यासाठी साइन इन करा';
 
   @override
-  String get loginIdentifierHint => 'ईमेल किंवा फोन नंबर';
+  String get loginIdentifierHint => 'ईमेल';
 
   @override
-  String get loginIdentifierRequired => 'ईमेल किंवा फोन नंबर आवश्यक आहे';
+  String get loginIdentifierRequired => 'ईमेल आवश्यक आहे';
 
   @override
   String get loginPasswordHint => 'पासवर्ड';

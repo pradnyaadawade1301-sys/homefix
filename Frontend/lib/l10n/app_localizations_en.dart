@@ -165,10 +165,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginSubtitle => 'Sign in to book trusted home services';
 
   @override
-  String get loginIdentifierHint => 'Email or phone number';
+  String get loginIdentifierHint => 'Email';
 
   @override
-  String get loginIdentifierRequired => 'Email or phone number required';
+  String get loginIdentifierRequired => 'Email required';
 
   @override
   String get loginPasswordHint => 'Password';
