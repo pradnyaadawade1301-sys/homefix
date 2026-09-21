@@ -32,6 +32,21 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  /// Shows an error as a floating rounded popup that auto-dismisses after 3s,
+  /// instead of Flutter's default edge-to-edge bottom banner.
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppTheme.errorColor,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   void _handleLogin() async {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
@@ -46,9 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (success) {
       await _routeAfterLogin();
     } else if (authProvider.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(authProvider.error!), backgroundColor: AppTheme.errorColor),
-      );
+      _showError(authProvider.error!);
     }
   }
 
@@ -65,9 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isGoogleLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).loginGoogleSignInFailed(e.toString().replaceFirst('Exception: ', ''))), backgroundColor: AppTheme.errorColor),
-      );
+      _showError(AppLocalizations.of(context).loginGoogleSignInFailed(e.toString().replaceFirst('Exception: ', '')));
       return;
     }
 
@@ -86,9 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (success) {
       await _routeAfterLogin();
     } else if (authProvider.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(authProvider.error!), backgroundColor: AppTheme.errorColor),
-      );
+      _showError(authProvider.error!);
     }
   }
 
