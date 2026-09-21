@@ -299,11 +299,6 @@ class _VisitTile extends StatelessWidget {
               ],
             ),
           ),
-          if (booking.finalPrice != null || booking.estimatedPrice != null)
-            Text(
-              '₹${(booking.finalPrice ?? booking.estimatedPrice)!.toStringAsFixed(0)}',
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: Color(0xFF1A1F36)),
-            ),
         ],
       ),
     ),
