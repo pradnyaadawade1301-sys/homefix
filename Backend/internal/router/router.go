@@ -37,9 +37,11 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 	r.Use(corsMiddleware())
 	r.Use(secureHeaders())
 
-	r.GET("/health", func(c *gin.Context) {
+	healthHandler := func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok", "service": "homefix-backend"})
-	})
+	}
+	r.GET("/health", healthHandler)
+	r.HEAD("/health", healthHandler)
 
 	// Serves files saved by UploadHandler (technician government ID / profile photo,
 	// review images, etc.) — swap for a real S3/CDN URL when AWS storage is configured.
