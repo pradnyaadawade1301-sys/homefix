@@ -23,7 +23,6 @@ import '../service_history_screen.dart';
 import '../payment_methods_screen.dart';
 import '../payment/transaction_history_screen.dart';
 import '../help_center_screen.dart';
-import '../dispute/my_disputes_screen.dart';
 import '../contact_support_screen.dart';
 import '../home/home_screen.dart';
 import '../../widgets/guided_tour.dart';
@@ -537,18 +536,10 @@ class _CustomerProfileBodyState extends State<_CustomerProfileBody> {
           title: l10n.profileSectionSupport,
           children: [
             _ActionTile(
-              icon: Icons.gavel_outlined,
-              label: 'My Disputes',
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const MyDisputesScreen()),
-              ),
-            ),
-            _ActionTile(
               icon: Icons.help_outline_rounded,
               label: l10n.profileHelpCenter,
               onTap: () => widget.openScreen(const HelpCenterScreen()),
             ),
-            
             _ActionTile(
               icon: Icons.support_agent_outlined,
               label: l10n.profileContactSupport,
@@ -881,13 +872,6 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
             _SectionCard(
               title: l10n.profileSectionSupport,
               children: [
-                _ActionTile(
-                  icon: Icons.gavel_outlined,
-                  label: 'My Disputes',
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const MyDisputesScreen()),
-                  ),
-                ),
                 _ActionTile(
                   icon: Icons.help_outline_rounded,
                   label: l10n.profileHelpCenter,

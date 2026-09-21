@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import 'dispute/my_disputes_screen.dart';
 
 /// Help Center — searchable FAQ list with expandable answers.
 class HelpCenterScreen extends StatefulWidget {
@@ -51,6 +52,26 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
       appBar: AppBar(title: const Text('Help Center')),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppTheme.lightOutline),
+              ),
+              child: ListTile(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                leading: const Icon(Icons.gavel_outlined, color: AppTheme.primaryColor),
+                title: const Text('Booking Issues', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
+                subtitle: const Text('Raised issues or claims on your bookings', style: TextStyle(fontSize: 12.5)),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const MyDisputesScreen()),
+                ),
+              ),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
