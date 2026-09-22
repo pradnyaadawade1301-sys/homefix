@@ -157,7 +157,26 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
     );
     if (source == null) return;
 
-    final picked = await _imagePicker.pickImage(source: source, imageQuality: 85);
+    XFile? picked;
+    try {
+      // maxWidth/maxHeight cap the decoded bitmap size — a full-resolution
+      // camera photo (12MP+, tens of MB once decoded) can OOM-kill the app
+      // on lower-RAM devices when the picker hands it back uncapped; 1600px
+      // is plenty for a chat thumbnail while keeping memory use bounded.
+      picked = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 70,
+        maxWidth: 1600,
+        maxHeight: 1600,
+      );
+    } catch (e) {
+      // e.g. camera permission denied, or no camera app available.
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open ${source == ImageSource.camera ? 'camera' : 'gallery'}: ${e.toString().replaceFirst('Exception: ', '')}')),
+      );
+      return;
+    }
     if (picked == null || _isUploadingImage) return;
 
     setState(() => _isUploadingImage = true);
