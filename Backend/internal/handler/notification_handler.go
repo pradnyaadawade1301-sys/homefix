@@ -35,3 +35,12 @@ func (h *NotificationHandler) MarkRead(c *gin.Context) {
 	}
 	utils.Success(c, http.StatusOK, gin.H{"message": "marked read"})
 }
+
+func (h *NotificationHandler) MarkAllRead(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if err := h.notifRepo.MarkAllRead(c.Request.Context(), userID); err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"message": "marked all read"})
+}

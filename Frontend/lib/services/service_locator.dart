@@ -396,6 +396,14 @@ class NotificationService {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
   }
+
+  Future<void> markAllRead() async {
+    try {
+      await _httpClient.patch(ApiConfig.notificationsMarkAllRead);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
 }
 
 // Address Service — GET/POST /users/me/addresses. Used by the "Book Technician"
