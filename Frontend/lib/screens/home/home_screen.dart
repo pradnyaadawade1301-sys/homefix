@@ -528,93 +528,79 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
     return i < 0 ? 0 : i;
   }
 
-  void _openBookingsTab() {
-    final homeState = context.findAncestorStateOfType<HomeScreenState>();
-    if (homeState != null) {
-      homeState.setState(() => homeState._selectedIndex = 1);
-    } else {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BookingsScreen()));
-    }
-  }
-
-  /// Small "Track Booking" row between My Technicians and Top Picks — every
-  /// booking that's neither completed nor cancelled yet, so the customer
-  /// doesn't have to dig into the Bookings tab just to check on one that's
-  /// already in flight. Hidden entirely when there's nothing to track.
+  /// Small "Track Booking" card between My Technicians and Top Picks — just
+  /// the single most recently updated booking that's neither completed nor
+  /// cancelled yet (not every active booking — one card, not a row of
+  /// them), so the customer sees what's actually in flight right now
+  /// without digging into the Bookings tab. Disappears the moment that
+  /// booking is marked completed (or cancelled), since it then drops out of
+  /// _activeBookingStatuses.
   Widget _buildActiveBookingsSection() {
     return Consumer<BookingProvider>(
       builder: (context, provider, _) {
-        final active = provider.bookings.where((b) => _activeBookingStatuses.contains(b.status)).toList();
+        final active = provider.bookings.where((b) => _activeBookingStatuses.contains(b.status)).toList()
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
         if (active.isEmpty) return const SizedBox.shrink();
+        final b = active.first;
+        final techName = b.technician?.name.isNotEmpty == true ? b.technician!.name : 'Technician';
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _sectionTitle('Track Booking', onViewAll: _openBookingsTab),
+            _sectionTitle('Track Booking', onViewAll: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => BookingTrackingScreen(bookingId: b.id)),
+                )),
             const SizedBox(height: 14),
-            SizedBox(
-              height: 140,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: active.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
-                itemBuilder: (context, i) {
-                  final b = active[i];
-                  final techName = b.technician?.name.isNotEmpty == true ? b.technician!.name : 'Technician';
-                  return GestureDetector(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => BookingTrackingScreen(bookingId: b.id)),
-                    ),
-                    child: Container(
-                      width: 210,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.grey[200]!),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 14,
-                                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.12),
-                                child: Text(
-                                  techName.isNotEmpty ? techName[0].toUpperCase() : '?',
-                                  style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 12),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  techName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                            ],
+            GestureDetector(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => BookingTrackingScreen(bookingId: b.id)),
+              ),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.grey[200]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 14,
+                          backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.12),
+                          child: Text(
+                            techName.isNotEmpty ? techName[0].toUpperCase() : '?',
+                            style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 12),
                           ),
-                          _MiniStepper(currentIndex: _stageIndex(b.status), stageCount: _stages.length),
-                          Text(
-                            _activeBookingStatusLabel(b.status),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            techName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 11.5, color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                           ),
-                          Text(
-                            b.categoryName.isNotEmpty ? b.categoryName : 'Service booking',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-                          ),
-                        ],
-                      ),
+                        ),
+                        Text(
+                          b.categoryName.isNotEmpty ? b.categoryName : 'Service booking',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 11.5, color: Colors.grey[500]),
+                        ),
+                      ],
                     ),
-                  );
-                },
+                    const SizedBox(height: 12),
+                    _MiniStepper(currentIndex: _stageIndex(b.status), stageCount: _stages.length),
+                    const SizedBox(height: 8),
+                    Text(
+                      _activeBookingStatusLabel(b.status),
+                      style: const TextStyle(fontSize: 11.5, color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 24),
