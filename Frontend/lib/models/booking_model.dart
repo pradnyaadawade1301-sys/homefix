@@ -145,6 +145,9 @@ class Booking {
   // How many chat messages on this booking the current user hasn't opened
   // yet — powers the WhatsApp-style badge on the Consult > Chat list.
   final int unreadMessageCount;
+  // This booking chat's most recent message (either side), if any — powers
+  // the WhatsApp-style preview line on the Consult > Chat list.
+  final BookingMessage? lastMessage;
 
   Booking({
     required this.id,
@@ -176,6 +179,7 @@ class Booking {
     this.warrantyClaimOf,
     this.warrantyClaimOfServiceCode,
     this.unreadMessageCount = 0,
+    this.lastMessage,
   });
 
   /// Price to display: final price once the job is done, otherwise the estimate.
@@ -261,6 +265,8 @@ class Booking {
       warrantyClaimOf: json['warranty_claim_of'] as String?,
       warrantyClaimOfServiceCode: json['warranty_claim_of_service_code'] as String?,
       unreadMessageCount: json['unread_message_count'] as int? ?? 0,
+      lastMessage:
+          json['last_message'] != null ? BookingMessage.fromJson(json['last_message'] as Map<String, dynamic>) : null,
     );
   }
 }

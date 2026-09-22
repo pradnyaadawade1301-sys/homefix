@@ -220,6 +220,11 @@ type BookingDetail struct {
 	// chat list (Consult > Chat). Populated by ListForCustomerDetailed /
 	// ListForTechnicianDetailed; omitted (zero value) elsewhere.
 	UnreadMessageCount int `json:"unread_message_count,omitempty"`
+	// LastMessage is this booking chat's most recent message (either side),
+	// if any — powers the WhatsApp-style preview line on the chat list
+	// (Consult > Chat), replacing the plain booking status text there.
+	// Populated alongside UnreadMessageCount; nil when the chat is empty.
+	LastMessage *BookingMessage `json:"last_message,omitempty"`
 }
 
 type BookingStatusHistory struct {

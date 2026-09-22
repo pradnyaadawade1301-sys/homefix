@@ -131,6 +131,10 @@ class _ChatRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tech = booking.technician!;
+    final lastMessage = booking.lastMessage;
+    final subtitle = lastMessage != null
+        ? (lastMessage.senderRole == 'customer' ? 'You: ${lastMessage.content}' : lastMessage.content)
+        : (booking.categoryName.isNotEmpty ? booking.categoryName : AppLocalizations.of(context).consultServiceBookingFallback);
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(14),
@@ -163,7 +167,7 @@ class _ChatRow extends StatelessWidget {
                     Text(tech.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
                     const SizedBox(height: 3),
                     Text(
-                      booking.categoryName.isNotEmpty ? booking.categoryName : AppLocalizations.of(context).consultServiceBookingFallback,
+                      subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),

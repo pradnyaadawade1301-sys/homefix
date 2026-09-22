@@ -109,6 +109,10 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
       itemBuilder: (context, i) {
         final b = bookings[i];
         final customerName = b.customer?.name.isNotEmpty == true ? b.customer!.name : 'Customer';
+        final lastMessage = b.lastMessage;
+        final subtitle = lastMessage != null
+            ? (lastMessage.senderRole == 'technician' ? 'You: ${lastMessage.content}' : lastMessage.content)
+            : b.status.replaceAll('_', ' ');
         void openChat() => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => BookingChatScreen(bookingId: b.id, peerName: customerName),
             ));
@@ -136,8 +140,12 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
                     children: [
                       Text(customerName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
                       const SizedBox(height: 2),
-                      Text(b.status.replaceAll('_', ' '),
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
                     ],
                   ),
                 ),

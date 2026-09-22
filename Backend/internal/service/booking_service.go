@@ -144,10 +144,21 @@ func (s *BookingService) attachUnreadCounts(ctx context.Context, list []models.B
 	counts, err := s.bookingRepo.UnreadMessageCounts(ctx, ids, viewerUserID)
 	if err != nil {
 		log.Printf("UnreadMessageCounts failed: %v", err)
+	} else {
+		for i := range list {
+			list[i].UnreadMessageCount = counts[list[i].ID]
+		}
+	}
+
+	lastMessages, err := s.bookingRepo.LastMessages(ctx, ids)
+	if err != nil {
+		log.Printf("LastMessages failed: %v", err)
 		return
 	}
 	for i := range list {
-		list[i].UnreadMessageCount = counts[list[i].ID]
+		if m, ok := lastMessages[list[i].ID]; ok {
+			list[i].LastMessage = &m
+		}
 	}
 }
 
