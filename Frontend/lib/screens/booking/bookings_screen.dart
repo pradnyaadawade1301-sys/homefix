@@ -394,12 +394,65 @@ class _BookingCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (b.warrantyEnabled) ...[
+              const SizedBox(height: 8),
+              _WarrantyChip(booking: b),
+            ],
             if (b.technician != null) ...[
               const SizedBox(height: 12),
               _TechnicianTile(technician: b.technician!, bookingId: b.id, bookingStatus: b.status),
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Small "🛡 X days warranty" pill shown on a booking card once the
+/// technician has offered one (see Booking.warrantyEnabled) — same
+/// active/expired distinction as TechnicianHistoryScreen's own warranty
+/// list, just compressed to fit inline on the booking card.
+class _WarrantyChip extends StatelessWidget {
+  final Booking booking;
+  const _WarrantyChip({required this.booking});
+
+  String _duration(int? days) {
+    if (days == null) return 'Warranty offered';
+    if (days % 365 == 0 && days >= 365) {
+      final years = days ~/ 365;
+      return '$years ${years == 1 ? 'year' : 'years'} warranty';
+    }
+    if (days % 30 == 0 && days >= 30) {
+      final months = days ~/ 30;
+      return '$months ${months == 1 ? 'month' : 'months'} warranty';
+    }
+    return '$days ${days == 1 ? 'day' : 'days'} warranty';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final expiresAt = booking.warrantyExpiresAt;
+    final active = expiresAt == null || expiresAt.isAfter(DateTime.now());
+    final color = active ? AppTheme.successColor : Colors.grey;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.shield_outlined, size: 13, color: color),
+          const SizedBox(width: 5),
+          Text(
+            expiresAt != null
+                ? '${_duration(booking.warrantyDays)} • ${active ? 'valid till' : 'expired'} ${expiresAt.day}/${expiresAt.month}/${expiresAt.year}'
+                : _duration(booking.warrantyDays),
+            style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600),
+          ),
+        ],
       ),
     );
   }
