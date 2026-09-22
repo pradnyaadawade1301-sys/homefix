@@ -9,6 +9,7 @@ import '../../providers/category_provider.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/booking_provider.dart';
 import '../booking/bookings_screen.dart';
+import '../booking/booking_tracking_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
 import 'categories_screen.dart';
@@ -361,6 +362,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
     context.read<TechnicianProvider>().fetchTechnicians();
     context.read<LocationProvider>().resolveLocation();
     context.read<BookingProvider>().fetchRepeatTechnicians();
+    context.read<BookingProvider>().fetchUserBookings();
   }
 
   void _openTechnicianList({String? categoryId, String? categoryName, String? initialQuery}) {
@@ -416,6 +418,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
             KeyedSubtree(key: widget.categoriesKey, child: _buildCategoriesRow()),
             const SizedBox(height: 24),
             _buildRepeatTechniciansSection(),
+            _buildActiveBookingsSection(),
             _sectionTitle(l10n.homeTopPicksForYou, onViewAll: () => _openTechnicianList()),
             const SizedBox(height: 14),
             _buildTechnicianList(),
@@ -510,6 +513,124 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
         );
       },
     );
+  }
+
+  static const _activeBookingStatuses = ['requested', 'pending_technician', 'accepted', 'on_the_way', 'arrived', 'inspecting', 'in_progress'];
+
+  void _openBookingsTab() {
+    final homeState = context.findAncestorStateOfType<HomeScreenState>();
+    if (homeState != null) {
+      homeState.setState(() => homeState._selectedIndex = 1);
+    } else {
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BookingsScreen()));
+    }
+  }
+
+  /// Small "Track Booking" row between My Technicians and Top Picks — every
+  /// booking that's neither completed nor cancelled yet, so the customer
+  /// doesn't have to dig into the Bookings tab just to check on one that's
+  /// already in flight. Hidden entirely when there's nothing to track.
+  Widget _buildActiveBookingsSection() {
+    return Consumer<BookingProvider>(
+      builder: (context, provider, _) {
+        final active = provider.bookings.where((b) => _activeBookingStatuses.contains(b.status)).toList();
+        if (active.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sectionTitle('Track Booking', onViewAll: _openBookingsTab),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 108,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: active.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, i) {
+                  final b = active[i];
+                  final techName = b.technician?.name.isNotEmpty == true ? b.technician!.name : 'Technician';
+                  return GestureDetector(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => BookingTrackingScreen(bookingId: b.id)),
+                    ),
+                    child: Container(
+                      width: 170,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.grey[200]!),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 14,
+                                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.12),
+                                child: Text(
+                                  techName.isNotEmpty ? techName[0].toUpperCase() : '?',
+                                  style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 12),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  techName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            _activeBookingStatusLabel(b.status),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11.5, color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
+                          ),
+                          Text(
+                            b.categoryName.isNotEmpty ? b.categoryName : 'Service booking',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        );
+      },
+    );
+  }
+
+  String _activeBookingStatusLabel(String status) {
+    switch (status) {
+      case 'requested':
+        return 'Finding technician';
+      case 'pending_technician':
+        return 'Awaiting confirmation';
+      case 'accepted':
+        return 'Technician assigned';
+      case 'on_the_way':
+        return 'On the way';
+      case 'arrived':
+        return 'Technician arrived';
+      case 'inspecting':
+        return 'Inspecting';
+      case 'in_progress':
+        return 'Service in progress';
+      default:
+        return status.replaceAll('_', ' ');
+    }
   }
 
   Widget _buildHeader(BuildContext context) {
