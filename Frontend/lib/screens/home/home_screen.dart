@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemNavigator;
 import 'package:provider/provider.dart';
@@ -315,10 +316,20 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
   // similar to how most apps offer suggestions after every keystroke.
   List<String> _suggestions = [];
 
+  // Keeps the "Track Booking" card's mini stepper moving on its own (e.g.
+  // technician taps "On the way" on their end) instead of only updating
+  // after the user manually pulls to refresh — same 5s cadence as
+  // BookingTrackingScreen's own poll.
+  Timer? _bookingsPollTimer;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+    _bookingsPollTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => context.read<BookingProvider>().fetchUserBookings(),
+    );
     _bannerAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2200),
@@ -390,6 +401,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
 
   @override
   void dispose() {
+    _bookingsPollTimer?.cancel();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _searchFocusNode.dispose();
