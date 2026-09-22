@@ -516,6 +516,17 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
   }
 
   static const _activeBookingStatuses = ['requested', 'pending_technician', 'accepted', 'on_the_way', 'arrived', 'inspecting', 'in_progress'];
+  // Mirrors BookingTrackingScreen's own _stages — the 7-step flow shown
+  // there (Pending Assignment -> ... -> Service Completed) — so the mini
+  // stepper on this card lines up with what the full tracking screen shows
+  // once tapped, just compressed to fit a small row card.
+  static const _stages = ['requested', 'pending_technician', 'accepted', 'on_the_way', 'arrived', 'in_progress', 'completed'];
+
+  int _stageIndex(String status) {
+    if (status == 'awaiting_estimate_approval' || status == 'inspecting') return _stages.indexOf('in_progress');
+    final i = _stages.indexOf(status);
+    return i < 0 ? 0 : i;
+  }
 
   void _openBookingsTab() {
     final homeState = context.findAncestorStateOfType<HomeScreenState>();
@@ -541,7 +552,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
             _sectionTitle('Track Booking', onViewAll: _openBookingsTab),
             const SizedBox(height: 14),
             SizedBox(
-              height: 108,
+              height: 140,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: active.length,
@@ -554,8 +565,8 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                       MaterialPageRoute(builder: (_) => BookingTrackingScreen(bookingId: b.id)),
                     ),
                     child: Container(
-                      width: 170,
-                      padding: const EdgeInsets.all(12),
+                      width: 210,
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(14),
@@ -586,6 +597,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
                               ),
                             ],
                           ),
+                          _MiniStepper(currentIndex: _stageIndex(b.status), stageCount: _stages.length),
                           Text(
                             _activeBookingStatusLabel(b.status),
                             maxLines: 1,
@@ -1235,6 +1247,46 @@ class _TechnicianCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Compact horizontal version of BookingTrackingScreen's vertical stepper —
+/// a dot per stage connected by lines, filled up to currentIndex — so the
+/// "Track Booking" card on Home conveys the same multi-step flow at a
+/// glance, without repeating every stage's label (no room for that at this
+/// card size; the full labelled stepper is one tap away).
+class _MiniStepper extends StatelessWidget {
+  final int currentIndex;
+  final int stageCount;
+
+  const _MiniStepper({required this.currentIndex, required this.stageCount});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List.generate(stageCount * 2 - 1, (i) {
+        if (i.isOdd) {
+          // connecting line between dot (i-1)/2 and (i+1)/2
+          final filled = (i ~/ 2) < currentIndex;
+          return Expanded(
+            child: Container(
+              height: 2,
+              color: filled ? AppTheme.primaryColor : Colors.grey[300],
+            ),
+          );
+        }
+        final stage = i ~/ 2;
+        final done = stage <= currentIndex;
+        return Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: done ? AppTheme.primaryColor : Colors.grey[300],
+          ),
+        );
+      }),
     );
   }
 }
