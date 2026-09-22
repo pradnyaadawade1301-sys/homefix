@@ -819,13 +819,6 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                   ),
                 ),
                 _ActionTile(
-                  icon: Icons.work_outline_rounded,
-                  label: l10n.techJobsNavTitleJobs,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const TechnicianJobsScreen()),
-                  ),
-                ),
-                _ActionTile(
                   icon: Icons.people_alt_outlined,
                   label: l10n.techJobsMyCustomersTooltip,
                   onTap: () => Navigator.of(context).push(
@@ -844,11 +837,6 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                       ),
                     ),
                   ),
-                ),
-                _ActionTile(
-                  icon: Icons.videocam_rounded,
-                  label: l10n.profileLiveConsultationRequestsLabel,
-                  onTap: () => Navigator.of(context).pushNamed('/consultation-requests'),
                 ),
               ],
             ),
