@@ -102,8 +102,23 @@ class _ChatHistoryTab extends StatelessWidget {
           }
           // Only bookings that actually have a technician assigned can have a
           // chat thread — a booking still "searching" has no one to chat with.
-          final withTechnician = provider.bookings.where((b) => b.technician != null).toList()
-            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          // Chat is booking-scoped (each booking id is its own thread — see
+          // BookingChatScreen's doc comment), but the same technician can be
+          // booked more than once — without grouping, that technician would
+          // show up as a separate row per booking instead of once, like a
+          // normal messaging app.
+          final byTechnician = <String, Booking>{};
+          for (final b in provider.bookings.where((b) => b.technician != null)) {
+            final techId = b.technician!.id;
+            final activity = b.lastMessage?.createdAt ?? b.updatedAt;
+            final existing = byTechnician[techId];
+            final existingActivity = existing == null ? null : (existing.lastMessage?.createdAt ?? existing.updatedAt);
+            if (existing == null || activity.isAfter(existingActivity!)) {
+              byTechnician[techId] = b;
+            }
+          }
+          final withTechnician = byTechnician.values.toList()
+            ..sort((a, b) => (b.lastMessage?.createdAt ?? b.updatedAt).compareTo(a.lastMessage?.createdAt ?? a.updatedAt));
 
           if (withTechnician.isEmpty) {
             return _EmptyState(

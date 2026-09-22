@@ -99,15 +99,32 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
   }
 
   Widget _chatsList(List<Booking> bookings) {
-    if (bookings.isEmpty) {
+    // Chat is booking-scoped (each booking id is its own thread), but the
+    // same customer can book this technician more than once — without
+    // grouping, that customer would show up as a separate row per booking
+    // instead of once, like a normal messaging app.
+    final byCustomer = <String, Booking>{};
+    for (final b in bookings.where((b) => b.customer != null)) {
+      final customerId = b.customer!.id;
+      final activity = b.lastMessage?.createdAt ?? b.updatedAt;
+      final existing = byCustomer[customerId];
+      final existingActivity = existing == null ? null : (existing.lastMessage?.createdAt ?? existing.updatedAt);
+      if (existing == null || activity.isAfter(existingActivity!)) {
+        byCustomer[customerId] = b;
+      }
+    }
+    final grouped = byCustomer.values.toList()
+      ..sort((a, b) => (b.lastMessage?.createdAt ?? b.updatedAt).compareTo(a.lastMessage?.createdAt ?? a.updatedAt));
+
+    if (grouped.isEmpty) {
       return const Center(child: Text('No jobs yet'));
     }
     return ListView.separated(
       padding: const EdgeInsets.all(16),
-      itemCount: bookings.length,
+      itemCount: grouped.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, i) {
-        final b = bookings[i];
+        final b = grouped[i];
         final customerName = b.customer?.name.isNotEmpty == true ? b.customer!.name : 'Customer';
         final lastMessage = b.lastMessage;
         final subtitle = lastMessage != null
