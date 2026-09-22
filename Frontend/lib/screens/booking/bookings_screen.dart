@@ -397,6 +397,15 @@ class _BookingCard extends StatelessWidget {
             if (b.warrantyEnabled) ...[
               const SizedBox(height: 8),
               _WarrantyChip(booking: b),
+              if (b.warrantyDescription != null && b.warrantyDescription!.trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  b.warrantyDescription!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
             ],
             if (b.technician != null) ...[
               const SizedBox(height: 12),
