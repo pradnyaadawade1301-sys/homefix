@@ -550,7 +550,15 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
   Widget _buildActiveBookingsSection() {
     return Consumer<BookingProvider>(
       builder: (context, provider, _) {
-        final active = provider.bookings.where((b) => _activeBookingStatuses.contains(b.status)).toList()
+        // A booking stuck in 'requested'/'pending_technician' for a long
+        // time (never accepted, never explicitly cancelled) is effectively
+        // abandoned — without this cutoff it would resurface here as a
+        // "new" booking the moment the customer's actual current job
+        // finishes, even though they never booked it.
+        final recentCutoff = DateTime.now().subtract(const Duration(hours: 24));
+        final active = provider.bookings
+            .where((b) => _activeBookingStatuses.contains(b.status) && b.updatedAt.isAfter(recentCutoff))
+            .toList()
           ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
         if (active.isEmpty) return const SizedBox.shrink();
         final b = active.first;
