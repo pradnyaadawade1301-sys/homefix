@@ -187,6 +187,7 @@ class _MyAppState extends State<MyApp> {
           // (a booking always has both a customer and a technician).
           peerDisplayName: (payload['technician_name'] as String?) ??
               (payload['customer_name'] as String?),
+          isVideo: payload['call_type'] == 'video',
         ),
       ));
     };

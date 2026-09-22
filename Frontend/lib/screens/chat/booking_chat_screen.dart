@@ -1,11 +1,22 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import '../../core/booking_call_launcher.dart';
 import '../../core/theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/booking_service.dart';
+import '../../services/service_locator.dart' show UploadService;
 import '../../l10n/app_localizations.dart';
+
+/// Prefix marking a chat message's content as an image URL rather than
+/// plain text — no separate message-type column on booking_messages, so
+/// this is the cheapest way to tell the two apart on render (see
+/// BookingMessage.content in the backend, which stores whatever this sends
+/// verbatim).
+const _imageMessagePrefix = 'img::';
 
 /// Booking-scoped chat between the customer and the technician assigned to
 /// that booking. Backed by GET/POST /bookings/:id/messages
@@ -29,16 +40,24 @@ class BookingChatScreen extends StatefulWidget {
 class _BookingChatScreenState extends State<BookingChatScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
+  final _imagePicker = ImagePicker();
   List<BookingMessage> _messages = [];
   bool _isLoading = true;
   bool _isSending = false;
+  bool _isUploadingImage = false;
   String? _error;
   Timer? _pollTimer;
+  // Whether the call buttons should be enabled — mirrors
+  // isCallableBookingStatus (only an assigned, active-or-completed booking
+  // can start a call); fetched separately since this screen is only ever
+  // given a bookingId + peerName by its callers, not the full Booking.
+  bool _callable = false;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadCallability();
     // Simple polling so new messages from the other side show up without a
     // websocket layer — cheap for a booking-scoped 1:1 thread like this.
     _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _load(silent: true));
@@ -50,6 +69,16 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadCallability() async {
+    try {
+      final booking = await context.read<BookingService>().getBookingDetail(widget.bookingId);
+      if (!mounted) return;
+      setState(() => _callable = isCallableBookingStatus(booking.status));
+    } catch (_) {
+      // Best-effort — the call buttons simply stay disabled if this fails.
+    }
   }
 
   Future<void> _load({bool silent = false}) async {
@@ -106,12 +135,84 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
     }
   }
 
+  Future<void> _pickAndSendImage() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Take photo'),
+              onTap: () => Navigator.of(sheetContext).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.of(sheetContext).pop(ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+
+    final picked = await _imagePicker.pickImage(source: source, imageQuality: 85);
+    if (picked == null || _isUploadingImage) return;
+
+    setState(() => _isUploadingImage = true);
+    try {
+      final url = await context.read<UploadService>().uploadFile(File(picked.path));
+      final sent = await context.read<BookingService>().sendMessage(widget.bookingId, '$_imageMessagePrefix$url');
+      if (!mounted) return;
+      setState(() {
+        _messages = [..._messages, sent];
+        _isUploadingImage = false;
+      });
+      _scrollToBottom();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isUploadingImage = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  void _openImage(String url) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
+        body: Center(child: InteractiveViewer(child: Image.network(url))),
+      ),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final myId = context.watch<AuthProvider>().currentUser?.id;
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.peerName)),
+      appBar: AppBar(
+        title: Text(widget.peerName),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.call_outlined),
+            tooltip: 'Audio call',
+            onPressed: _callable
+                ? () => startBookingAudioCall(context, bookingId: widget.bookingId, peerDisplayName: widget.peerName)
+                : null,
+          ),
+          IconButton(
+            icon: const Icon(Icons.videocam_outlined),
+            tooltip: 'Video call',
+            onPressed: _callable
+                ? () => startBookingVideoCall(context, bookingId: widget.bookingId, peerDisplayName: widget.peerName)
+                : null,
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(child: _body(myId)),
@@ -153,11 +254,15 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
       itemBuilder: (context, i) {
         final msg = _messages[i];
         final isMine = msg.senderId == myId;
+        final isImage = msg.content.startsWith(_imageMessagePrefix);
+        final imageUrl = isImage ? msg.content.substring(_imageMessagePrefix.length) : null;
         return Align(
           alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
           child: Container(
             margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: isImage
+                ? const EdgeInsets.all(6)
+                : const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
             decoration: BoxDecoration(
               color: isMine ? AppTheme.primaryColor : Colors.grey[200],
@@ -172,10 +277,28 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  msg.content,
-                  style: TextStyle(color: isMine ? Colors.white : Colors.black87, fontSize: 14),
-                ),
+                if (isImage)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: GestureDetector(
+                      onTap: () => _openImage(imageUrl),
+                      child: Image.network(
+                        imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 160,
+                          height: 120,
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Text(
+                    msg.content,
+                    style: TextStyle(color: isMine ? Colors.white : Colors.black87, fontSize: 14),
+                  ),
                 const SizedBox(height: 4),
                 Text(
                   _formatTime(msg.createdAt),
@@ -203,6 +326,13 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
         ),
         child: Row(
           children: [
+            IconButton(
+              icon: _isUploadingImage
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Icon(Icons.camera_alt_outlined, color: Colors.grey[700]),
+              tooltip: 'Send photo',
+              onPressed: _isUploadingImage ? null : _pickAndSendImage,
+            ),
             Expanded(
               child: TextField(
                 controller: _controller,

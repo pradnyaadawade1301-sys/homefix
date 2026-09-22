@@ -289,9 +289,12 @@ class BookingService {
   /// Technician taps "Audio Call" on an active job's card — notifies the
   /// customer via FCM (see BookingService.InitiateCall on the backend) and
   /// returns everything needed to immediately join the call room.
-  Future<BookingCallInfo> initiateCall(String bookingId) async {
+  Future<BookingCallInfo> initiateCall(String bookingId, {bool isVideo = false}) async {
     try {
-      final response = await _httpClient.post('${ApiConfig.bookingComplete}/$bookingId/call/initiate');
+      final response = await _httpClient.post(
+        '${ApiConfig.bookingComplete}/$bookingId/call/initiate',
+        queryParameters: {'video': isVideo.toString()},
+      );
       final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
       return BookingCallInfo.fromJson(data);
     } catch (e) {
