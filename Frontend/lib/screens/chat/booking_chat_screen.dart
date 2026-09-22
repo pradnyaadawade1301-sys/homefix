@@ -301,14 +301,20 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
                     borderRadius: BorderRadius.circular(10),
                     child: GestureDetector(
                       onTap: () => _openImage(imageUrl),
-                      child: Image.network(
-                        imageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          width: 160,
-                          height: 120,
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
+                      child: SizedBox(
+                        width: 200,
+                        height: 200,
+                        child: Image.network(
+                          imageUrl!,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, progress) {
+                            if (progress == null) return child;
+                            return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                          },
+                          errorBuilder: (_, __, ___) => Container(
+                            color: Colors.grey[300],
+                            child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
+                          ),
                         ),
                       ),
                     ),
