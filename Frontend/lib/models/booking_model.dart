@@ -411,6 +411,18 @@ class BookingMessage {
     required this.createdAt,
   });
 
+  // Content prefixed this way marks it as an image URL rather than plain
+  // text — see BookingChatScreen, which sends messages this way (no
+  // separate message-type column on booking_messages).
+  static const _imagePrefix = 'img::';
+  bool get isImage => content.startsWith(_imagePrefix);
+  String get imageUrl => content.substring(_imagePrefix.length);
+
+  /// One-line preview for chat list rows — the raw content for a text
+  /// message, or a "📷 Photo" placeholder for an image one (showing the
+  /// image URL there would be meaningless to the user).
+  String get previewText => isImage ? '📷 Photo' : content;
+
   factory BookingMessage.fromJson(Map<String, dynamic> json) {
     return BookingMessage(
       id: json['id'] as String,

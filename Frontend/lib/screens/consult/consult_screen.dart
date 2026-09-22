@@ -133,7 +133,7 @@ class _ChatRow extends StatelessWidget {
     final tech = booking.technician!;
     final lastMessage = booking.lastMessage;
     final subtitle = lastMessage != null
-        ? (lastMessage.senderRole == 'customer' ? 'You: ${lastMessage.content}' : lastMessage.content)
+        ? (lastMessage.senderRole == 'customer' ? 'You: ${lastMessage.previewText}' : lastMessage.previewText)
         : (booking.categoryName.isNotEmpty ? booking.categoryName : AppLocalizations.of(context).consultServiceBookingFallback);
     return Material(
       color: Colors.white,

@@ -14,8 +14,7 @@ import '../../l10n/app_localizations.dart';
 /// Prefix marking a chat message's content as an image URL rather than
 /// plain text — no separate message-type column on booking_messages, so
 /// this is the cheapest way to tell the two apart on render (see
-/// BookingMessage.content in the backend, which stores whatever this sends
-/// verbatim).
+/// BookingMessage.isImage/previewText, which share this same prefix).
 const _imageMessagePrefix = 'img::';
 
 /// Booking-scoped chat between the customer and the technician assigned to

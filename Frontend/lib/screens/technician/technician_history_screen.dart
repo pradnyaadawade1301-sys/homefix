@@ -111,7 +111,7 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
         final customerName = b.customer?.name.isNotEmpty == true ? b.customer!.name : 'Customer';
         final lastMessage = b.lastMessage;
         final subtitle = lastMessage != null
-            ? (lastMessage.senderRole == 'technician' ? 'You: ${lastMessage.content}' : lastMessage.content)
+            ? (lastMessage.senderRole == 'technician' ? 'You: ${lastMessage.previewText}' : lastMessage.previewText)
             : b.status.replaceAll('_', ' ');
         void openChat() => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => BookingChatScreen(bookingId: b.id, peerName: customerName),
