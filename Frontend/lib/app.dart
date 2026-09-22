@@ -4,6 +4,7 @@ import 'package:flutter_ringtone_player/flutter_ringtone_player.dart' show Flutt
 import 'package:provider/provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'core/http_client.dart';
+import 'core/notification_navigation.dart';
 import 'core/theme.dart';
 import 'l10n/app_localizations.dart';
 import 'providers/address_provider.dart';
@@ -32,8 +33,6 @@ import 'services/dispute_service.dart';
 import 'services/location_service.dart';
 import 'services/service_locator.dart';
 import 'screens/technician/technician_jobs_screen.dart';
-import 'screens/notifications/notification_detail_screen.dart';
-import 'screens/chat/booking_chat_screen.dart';
 import 'main.dart' as app; // for fcmNotificationService, navigatorKey
 
 /// Sends the current FCM token to the backend via the authenticated endpoint.
@@ -116,33 +115,19 @@ class _MyAppState extends State<MyApp> {
       _registerFcmToken(_httpClient);
     }
 
-    // Wire up notification tap: open that exact notification's message,
-    // with a shortcut to the booking when the payload has a booking_id.
-    // A chat message push ("New message" / type: booking_message, sent by
-    // BookingService.SendMessage) is the one case that should skip the
-    // generic detail screen entirely and land straight in that same chat
-    // thread, matching what a normal messaging app does on tap.
+    // Wire up notification tap: land straight on whichever screen that
+    // notification is actually about (booking tracking/job detail, invoice,
+    // chat thread, consultation) — see openNotificationTarget, the same
+    // routing NotificationsScreen's own list uses, so a push tap and an
+    // in-app list tap behave identically instead of drifting apart.
     app.fcmNotificationService.onNotificationTap = (payload) {
       final title = (payload['title'] as String?) ?? 'OneFix';
       final body = (payload['body'] as String?) ?? '';
       debugPrint('[FCM Navigate] title=$title body=$body payload=$payload');
 
-      final type = payload['type'] as String?;
-      final bookingId = payload['booking_id'] as String?;
-      if (type == 'booking_message' && bookingId != null && bookingId.isNotEmpty) {
-        final peerName = (payload['sender_name'] as String?)?.trim();
-        app.navigatorKey.currentState?.push(MaterialPageRoute(
-          builder: (_) => BookingChatScreen(
-            bookingId: bookingId,
-            peerName: (peerName != null && peerName.isNotEmpty) ? peerName : 'Chat',
-          ),
-        ));
-        return;
-      }
-
-      app.navigatorKey.currentState?.push(MaterialPageRoute(
-        builder: (_) => NotificationDetailScreen(title: title, body: body, data: payload),
-      ));
+      final navContext = app.navigatorKey.currentState?.context;
+      if (navContext == null) return;
+      openNotificationTarget(navContext, title: title, body: body, data: payload);
     };
 
     // Wire up incoming consultation requests: ring immediately (like a real

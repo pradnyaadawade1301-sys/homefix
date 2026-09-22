@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/notification_navigation.dart';
 import '../../services/service_locator.dart';
-import 'notification_detail_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({Key? key}) : super(key: key);
@@ -87,9 +87,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
 
     if (!mounted) return;
-    await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => NotificationDetailScreen(title: title, body: body, data: data, createdAt: createdAt),
-    ));
+    await openNotificationTarget(context, title: title, body: body, data: data, createdAt: createdAt);
     if (mounted) _refresh();
   }
 
