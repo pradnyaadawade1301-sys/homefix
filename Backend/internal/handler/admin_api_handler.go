@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"homefix-backend/internal/models"
 	"homefix-backend/internal/repository"
 	"homefix-backend/internal/service"
 	"homefix-backend/internal/utils"
@@ -113,6 +114,7 @@ func (h *AdminAPIHandler) Orders(c *gin.Context) {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
+	h.attachPaymentMethods(c, bookings)
 	utils.Success(c, http.StatusOK, bookings)
 }
 
@@ -124,7 +126,30 @@ func (h *AdminAPIHandler) Bookings(c *gin.Context) {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
+	h.attachPaymentMethods(c, bookings)
 	utils.Success(c, http.StatusOK, bookings)
+}
+
+// attachPaymentMethods fills in PaymentMethod on each booking — best effort,
+// a failure here shouldn't stop the bookings themselves from loading (same
+// pattern as BookingService.attachUnreadCounts).
+func (h *AdminAPIHandler) attachPaymentMethods(c *gin.Context, bookings []models.BookingDetail) {
+	if len(bookings) == 0 {
+		return
+	}
+	ids := make([]string, len(bookings))
+	for i, b := range bookings {
+		ids[i] = b.ID
+	}
+	methods, err := h.paymentRepo.MethodsByBooking(c.Request.Context(), ids)
+	if err != nil {
+		return
+	}
+	for i := range bookings {
+		if m, ok := methods[bookings[i].ID]; ok {
+			bookings[i].PaymentMethod = &m
+		}
+	}
 }
 
 // BookingPhotos — GET /admin/bookings/:id/photos — the technician's

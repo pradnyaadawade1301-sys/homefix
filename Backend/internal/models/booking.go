@@ -225,6 +225,12 @@ type BookingDetail struct {
 	// (Consult > Chat), replacing the plain booking status text there.
 	// Populated alongside UnreadMessageCount; nil when the chat is empty.
 	LastMessage *BookingMessage `json:"last_message,omitempty"`
+	// PaymentMethod is this booking's most recent payment's method —
+	// "cash" (Cash on Delivery) or "razorpay"/a Razorpay method name like
+	// "upi"/"card" for an online payment — so the admin panel's Bookings
+	// table can show how the customer is paying, not just whether it's
+	// paid. Populated only by AdminAPIHandler.Bookings; nil elsewhere.
+	PaymentMethod *string `json:"payment_method,omitempty"`
 }
 
 type BookingStatusHistory struct {
