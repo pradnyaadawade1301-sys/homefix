@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../core/theme.dart';
+import '../../core/technician_theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/category_provider.dart';
@@ -647,6 +648,8 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                 roleLabel: l10n.profileTechnicianRole,
                 photoUrl: (widget.user.photoUrl != null && widget.user.photoUrl!.isNotEmpty) ? widget.user.photoUrl : null,
                 verifiedBadge: (widget.user.email != null && widget.user.email!.isNotEmpty) ? widget.user.emailVerified : widget.user.phoneVerified,
+                accentColor: TechTheme.primary,
+                accentColorDark: TechTheme.primaryDark,
               ),
               const SizedBox(height: 20),
               Container(
@@ -723,6 +726,8 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
               photoUrl: profile.profilePhotoUrl.isNotEmpty ? profile.profilePhotoUrl : null,
               verifiedBadge: profile.isVerified,
               isUploading: _uploadingPhoto,
+              accentColor: TechTheme.primary,
+              accentColorDark: TechTheme.primaryDark,
               onEditPhoto: () => _showProfilePhotoSheet(
                 context,
                 photoUrl: profile.profilePhotoUrl.isNotEmpty ? profile.profilePhotoUrl : null,
@@ -791,7 +796,7 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                   else
                     Switch(
                       value: isOnline,
-                      activeThumbColor: AppTheme.successColor,
+                      activeThumbColor: TechTheme.primary,
                       onChanged: canGoOnline ? _onToggleAvailability : null,
                     ),
                 ],
@@ -814,6 +819,7 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                 _ActionTile(
                   icon: Icons.category_outlined,
                   label: 'Manage Categories',
+                  accentColor: TechTheme.primary,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const ManageCategoriesScreen()),
                   ),
@@ -821,6 +827,7 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                 _ActionTile(
                   icon: Icons.people_alt_outlined,
                   label: l10n.techJobsMyCustomersTooltip,
+                  accentColor: TechTheme.primary,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const RepeatCustomersScreen()),
                   ),
@@ -828,6 +835,7 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                 _ActionTile(
                   icon: Icons.star_outline_rounded,
                   label: 'My Reviews',
+                  accentColor: TechTheme.primary,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => TechnicianReviewsScreen(
@@ -847,11 +855,13 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                 _ActionTile(
                   icon: Icons.explore_outlined,
                   label: l10n.profileReplayTour,
+                  accentColor: TechTheme.primary,
                   onTap: widget.onReplayTour,
                 ),
                 _ActionTile(
                   icon: Icons.language_rounded,
                   label: l10n.profileLanguage,
+                  accentColor: TechTheme.primary,
                   onTap: () => showLanguagePicker(context),
                 ),
               ],
@@ -863,17 +873,20 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                 _ActionTile(
                   icon: Icons.help_outline_rounded,
                   label: l10n.profileHelpCenter,
+                  accentColor: TechTheme.primary,
                   onTap: () => widget.openScreen(const HelpCenterScreen()),
                 ),
                 _ActionTile(
                   icon: Icons.support_agent_outlined,
                   label: l10n.profileContactSupport,
+                  accentColor: TechTheme.primary,
                   onTap: () => widget.openScreen(const ContactSupportScreen()),
                 ),
-                
+
                 _ActionTile(
                   icon: Icons.description_outlined,
                   label: l10n.profileTerms,
+                  accentColor: TechTheme.primary,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const TermsScreen()),
                   ),
@@ -919,6 +932,11 @@ class _ProfileHeader extends StatelessWidget {
   // entirely for screens with no photo-edit capability.
   final VoidCallback? onEditPhoto;
   final bool isUploading;
+  // Lets the technician profile body override the header's teal gradient
+  // with the purple TechTheme accent, without changing the customer body's
+  // default (still teal, via _defaultAccent below).
+  final Color? accentColor;
+  final Color? accentColorDark;
 
   const _ProfileHeader({
     required this.name,
@@ -929,17 +947,22 @@ class _ProfileHeader extends StatelessWidget {
     this.extra,
     this.onEditPhoto,
     this.isUploading = false,
+    this.accentColor,
+    this.accentColorDark,
   });
 
-  static const Color _accent = Color(0xFF0F766E);
-  static const Color _accentDark = Color(0xFF115E59);
+  static const Color _defaultAccent = Color(0xFF0F766E);
+  static const Color _defaultAccentDark = Color(0xFF115E59);
+
+  Color get _accent => accentColor ?? _defaultAccent;
+  Color get _accentDark => accentColorDark ?? _defaultAccentDark;
 
   Widget _initialAvatar() => Container(
         color: _accent.withValues(alpha: 0.1),
         alignment: Alignment.center,
         child: Text(
           name.isNotEmpty ? name[0].toUpperCase() : '?',
-          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: _accent),
+          style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: _accent),
         ),
       );
 
@@ -948,7 +971,7 @@ class _ProfileHeader extends StatelessWidget {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           colors: [_accent, _accentDark],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -1003,10 +1026,10 @@ class _ProfileHeader extends StatelessWidget {
                     child: Container(
                       width: 26,
                       height: 26,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         color: _accent,
                         shape: BoxShape.circle,
-                        border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 2)),
+                        border: const Border.fromBorderSide(BorderSide(color: Colors.white, width: 2)),
                       ),
                       child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 13),
                     ),
@@ -1019,7 +1042,7 @@ class _ProfileHeader extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.all(3),
                     decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                    child: const Icon(Icons.verified_rounded, color: _accent, size: 18),
+                    child: Icon(Icons.verified_rounded, color: _accent, size: 18),
                   ),
                 ),
             ],
@@ -1085,13 +1108,14 @@ class _ActionTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final Color accentColor;
 
-  const _ActionTile({required this.icon, required this.label, required this.onTap});
+  const _ActionTile({required this.icon, required this.label, required this.onTap, this.accentColor = AppTheme.primaryColor});
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: Icon(icon, color: AppTheme.primaryColor, size: 22),
+      leading: Icon(icon, color: accentColor, size: 22),
       title: Text(label, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
       trailing: const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
       onTap: onTap,

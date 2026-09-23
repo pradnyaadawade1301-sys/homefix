@@ -4,6 +4,7 @@ import 'package:flutter/services.dart' show SystemNavigator;
 import 'package:provider/provider.dart';
 import '../../core/booking_call_launcher.dart';
 import '../../core/theme.dart';
+import '../../core/technician_theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/booking_model.dart';
 import '../../models/consultation_model.dart';
@@ -21,8 +22,10 @@ import 'repeat_customers_screen.dart';
 import '../chat/booking_chat_screen.dart';
 import 'technician_job_detail_screen.dart';
 import '../../providers/category_provider.dart';
+import '../../providers/payment_provider.dart';
 import 'job_brief_card.dart';
 import '../notifications/notifications_screen.dart';
+import 'manage_categories_screen.dart';
 
 class TechnicianJobsScreen extends StatefulWidget {
   const TechnicianJobsScreen({Key? key}) : super(key: key);
@@ -34,8 +37,23 @@ class TechnicianJobsScreen extends StatefulWidget {
 }
 
 class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
-  int _navIndex = 0; // 0 = Jobs, 1 = Consultations, 2 = Settlement, 3 = History
+  // Purple/indigo dashboard palette — scoped to the technician app only
+  // (customer-facing screens keep AppTheme's teal/green palette). Sourced
+  // from TechTheme so every technician screen shares one definition.
+  static const _purple = TechTheme.primary;
+  static const _purpleDark = TechTheme.primaryDark;
+  static const _purpleSoft = TechTheme.primarySoft;
+  static const _canvas = TechTheme.canvas;
+  static const _green = TechTheme.green;
+  static const _greenSoft = TechTheme.greenSoft;
+  static const _blue = TechTheme.blue;
+  static const _blueSoft = TechTheme.blueSoft;
+  static const _amber = TechTheme.amber;
+  static const _amberSoft = TechTheme.amberSoft;
+
+  int _navIndex = 0; // 0 = Home, 1 = Jobs, 2 = Earnings, 3 = Messages, 4 = Profile (pushed)
   int _tabIndex = 0;
+  int _homeWorkTab = 0; // 0 = Active, 1 = Upcoming, 2 = Completed — "Your Work" card on the Home dashboard
   // For the "press back again to exit" behaviour on the Jobs tab.
   DateTime? _lastBackPress;
 
@@ -71,18 +89,21 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
         icon: Icons.pending_actions_rounded,
         title: 'Welcome to OneFix!',
         description: 'Here\'s a quick overview of your active and completed jobs at a glance.',
+        tabIndex: 0,
       ),
       GuidedTourStep(
         targetKey: _filterKey,
         icon: Icons.filter_list_rounded,
         title: 'Active & All Jobs',
         description: 'Switch between jobs that need your attention right now and your full job history.',
+        tabIndex: 1,
       ),
       GuidedTourStep(
         targetKey: _jobsListKey,
         icon: Icons.work_outline_rounded,
         title: 'Your Jobs',
         description: 'Every job assigned to you shows up here — tap a card to see the full Job Brief, chat with the customer, and update the job status.',
+        tabIndex: 1,
       ),
       GuidedTourStep(
         targetKey: _customersNavKey,
@@ -108,6 +129,9 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
       context,
       force: force,
       steps: steps,
+      onTabChange: (i) {
+        if (mounted) setState(() => _navIndex = i);
+      },
       onTourEnd: () {
         if (mounted) setState(() => _navIndex = 0);
       },
@@ -152,6 +176,14 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
     if (technicianId != null && mounted) {
       await context.read<BookingProvider>().fetchTechnicianBookings(technicianId);
     }
+    if (mounted) {
+      // Powers the Home dashboard's Total Earned / This Month / Earnings
+      // Overview widgets — non-fatal if it fails, those just show ₹0.
+      await context.read<PaymentProvider>().loadHistory();
+    }
+    if (mounted && context.read<CategoryProvider>().categories.isEmpty) {
+      await context.read<CategoryProvider>().fetchCategories();
+    }
   }
 
   // Silent poll used by the periodic timer: same fetch as _load, but skips
@@ -189,19 +221,6 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
     Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
   }
 
-  String _navTitle(AppLocalizations l10n) {
-    switch (_navIndex) {
-      case 0:
-        return l10n.techJobsNavTitleJobs;
-      case 1:
-        return l10n.techJobsNavTitleConsultations;
-      case 2:
-        return l10n.techJobsNavTitleSettlement;
-      default:
-        return l10n.techJobsNavTitleHistory;
-    }
-  }
-
   /// Back-button handling for the technician shell:
   /// - on any non-Jobs tab, back returns to the Jobs tab instead of leaving;
   /// - on the Jobs tab, back must be pressed twice within 2s to exit —
@@ -231,49 +250,19 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) => _handleBack(didPop),
       child: Scaffold(
-      appBar: AppBar(
-        title: Text(_navTitle(l10n)),
-        actions: [
-           IconButton(
-icon: const Icon(Icons.language_rounded),
-    tooltip: l10n.profileLanguage,
-    onPressed: () => showLanguagePicker(context),
-  ),
-          IconButton(
-            icon: const Icon(Icons.people_alt_outlined),
-            key: _customersNavKey,
-            tooltip: l10n.techJobsMyCustomersTooltip,
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const RepeatCustomersScreen()),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.swap_horiz_rounded),
-            tooltip: 'Book a service for yourself',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const HomeScreen(guestMode: true)),
-            ),
-          ),
-          IconButton(
-  icon: const Icon(Icons.notifications_none_rounded),
-  tooltip: l10n.profileNotifications,
-  onPressed: () => Navigator.of(context).push(
-    MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-  ),
-),
-        ],
-      ),
+      appBar: _buildHeader(l10n),
       body: IndexedStack(
         index: _navIndex,
         children: [
+          _buildHomeDashboard(),
           _buildJobsBody(),
-          const UpcomingConsultationsScreen(embedded: true),
           const TechnicianSettlementScreen(),
           const TechnicianHistoryScreen(),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
+        selectedItemColor: _purple,
         currentIndex: _navIndex,
         onTap: (i) {
           // "Profile" isn't a tab in the IndexedStack (ProfileScreen owns its
@@ -288,8 +277,8 @@ icon: const Icon(Icons.language_rounded),
           setState(() => _navIndex = i);
         },
         items: [
+          const BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
           BottomNavigationBarItem(icon: const Icon(Icons.work_outline_rounded), label: l10n.techJobsBottomNavJobs),
-          BottomNavigationBarItem(icon: const Icon(Icons.event_available_outlined), label: l10n.techJobsBottomNavUpcoming),
           BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined, key: _settlementNavKey), label: l10n.techJobsBottomNavSettlement),
           BottomNavigationBarItem(icon: const Icon(Icons.chat_bubble_outline_rounded), label: l10n.techJobsBottomNavHistory),
           BottomNavigationBarItem(icon: Icon(Icons.person_outline, key: _profileNavKey), label: l10n.profileTitle),
@@ -299,64 +288,470 @@ icon: const Icon(Icons.language_rounded),
     );
   }
 
-  Widget _buildGreetingHeader() {
-    final l10n = AppLocalizations.of(context);
-    return Consumer<BookingProvider>(
-      builder: (context, provider, _) {
-        final activeCount = provider.bookings
-.where((b) => b.status == 'requested' || b.status == 'pending_technician' || b.status == 'accepted' || b.status == 'on_the_way' || b.status == 'arrived' || b.status == 'inspecting' || b.status == 'in_progress' || b.status == 'awaiting_estimate_approval')            .length;
-        final completedCount = provider.bookings.where((b) => b.status == 'completed').length;
-        return Container(
-          key: _overviewKey,
-          margin: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+  /// Custom header replacing the default AppBar — brand mark + name on the
+  /// left, all the same functional icons on the right (language, my
+  /// customers, book-for-yourself, notifications) plus a bell-style
+  /// notification icon and a tappable profile avatar, styled to match the
+  /// app's dashboard mockup instead of a plain Material AppBar.
+  /// Header for the technician shell — profile photo, greeting + name,
+  /// role/category + online status on the left; bell and a settings menu
+  /// (bundling language/customers/book-for-yourself, which the previous
+  /// icon-row style exposed directly) on the right.
+  PreferredSizeWidget _buildHeader(AppLocalizations l10n) {
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(76),
+      child: Container(
+        color: _canvas,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: SafeArea(
+          bottom: false,
+          child: SizedBox(
+            height: 76,
+            child: Consumer2<AuthProvider, TechnicianKycProvider>(
+              builder: (context, auth, kyc, _) {
+                final user = auth.currentUser;
+                final photo = user?.photoUrl;
+                final initial = (user?.name.isNotEmpty == true) ? user!.name[0].toUpperCase() : '?';
+                final firstName = (user?.name.trim().isNotEmpty == true) ? user!.name.trim().split(' ').first : '';
+                final hour = DateTime.now().hour;
+                final greeting = hour < 12 ? 'Good Morning' : (hour < 17 ? 'Good Afternoon' : 'Good Evening');
+                final isOnline = kyc.profile?.isAvailable ?? false;
+                return Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                      ),
+                      child: CircleAvatar(
+                        radius: 26,
+                        backgroundColor: _purpleSoft,
+                        backgroundImage: (photo != null && photo.isNotEmpty) ? NetworkImage(photo) : null,
+                        child: (photo == null || photo.isEmpty)
+                            ? Text(initial, style: const TextStyle(color: _purple, fontWeight: FontWeight.w700, fontSize: 18))
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('$greeting 👋', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                          Text(
+                            firstName.isNotEmpty ? firstName : 'Technician',
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: Color(0xFF1A1F36)),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Row(
+                            children: [
+                              Container(
+                                width: 7,
+                                height: 7,
+                                margin: const EdgeInsets.only(right: 5),
+                                decoration: BoxDecoration(color: isOnline ? _green : Colors.grey[400], shape: BoxShape.circle),
+                              ),
+                              Text(
+                                isOnline ? 'Online' : 'Offline',
+                                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: isOnline ? _green : Colors.grey[500]),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.notifications_none_rounded, size: 23),
+                          tooltip: l10n.profileNotifications,
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                          ),
+                        ),
+                        if (_pendingRequests.isNotEmpty)
+                          Positioned(
+                            right: 6,
+                            top: 6,
+                            child: Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: const BoxDecoration(color: AppTheme.errorColor, shape: BoxShape.circle),
+                              constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                              child: Text(
+                                '${_pendingRequests.length}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    PopupMenuButton<int>(
+                      key: _customersNavKey,
+                      icon: Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey[200]!)),
+                        child: const Icon(Icons.settings_outlined, size: 19, color: Color(0xFF1A1F36)),
+                      ),
+                      onSelected: (v) {
+                        switch (v) {
+                          case 0:
+                            showLanguagePicker(context);
+                            break;
+                          case 1:
+                            Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RepeatCustomersScreen()));
+                            break;
+                          case 2:
+                            Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HomeScreen(guestMode: true)));
+                            break;
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(value: 0, child: Row(children: [const Icon(Icons.language_rounded, size: 18), const SizedBox(width: 10), Text(l10n.profileLanguage)])),
+                        PopupMenuItem(value: 1, child: Row(children: [const Icon(Icons.people_alt_outlined, size: 18), const SizedBox(width: 10), Text(l10n.techJobsMyCustomersTooltip)])),
+                        const PopupMenuItem(value: 2, child: Row(children: [Icon(Icons.swap_horiz_rounded, size: 18), SizedBox(width: 10), Text('Book a service for yourself')])),
+                      ],
+                    ),
+                  ],
+                );
+              },
             ),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: AppTheme.primaryColor.withValues(alpha: 0.25), blurRadius: 14, offset: const Offset(0, 6))],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(l10n.techJobsWelcomeBack, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-              const SizedBox(height: 4),
-              Text(l10n.techJobsWorkOverview, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(child: _statPill(l10n.techJobsActive, activeCount.toString(), Icons.pending_actions_rounded)),
-                  const SizedBox(width: 10),
-                  Expanded(child: _statPill(l10n.techJobsCompleted, completedCount.toString(), Icons.check_circle_outline_rounded)),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
+        ),
+      ),
     );
   }
 
-  Widget _statPill(String label, String value, IconData icon) {
+  /// The purple hero card + stat grid + "Your Work" tabs/list that make up
+  /// the new Home tab — the technician dashboard landing screen.
+  Widget _buildHomeDashboard() {
+    final l10n = AppLocalizations.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(14),
+      color: _canvas,
+      child: RefreshIndicator(
+        onRefresh: () async {
+          await _load();
+          await _pollPendingRequests();
+          await _pollUpcoming();
+        },
+        child: Consumer2<BookingProvider, TechnicianKycProvider>(
+          builder: (context, provider, kyc, _) {
+            final activeCount = provider.bookings
+                .where((b) =>
+                    b.status == 'requested' ||
+                    b.status == 'pending_technician' ||
+                    b.status == 'accepted' ||
+                    b.status == 'on_the_way' ||
+                    b.status == 'arrived' ||
+                    b.status == 'inspecting' ||
+                    b.status == 'in_progress' ||
+                    b.status == 'awaiting_estimate_approval')
+                .toList();
+            final completedBookings = provider.bookings.where((b) => b.status == 'completed').toList();
+            final now = DateTime.now();
+            final thisMonthPaid = context.watch<PaymentProvider>().history.where((p) =>
+                p.status == 'paid' && p.createdAt.year == now.year && p.createdAt.month == now.month);
+            final thisMonthEarned = thisMonthPaid.fold<double>(0, (sum, p) => sum + (p.technicianEarning ?? p.amount));
+            final ratingAvg = kyc.profile?.ratingAvg ?? 0;
+            final ratingCount = kyc.profile?.ratingCount ?? 0;
+
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+              children: [
+                _heroCard(activeCount.length, completedBookings.length),
+                if (_upcomingConsultations.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  _buildUpcomingBanner(inList: true),
+                ],
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(child: _statCard('Active Jobs', activeCount.length.toString(), Icons.work_outline_rounded, _purple, _purpleSoft, onTap: () => _goToJobsTab(0))),
+                    const SizedBox(width: 12),
+                    Expanded(child: _statCard('Completed', completedBookings.length.toString(), Icons.check_circle_rounded, _green, _greenSoft, onTap: () => _goToJobsTab(1))),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _statCard(
+                        'Rating',
+                        ratingCount > 0 ? ratingAvg.toStringAsFixed(1) : '—',
+                        Icons.star_rounded,
+                        _amber,
+                        _amberSoft,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: _statCard('This Month', '₹${thisMonthEarned.toStringAsFixed(0)}', Icons.account_balance_wallet_rounded, _blue, _blueSoft)),
+                  ],
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Your Work', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: Color(0xFF1A1F36))),
+                    GestureDetector(
+                      onTap: () => setState(() => _navIndex = 1),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('View All', style: TextStyle(color: _purple, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                          Icon(Icons.chevron_right_rounded, color: _purple, size: 18),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                _yourWorkCard(activeCount, completedBookings, l10n, kyc),
+                const SizedBox(height: 16),
+                _servicesOfferedCard(kyc),
+              ],
+            );
+          },
+        ),
       ),
+    );
+  }
+
+  void _goToJobsTab(int tabIndex) {
+    setState(() {
+      _navIndex = 1;
+      _tabIndex = tabIndex;
+    });
+  }
+
+  Widget _heroCard(int activeCount, int completedCount) {
+    return Container(
+      key: _overviewKey,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [_purple, _purpleDark], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [BoxShadow(color: _purple.withValues(alpha: 0.3), blurRadius: 16, offset: const Offset(0, 8))],
+      ),
+      child: Stack(
+        children: [
+          // Large illustration, top-right — allowed to bleed behind the
+          // pills row a little (pills are painted on top, in their own
+          // opaque white cards, so the overlap never reads as broken).
+          Positioned(
+            top: -6,
+            right: 0,
+            child: Image.asset(
+              'assets/images/technician_illustration.png',
+              width: 150,
+              fit: BoxFit.contain,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Your work at a glance', style: TextStyle(color: Colors.white70, fontSize: 12.5)),
+                const SizedBox(height: 6),
+                const Text(
+                  'Keep making\na difference ✨',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22, height: 1.15),
+                ),
+                const SizedBox(height: 46),
+                Row(
+                  children: [
+                    Expanded(child: _heroPill(Icons.work_outline_rounded, activeCount.toString(), 'Active Jobs', _purple)),
+                    const SizedBox(width: 10),
+                    Expanded(child: _heroPill(Icons.check_rounded, completedCount.toString(), 'Completed', _green)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _heroPill(IconData icon, String value, String label, Color iconColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.94), borderRadius: BorderRadius.circular(14)),
+      child: Column(
+        children: [
+          Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(color: iconColor, shape: BoxShape.circle),
+            child: Icon(icon, color: Colors.white, size: 14),
+          ),
+          const SizedBox(height: 6),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1A1F36)), maxLines: 1, overflow: TextOverflow.ellipsis),
+          Text(label, style: TextStyle(fontSize: 9.5, color: Colors.grey[600]), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
+        ],
+      ),
+    );
+  }
+
+  Widget _statCard(String label, String value, IconData icon, Color color, Color bg, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(16)),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+              child: Icon(icon, color: color, size: 19),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(label, style: TextStyle(fontSize: 11.5, color: Colors.grey[700])),
+                  Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Color(0xFF1A1F36))),
+                ],
+              ),
+            ),
+            if (onTap != null) Icon(Icons.chevron_right_rounded, color: Colors.grey[400], size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _yourWorkCard(List<Booking> active, List<Booking> completed, AppLocalizations l10n, TechnicianKycProvider kyc) {
+    final shown = switch (_homeWorkTab) {
+      1 => _upcomingConsultations.isEmpty ? <Booking>[] : active.where((b) => b.scheduledAt != null).toList(),
+      2 => completed,
+      _ => active,
+    };
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10)]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _workTabChip('Active (${active.length})', 0),
+                const SizedBox(width: 8),
+                _workTabChip('Upcoming (${_upcomingConsultations.length})', 1),
+                const SizedBox(width: 8),
+                _workTabChip('Completed (${completed.length})', 2),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (shown.isEmpty)
+            Column(
+              children: [
+                Icon(Icons.calendar_month_outlined, size: 56, color: _purple.withValues(alpha: 0.3)),
+                const SizedBox(height: 12),
+                Text(
+                  _homeWorkTab == 2 ? 'No completed jobs yet' : (_homeWorkTab == 1 ? 'No upcoming jobs' : 'No active jobs right now'),
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5, color: Color(0xFF1A1F36)),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _homeWorkTab == 0 ? 'Your next service request will appear here. Stay online and ready!' : ' ',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  textAlign: TextAlign.center,
+                ),
+                if (_homeWorkTab == 0) ...[
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(backgroundColor: _purple, padding: const EdgeInsets.symmetric(vertical: 13)),
+                      onPressed: () async {
+                        final next = !(kyc.profile?.isAvailable ?? false);
+                        await kyc.setAvailability(next);
+                      },
+                      icon: const Icon(Icons.event_available_outlined, size: 18),
+                      label: Text((kyc.profile?.isAvailable ?? false) ? 'Go Offline' : 'Update Availability'),
+                    ),
+                  ),
+                ],
+              ],
+            )
+          else
+            ...shown.take(3).map((b) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _JobCard(key: ValueKey(b.id), booking: b),
+                )),
+        ],
+      ),
+    );
+  }
+
+  Widget _workTabChip(String label, int index) {
+    final selected = _homeWorkTab == index;
+    return GestureDetector(
+      onTap: () => setState(() => _homeWorkTab = index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? _purple : _purpleSoft,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: selected ? Colors.white : _purple)),
+      ),
+    );
+  }
+
+  Widget _servicesOfferedCard(TechnicianKycProvider kyc) {
+    final categoryIds = kyc.profile?.categoryIds ?? const [];
+    final allCategories = context.watch<CategoryProvider>().categories;
+    final names = <String>[];
+    for (final id in categoryIds) {
+      for (final c in allCategories) {
+        if (c.id == id) {
+          names.add(c.name);
+          break;
+        }
+      }
+    }
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10)]),
       child: Row(
         children: [
-          Icon(icon, color: Colors.white, size: 20),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-              Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-            ],
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: _purpleSoft, borderRadius: BorderRadius.circular(12)),
+            child: const Icon(Icons.build_outlined, color: _purple, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Services You Offer', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                Text(
+                  names.isNotEmpty ? names.join(' • ') : 'Manage your services and categories',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManageCategoriesScreen())),
+            style: TextButton.styleFrom(backgroundColor: _purpleSoft, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+            child: const Text('View / Edit', style: TextStyle(color: _purple, fontWeight: FontWeight.w700, fontSize: 11.5)),
           ),
         ],
       ),
@@ -367,8 +762,7 @@ icon: const Icon(Icons.language_rounded),
     final l10n = AppLocalizations.of(context);
     return Column(
       children: [
-        _buildGreetingHeader(),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
         if (_pendingRequests.isNotEmpty) _buildConsultationBanner(),
         if (_upcomingConsultations.isNotEmpty) _buildUpcomingBanner(),
         Padding(
@@ -379,15 +773,15 @@ icon: const Icon(Icons.language_rounded),
             padding: const EdgeInsets.only(right: 20),
             child: Row(
               children: [
-                _FilterChip(label: l10n.techJobsActive, selected: _tabIndex == 0, onTap: () => setState(() => _tabIndex = 0)),
+                _FilterChip(icon: Icons.work_outline_rounded, label: l10n.techJobsActive, selected: _tabIndex == 0, onTap: () => setState(() => _tabIndex = 0)),
                 const SizedBox(width: 8),
-                _FilterChip(label: l10n.techJobsFilterAll, selected: _tabIndex == 1, onTap: () => setState(() => _tabIndex = 1)),
+                _FilterChip(icon: Icons.grid_view_rounded, label: l10n.techJobsFilterAll, selected: _tabIndex == 1, onTap: () => setState(() => _tabIndex = 1)),
                 const SizedBox(width: 8),
-                _FilterChip(label: 'Book Now', selected: _tabIndex == 2, onTap: () => setState(() => _tabIndex = 2)),
+                _FilterChip(icon: Icons.calendar_month_rounded, label: 'Book Now', selected: _tabIndex == 2, onTap: () => setState(() => _tabIndex = 2)),
                 const SizedBox(width: 8),
-                _FilterChip(label: 'Video Call', selected: _tabIndex == 3, onTap: () => setState(() => _tabIndex = 3)),
+                _FilterChip(icon: Icons.videocam_rounded, label: 'Video Call', selected: _tabIndex == 3, onTap: () => setState(() => _tabIndex = 3)),
                 const SizedBox(width: 8),
-                _FilterChip(label: 'Schedule for later', selected: _tabIndex == 4, onTap: () => setState(() => _tabIndex = 4)),
+                _FilterChip(icon: Icons.access_time_rounded, label: 'Schedule for later', selected: _tabIndex == 4, onTap: () => setState(() => _tabIndex = 4)),
               ],
             ),
           ),
@@ -501,12 +895,12 @@ icon: const Icon(Icons.language_rounded),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
+              colors: [_purple, _purpleDark],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [BoxShadow(color: AppTheme.primaryColor.withValues(alpha: 0.25), blurRadius: 12, offset: const Offset(0, 4))],
+            boxShadow: [BoxShadow(color: _purple.withValues(alpha: 0.25), blurRadius: 12, offset: const Offset(0, 4))],
           ),
           child: Row(
             children: [
@@ -558,10 +952,10 @@ icon: const Icon(Icons.language_rounded),
     );
   }
 
-  Widget _buildUpcomingBanner() {
+  Widget _buildUpcomingBanner({bool inList = false}) {
     final l10n = AppLocalizations.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+      padding: inList ? EdgeInsets.zero : const EdgeInsets.fromLTRB(20, 14, 20, 0),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () => Navigator.of(context).push(
@@ -571,15 +965,15 @@ icon: const Icon(Icons.language_rounded),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white,
-            border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+            border: Border.all(color: _purple.withValues(alpha: 0.3)),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
             children: [
-              CircleAvatar(
+              const CircleAvatar(
                 radius: 22,
-                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
-                child: const Icon(Icons.event_rounded, color: AppTheme.primaryColor),
+                backgroundColor: _purpleSoft,
+                child: Icon(Icons.event_rounded, color: _purple),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -597,7 +991,7 @@ icon: const Icon(Icons.language_rounded),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: AppTheme.primaryColor),
+              const Icon(Icons.chevron_right_rounded, color: _purple),
             ],
           ),
         ),
@@ -607,28 +1001,40 @@ icon: const Icon(Icons.language_rounded),
 }
 
 class _FilterChip extends StatelessWidget {
+  final IconData icon;
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  const _FilterChip({required this.label, required this.selected, required this.onTap});
+  const _FilterChip({required this.icon, required this.label, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? AppTheme.primaryColor : Colors.grey[100],
-          borderRadius: BorderRadius.circular(20),
+          color: selected ? TechTheme.primary : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: selected ? null : Border.all(color: Colors.grey[300]!),
+          boxShadow: selected
+              ? [BoxShadow(color: TechTheme.primary.withValues(alpha: 0.25), blurRadius: 8, offset: const Offset(0, 3))]
+              : null,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : Colors.grey[700],
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: selected ? Colors.white : Colors.grey[700]),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : Colors.grey[700],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -709,7 +1115,7 @@ class _JobCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.05),
+                color: TechTheme.primary.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -724,10 +1130,10 @@ class _JobCard extends StatelessWidget {
                         children: [
                           CircleAvatar(
                             radius: 18,
-                            backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.15),
+                            backgroundColor: TechTheme.primary.withValues(alpha: 0.15),
                             child: Text(
                               customer.name.isNotEmpty ? customer.name[0].toUpperCase() : '?',
-                              style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w700),
+                              style: const TextStyle(color: TechTheme.primary, fontWeight: FontWeight.w700),
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -752,7 +1158,7 @@ class _JobCard extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.call_outlined, color: AppTheme.primaryColor, size: 20),
+                    icon: const Icon(Icons.call_outlined, color: TechTheme.primary, size: 20),
                     tooltip: 'Call',
                     onPressed: () => startBookingAudioCall(
                       context,
@@ -761,7 +1167,7 @@ class _JobCard extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.forum_outlined, color: AppTheme.primaryColor, size: 20),
+                    icon: const Icon(Icons.forum_outlined, color: TechTheme.primary, size: 20),
                     tooltip: l10n.techJobsChatTooltip,
                     onPressed: () {
                       Navigator.of(context).push(MaterialPageRoute(
@@ -823,6 +1229,7 @@ class JobActionRow extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
                 onPressed: kycProfile == null
                     ? null
                     : () => _acceptBooking(context, provider, booking, kycProfile.id),
@@ -835,6 +1242,7 @@ class JobActionRow extends StatelessWidget {
         return SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(foregroundColor: TechTheme.primary, side: const BorderSide(color: TechTheme.primary)),
             icon: const Icon(Icons.directions_run_rounded, size: 18),
             onPressed: () => _runAction(
                 context, () => provider.updateBookingStatus(booking.id, 'on_the_way', note: 'Technician is on the way')),
@@ -845,6 +1253,7 @@ class JobActionRow extends StatelessWidget {
         return SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
             icon: const Icon(Icons.home_rounded, size: 18),
             onPressed: kycProfile == null
                 ? null
@@ -859,6 +1268,7 @@ class JobActionRow extends StatelessWidget {
         return SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
             icon: const Icon(Icons.receipt_long_rounded, size: 18),
             onPressed: () => _showInvoiceDialog(context, provider, booking),
             label: Text(l10n.techJobsGenerateInvoiceComplete),
@@ -1109,6 +1519,7 @@ class _InvoiceDialogState extends State<_InvoiceDialog> {
                 ),
               )
             : ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
                 onPressed: () async {
                   final price = double.tryParse(_controller.text.trim());
                   if (price == null || price <= 0) {
@@ -1236,6 +1647,7 @@ class _OtpVerifyRowState extends State<_OtpVerifyRow> {
             ),
             const SizedBox(width: 10),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
               onPressed: _submitting ? null : _submit,
               child: _submitting
                   ? const SizedBox(

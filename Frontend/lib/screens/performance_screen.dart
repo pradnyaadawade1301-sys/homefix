@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import '../core/technician_theme.dart';
 
 /// Technician performance overview: jobs completed/cancelled and response
 /// metrics. UI-only for now with sample data; wire to your stats API once
@@ -25,7 +26,7 @@ class PerformanceScreen extends StatelessWidget {
             children: const [
               _StatCard(icon: Icons.check_circle_outline_rounded, label: 'Jobs Completed', value: '142', color: AppTheme.successColor),
               _StatCard(icon: Icons.cancel_outlined, label: 'Jobs Cancelled', value: '6', color: AppTheme.errorColor),
-              _StatCard(icon: Icons.speed_outlined, label: 'Response Rate', value: '96%', color: AppTheme.primaryColor),
+              _StatCard(icon: Icons.speed_outlined, label: 'Response Rate', value: '96%', color: TechTheme.primary),
               _StatCard(icon: Icons.timer_outlined, label: 'Avg Response Time', value: '4 min', color: Colors.orange),
             ],
           ),

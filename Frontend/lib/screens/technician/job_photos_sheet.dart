@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/technician_theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../services/service_locator.dart' show UploadService;
@@ -136,7 +137,7 @@ class _JobPhotosSheetState extends State<JobPhotosSheet> {
                   if (provider.isLoadingJobPhotos)
                     const Center(child: Padding(
                       padding: EdgeInsets.symmetric(vertical: 20),
-                      child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryColor),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: TechTheme.primary),
                     ))
                   else ...[
                     _photoSection(
@@ -191,18 +192,18 @@ class _JobPhotosSheetState extends State<JobPhotosSheet> {
                 child: Container(
                   width: 96, height: 96,
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.06),
+                    color: TechTheme.primary.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.25)),
+                    border: Border.all(color: TechTheme.primary.withValues(alpha: 0.25)),
                   ),
                   child: uploading
                       ? const Center(
                           child: SizedBox(
                             width: 20, height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryColor),
+                            child: CircularProgressIndicator(strokeWidth: 2, color: TechTheme.primary),
                           ),
                         )
-                      : const Icon(Icons.add_a_photo_outlined, color: AppTheme.primaryColor),
+                      : const Icon(Icons.add_a_photo_outlined, color: TechTheme.primary),
                 ),
               ),
             ],

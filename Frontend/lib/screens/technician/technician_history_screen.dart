@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/booking_call_launcher.dart';
 import '../../core/theme.dart';
+import '../../core/technician_theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/consultation_provider.dart';
@@ -82,7 +83,7 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? AppTheme.primaryColor : Colors.grey[200],
+          color: selected ? TechTheme.primary : Colors.grey[200],
           borderRadius: BorderRadius.circular(20),
         ),
         alignment: Alignment.center,
@@ -125,9 +126,9 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
             child: Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.12),
+                  backgroundColor: TechTheme.primary.withValues(alpha: 0.12),
                   child: Text(customerName.isNotEmpty ? customerName[0].toUpperCase() : '?',
-                      style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w700)),
+                      style: const TextStyle(color: TechTheme.primary, fontWeight: FontWeight.w700)),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -145,7 +146,7 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryColor,
+                      color: TechTheme.primary,
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
@@ -156,7 +157,7 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
                   const SizedBox(width: 8),
                 ],
                 IconButton(
-                  icon: const Icon(Icons.forum_outlined, color: AppTheme.primaryColor),
+                  icon: const Icon(Icons.forum_outlined, color: TechTheme.primary),
                   tooltip: 'Open chat',
                   onPressed: openChat,
                 ),
@@ -239,9 +240,9 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
             child: Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.12),
+                  backgroundColor: TechTheme.primary.withValues(alpha: 0.12),
                   child: Text(peerName.isNotEmpty ? peerName[0].toUpperCase() : '?',
-                      style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w700)),
+                      style: const TextStyle(color: TechTheme.primary, fontWeight: FontWeight.w700)),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -271,7 +272,7 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
                     Text(dateLabel, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                     const SizedBox(height: 6),
                     IconButton(
-                      icon: const Icon(Icons.call_outlined, color: AppTheme.primaryColor, size: 20),
+                      icon: const Icon(Icons.call_outlined, color: TechTheme.primary, size: 20),
                       tooltip: 'Call',
                       onPressed: call.bookingId != null ? call_ : null,
                     ),
@@ -309,8 +310,8 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
           child: Row(
             children: [
               CircleAvatar(
-                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.12),
-                child: const Icon(Icons.videocam_outlined, color: AppTheme.primaryColor, size: 20),
+                backgroundColor: TechTheme.primary.withValues(alpha: 0.12),
+                child: const Icon(Icons.videocam_outlined, color: TechTheme.primary, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -383,8 +384,8 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
           child: Row(
             children: [
               CircleAvatar(
-                backgroundColor: (active ? AppTheme.primaryColor : Colors.grey).withValues(alpha: 0.12),
-                child: Icon(Icons.shield_outlined, color: active ? AppTheme.primaryColor : Colors.grey[600], size: 20),
+                backgroundColor: (active ? TechTheme.primary : Colors.grey).withValues(alpha: 0.12),
+                child: Icon(Icons.shield_outlined, color: active ? TechTheme.primary : Colors.grey[600], size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -410,14 +411,14 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: (active ? AppTheme.primaryColor : Colors.grey).withValues(alpha: 0.08),
+                  color: (active ? TechTheme.primary : Colors.grey).withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   active ? 'Active' : 'Expired',
                   style: TextStyle(
                     fontSize: 11,
-                    color: active ? AppTheme.primaryColor : Colors.grey[600],
+                    color: active ? TechTheme.primary : Colors.grey[600],
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -489,7 +490,7 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
       case 'ended':
         return Colors.grey[700]!;
       default:
-        return AppTheme.primaryColor;
+        return TechTheme.primary;
     }
   }
 }

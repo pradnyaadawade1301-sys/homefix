@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/technician_theme.dart';
 
 /// Technician bank/UPI details for settlement payouts. UI-only for now;
 /// wire the save action to your settlement/payouts API once ready.
@@ -95,6 +96,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                   height: 54,
                   child: ElevatedButton(
                     onPressed: _isSaving ? null : _save,
+                    style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
                     child: _isSaving
                         ? const SizedBox(
                             height: 22,

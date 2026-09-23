@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/technician_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/category_provider.dart';
 import 'technician_jobs_screen.dart';
@@ -112,6 +113,7 @@ class _TechnicianStatusScreenState extends State<TechnicianStatusScreen> {
                       height: 54,
                       child: OutlinedButton(
                         onPressed: () => Navigator.of(context).pushReplacementNamed('/technician-kyc'),
+                        style: OutlinedButton.styleFrom(foregroundColor: TechTheme.primary, side: const BorderSide(color: TechTheme.primary)),
                         child: const Text('Resubmit documents'),
                       ),
                     )
@@ -121,6 +123,7 @@ class _TechnicianStatusScreenState extends State<TechnicianStatusScreen> {
                       height: 54,
                       child: OutlinedButton(
                         onPressed: _refresh,
+                        style: OutlinedButton.styleFrom(foregroundColor: TechTheme.primary, side: const BorderSide(color: TechTheme.primary)),
                         child: const Text('Refresh status'),
                       ),
                     ),

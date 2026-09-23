@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme.dart';
+import '../../core/technician_theme.dart';
 import '../../core/booking_call_launcher.dart';
 import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
@@ -98,10 +99,10 @@ class _RepeatCustomerCard extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.12),
+            backgroundColor: TechTheme.primary.withValues(alpha: 0.12),
             child: Text(
               customer.name.isNotEmpty ? customer.name[0].toUpperCase() : '?',
-              style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold),
+              style: const TextStyle(color: TechTheme.primary, fontWeight: FontWeight.bold),
             ),
           ),
           const SizedBox(width: 12),
@@ -127,12 +128,12 @@ class _RepeatCustomerCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppTheme.successColor.withValues(alpha: 0.12),
+                  color: TechTheme.greenSoft,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   '${customer.totalBookings} bookings',
-                  style: const TextStyle(color: AppTheme.successColor, fontWeight: FontWeight.w600, fontSize: 12),
+                  style: const TextStyle(color: TechTheme.green, fontWeight: FontWeight.w600, fontSize: 12),
                 ),
               ),
               if (customer.activeBookingId != null) ...[
@@ -140,7 +141,7 @@ class _RepeatCustomerCard extends StatelessWidget {
                 Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.chat_bubble_outline, size: 20, color: AppTheme.primaryColor),
+                      icon: const Icon(Icons.chat_bubble_outline, size: 20, color: TechTheme.primary),
                       tooltip: 'Chat',
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
@@ -153,7 +154,7 @@ class _RepeatCustomerCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     IconButton(
-                      icon: const Icon(Icons.call_outlined, size: 20, color: AppTheme.primaryColor),
+                      icon: const Icon(Icons.call_outlined, size: 20, color: TechTheme.primary),
                       tooltip: 'Call',
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
@@ -241,7 +242,11 @@ class _ErrorState extends StatelessWidget {
             const SizedBox(height: 12),
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
+            ElevatedButton(
+              onPressed: onRetry,
+              style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
+              child: const Text('Retry'),
+            ),
           ],
         ),
       ),

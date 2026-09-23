@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/technician_theme.dart';
 import '../../providers/category_provider.dart';
 
 /// Technician KYC / registration screen — collects service category, experience,
@@ -158,10 +159,10 @@ class _TechnicianKycScreenState extends State<TechnicianKycScreen> {
                               _selectedCategoryIds.remove(c.id);
                             }
                           }),
-                          selectedColor: AppTheme.primaryColor.withValues(alpha: 0.15),
-                          checkmarkColor: AppTheme.primaryColor,
+                          selectedColor: TechTheme.primary.withValues(alpha: 0.15),
+                          checkmarkColor: TechTheme.primary,
                           labelStyle: TextStyle(
-                            color: selected ? AppTheme.primaryColor : null,
+                            color: selected ? TechTheme.primary : null,
                             fontWeight: selected ? FontWeight.w600 : null,
                           ),
                         );
@@ -228,6 +229,7 @@ class _TechnicianKycScreenState extends State<TechnicianKycScreen> {
                       height: 54,
                       child: ElevatedButton(
                         onPressed: busy ? null : _handleSubmit,
+                        style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
                         child: busy
                             ? const SizedBox(
                                 height: 22,
@@ -289,10 +291,10 @@ class _DocumentPicker extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                  color: TechTheme.primary.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.upload_file_rounded, color: AppTheme.primaryColor),
+                child: const Icon(Icons.upload_file_rounded, color: TechTheme.primary),
               ),
             const SizedBox(width: 14),
             Expanded(

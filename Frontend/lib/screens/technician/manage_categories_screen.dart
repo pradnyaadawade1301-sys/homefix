@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/technician_theme.dart';
 import '../../providers/category_provider.dart';
 
 /// Lets an already-approved technician add or remove the categories they
@@ -93,13 +94,13 @@ class _ManageCategoriesScreenState extends State<ManageCategoriesScreen> {
                                 _selectedCategoryIds.remove(c.id);
                               }
                             }),
-                            selectedColor: AppTheme.primaryColor.withValues(alpha: 0.15),
-                            checkmarkColor: AppTheme.primaryColor,
+                            selectedColor: TechTheme.primary.withValues(alpha: 0.15),
+                            checkmarkColor: TechTheme.primary,
                             labelStyle: TextStyle(
-                              color: selected ? AppTheme.primaryColor : Colors.black87,
+                              color: selected ? TechTheme.primary : Colors.black87,
                               fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
                             ),
-                            side: BorderSide(color: selected ? AppTheme.primaryColor : Colors.grey.shade300),
+                            side: BorderSide(color: selected ? TechTheme.primary : Colors.grey.shade300),
                           );
                         }).toList(),
                       );
@@ -117,6 +118,7 @@ class _ManageCategoriesScreenState extends State<ManageCategoriesScreen> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: _saving ? null : _handleSave,
+                  style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
                   child: _saving
                       ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                       : const Text('Save'),

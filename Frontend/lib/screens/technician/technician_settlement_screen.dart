@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/technician_theme.dart';
 import '../../models/booking_model.dart';
 import '../../models/payment_model.dart';
 import '../../providers/booking_provider.dart';
@@ -117,11 +118,11 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: selected ? AppTheme.primaryColor : Colors.white,
+          color: selected ? TechTheme.primary : Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: selected ? AppTheme.primaryColor : Colors.grey[300]!),
+          border: Border.all(color: selected ? TechTheme.primary : Colors.grey[300]!),
           boxShadow: selected
-              ? [BoxShadow(color: AppTheme.primaryColor.withValues(alpha: 0.22), blurRadius: 10, offset: const Offset(0, 4))]
+              ? [BoxShadow(color: TechTheme.primary.withValues(alpha: 0.22), blurRadius: 10, offset: const Offset(0, 4))]
               : null,
         ),
         child: Column(
@@ -204,12 +205,12 @@ class _SummaryCard extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
+          colors: [TechTheme.primary, TechTheme.primaryDark],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: AppTheme.primaryColor.withValues(alpha: 0.25), blurRadius: 16, offset: const Offset(0, 6))],
+        boxShadow: [BoxShadow(color: TechTheme.primary.withValues(alpha: 0.25), blurRadius: 16, offset: const Offset(0, 6))],
       ),
       child: Row(
         children: [

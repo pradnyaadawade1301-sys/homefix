@@ -8,7 +8,9 @@ import 'package:printing/printing.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 import '../../core/theme.dart';
+import '../../core/technician_theme.dart';
 import '../../models/payment_model.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/payment_provider.dart';
 
 /// Shows the full GST-compliant invoice for a paid booking — service ID,
@@ -80,7 +82,12 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                   onPressed: () => _downloadPdf(provider.invoice!),
                   icon: const Icon(Icons.download_rounded),
                   label: const Text('Download PDF'),
-                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, foregroundColor: Colors.white),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: context.watch<AuthProvider>().currentUser?.isTechnician == true
+                        ? TechTheme.primary
+                        : AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                  ),
                 ),
               ),
             ),

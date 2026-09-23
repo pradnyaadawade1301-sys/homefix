@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/theme.dart';
+import '../core/technician_theme.dart';
 import '../providers/category_provider.dart';
 import '../utils/working_hours.dart';
 import '../services/location_service.dart';
@@ -271,7 +272,7 @@ class _WorkingHoursCardState extends State<_WorkingHoursCard> {
         children: [
           Row(
             children: [
-              const Icon(Icons.schedule_rounded, size: 20, color: AppTheme.primaryColor),
+              const Icon(Icons.schedule_rounded, size: 20, color: TechTheme.primary),
               const SizedBox(width: 8),
               const Expanded(
                 child: Text('Working hours', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
@@ -293,6 +294,7 @@ class _WorkingHoursCardState extends State<_WorkingHoursCard> {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: (!_dirty || _saving) ? null : _save,
+              style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
               child: _saving
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Text('Save working hours'),
@@ -330,7 +332,7 @@ class _WorkingHoursCardState extends State<_WorkingHoursCard> {
           ),
           Switch(
             value: isOpen,
-            activeThumbColor: AppTheme.primaryColor,
+            activeThumbColor: TechTheme.primary,
             onChanged: (on) => setState(() => _draft[k] = on ? (widget.initial[k] ?? _fallback) : null),
           ),
         ],
@@ -345,10 +347,10 @@ class _WorkingHoursCardState extends State<_WorkingHoursCard> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: AppTheme.primaryColor.withValues(alpha: 0.08),
+          color: TechTheme.primary.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppTheme.primaryColor)),
+        child: Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: TechTheme.primary)),
       ),
     );
   }

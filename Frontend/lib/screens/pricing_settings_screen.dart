@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/technician_theme.dart';
 
 /// Combined pricing settings for a technician: hourly/visit charge, travel
 /// fee, emergency service fee, and minimum service charge. UI-only for now;
@@ -94,6 +95,7 @@ class _PricingSettingsScreenState extends State<PricingSettingsScreen> {
               height: 54,
               child: ElevatedButton(
                 onPressed: _isSaving ? null : _save,
+                style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
                 child: _isSaving
                     ? const SizedBox(
                         height: 22,

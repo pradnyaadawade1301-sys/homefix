@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/technician_theme.dart';
 import '../../models/consultation_model.dart';
 import '../../providers/consultation_provider.dart';
 import '../../l10n/app_localizations.dart';
@@ -238,17 +239,17 @@ class _UpcomingCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withValues(alpha: 0.05),
+              color: TechTheme.primary.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
                 CircleAvatar(
                   radius: 18,
-                  backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.15),
+                  backgroundColor: TechTheme.primary.withValues(alpha: 0.15),
                   child: Text(
                     (consultation.customerName ?? '?').isNotEmpty ? consultation.customerName![0].toUpperCase() : '?',
-                    style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w700),
+                    style: const TextStyle(color: TechTheme.primary, fontWeight: FontWeight.w700),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -261,11 +262,11 @@ class _UpcomingCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Row(
                         children: [
-                          const Icon(Icons.schedule_rounded, size: 13, color: AppTheme.primaryColor),
+                          const Icon(Icons.schedule_rounded, size: 13, color: TechTheme.primary),
                           const SizedBox(width: 4),
                           Text(
                             formatSlot(consultation.scheduledAt),
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primaryColor),
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: TechTheme.primary),
                           ),
                         ],
                       ),
@@ -326,6 +327,7 @@ class _UpcomingCard extends StatelessWidget {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: onConfirm,
+                    style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
                     child: Text(l10n.consultUpcomingConfirm),
                   ),
                 ),

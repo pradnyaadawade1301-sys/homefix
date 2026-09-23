@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/technician_theme.dart';
 import '../../providers/consultation_provider.dart';
 
 /// Shown right after a Live Video Consultation call ends, on the
@@ -110,7 +111,11 @@ class _TechnicianPostCallScreenState extends State<TechnicianPostCallScreen> {
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(onPressed: _done, child: const Text('Done')),
+                    child: ElevatedButton(
+                      onPressed: _done,
+                      style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
+                      child: const Text('Done'),
+                    ),
                   ),
                 ],
               ),
@@ -129,12 +134,12 @@ class _TechnicianPostCallScreenState extends State<TechnicianPostCallScreen> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.06),
+                color: TechTheme.primary.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.videocam_rounded, color: AppTheme.primaryColor),
+                  const Icon(Icons.videocam_rounded, color: TechTheme.primary),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -183,6 +188,7 @@ class _TechnicianPostCallScreenState extends State<TechnicianPostCallScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _isSending ? null : _send,
+                style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
                 child: _isSending
                     ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Text('Send to Customer'),

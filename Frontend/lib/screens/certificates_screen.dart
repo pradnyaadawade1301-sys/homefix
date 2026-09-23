@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../core/technician_theme.dart';
 
 /// Lets the technician upload professional certificates. Reuses the same
 /// image-picker pattern as the KYC screen. UI-only for now; wire the
@@ -89,6 +90,7 @@ class _CertificatesScreenState extends State<CertificatesScreen> {
               height: 50,
               child: OutlinedButton.icon(
                 onPressed: _addCertificate,
+                style: OutlinedButton.styleFrom(foregroundColor: TechTheme.primary, side: const BorderSide(color: TechTheme.primary)),
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('Add Certificate'),
               ),

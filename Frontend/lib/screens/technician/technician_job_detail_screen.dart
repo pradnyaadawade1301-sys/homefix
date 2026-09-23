@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/technician_theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../core/booking_call_launcher.dart';
@@ -171,7 +172,7 @@ class TechnicianJobDetailScreen extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.05),
+                      color: TechTheme.primary.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Column(
@@ -181,10 +182,10 @@ class TechnicianJobDetailScreen extends StatelessWidget {
                           children: [
                             CircleAvatar(
                               radius: 22,
-                              backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.15),
+                              backgroundColor: TechTheme.primary.withValues(alpha: 0.15),
                               child: Text(
                                 customer.name.isNotEmpty ? customer.name[0].toUpperCase() : '?',
-                                style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 18),
+                                style: const TextStyle(color: TechTheme.primary, fontWeight: FontWeight.bold, fontSize: 18),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -217,6 +218,7 @@ class TechnicianJobDetailScreen extends StatelessWidget {
                           children: [
                             Expanded(
                               child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
                                 icon: const Icon(Icons.forum_outlined, size: 16),
                                 label: const Text('Chat'),
                                 onPressed: () => Navigator.of(context).push(MaterialPageRoute(
@@ -230,6 +232,7 @@ class TechnicianJobDetailScreen extends StatelessWidget {
                             const SizedBox(width: 10),
                             Expanded(
                               child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
                                 icon: const Icon(Icons.call_outlined, size: 16),
                                 label: const Text('Call'),
                                 onPressed: isCallableBookingStatus(current.status)

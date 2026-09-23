@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import '../../core/theme.dart';
+import '../../core/technician_theme.dart';
 import '../../models/booking_model.dart';
 
 /// The technician-facing "Job Brief": everything collected from the customer
@@ -71,7 +72,7 @@ class _JobBriefCardState extends State<JobBriefCard> {
         children: [
           Row(
             children: [
-              const Icon(Icons.assignment_outlined, size: 18, color: AppTheme.primaryColor),
+              const Icon(Icons.assignment_outlined, size: 18, color: TechTheme.primary),
               const SizedBox(width: 8),
               const Text('Job Brief', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
               const Spacer(),
@@ -184,7 +185,7 @@ class _JobBriefCardState extends State<JobBriefCard> {
                                 ? Icons.play_circle_fill_rounded
                                 : Icons.videocam_outlined,
                             size: 24,
-                            color: brief?.videoUrl != null && brief!.videoUrl!.isNotEmpty ? AppTheme.primaryColor : null,
+                            color: brief?.videoUrl != null && brief!.videoUrl!.isNotEmpty ? TechTheme.primary : null,
                           ),
                         ),
                       ),

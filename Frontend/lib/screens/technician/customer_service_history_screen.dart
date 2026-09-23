@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme.dart';
+import '../../core/technician_theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/category_provider.dart' show TechnicianKycProvider;
@@ -97,7 +98,7 @@ class _ServiceHistoryCard extends StatelessWidget {
       case 'in_progress':
         return AppTheme.warningColor;
       default:
-        return AppTheme.primaryColor;
+        return TechTheme.primary;
     }
   }
 
@@ -254,7 +255,11 @@ class _ErrorState extends StatelessWidget {
             const SizedBox(height: 12),
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
+            ElevatedButton(
+              onPressed: onRetry,
+              style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
+              child: const Text('Retry'),
+            ),
           ],
         ),
       ),

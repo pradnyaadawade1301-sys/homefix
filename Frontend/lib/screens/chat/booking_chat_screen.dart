@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/technician_theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/booking_service.dart';
@@ -160,7 +161,9 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
             decoration: BoxDecoration(
-              color: isMine ? AppTheme.primaryColor : Colors.grey[200],
+              color: isMine
+                  ? (context.watch<AuthProvider>().currentUser?.isTechnician == true ? TechTheme.primary : AppTheme.primaryColor)
+                  : Colors.grey[200],
               borderRadius: BorderRadius.only(
                 topLeft: const Radius.circular(14),
                 topRight: const Radius.circular(14),
@@ -221,7 +224,10 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
             ),
             const SizedBox(width: 8),
             Container(
-              decoration: const BoxDecoration(color: AppTheme.primaryColor, shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                color: context.watch<AuthProvider>().currentUser?.isTechnician == true ? TechTheme.primary : AppTheme.primaryColor,
+                shape: BoxShape.circle,
+              ),
               child: IconButton(
                 icon: _isSending
                     ? const SizedBox(

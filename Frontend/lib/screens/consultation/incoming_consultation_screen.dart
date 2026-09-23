@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart' show FlutterRingtonePlayer;
 import 'package:provider/provider.dart';
 import '../../config/api_config.dart';
-import '../../core/theme.dart';
+import '../../core/technician_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/consultation_provider.dart';
 import '../../services/signaling_service.dart';
@@ -146,7 +146,7 @@ class _IncomingConsultationScreenState extends State<IncomingConsultationScreen>
               if (mounted) _syncRingtone(provider.pendingRequests.isNotEmpty);
             });
             if (provider.isLoadingPending && provider.pendingRequests.isEmpty) {
-              return const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor));
+              return const Center(child: CircularProgressIndicator(color: TechTheme.primary));
             }
             if (provider.pendingRequests.isEmpty) {
               return ListView(
@@ -194,20 +194,20 @@ class _IncomingConsultationScreenState extends State<IncomingConsultationScreen>
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: AppTheme.primaryColor.withValues(alpha: 0.06),
+                              color: TechTheme.primary.withValues(alpha: 0.06),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Icons.auto_awesome_outlined, size: 15, color: AppTheme.primaryColor),
+                                const Icon(Icons.auto_awesome_outlined, size: 15, color: TechTheme.primary),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     req.aiAssessment!,
                                     maxLines: 3,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 12, color: AppTheme.primaryColor, height: 1.3),
+                                    style: const TextStyle(fontSize: 12, color: TechTheme.primary, height: 1.3),
                                   ),
                                 ),
                               ],
@@ -220,6 +220,7 @@ class _IncomingConsultationScreenState extends State<IncomingConsultationScreen>
                             Expanded(
                               child: OutlinedButton(
                                 onPressed: joining ? null : () => _reject(req.consultationId),
+                                style: OutlinedButton.styleFrom(foregroundColor: TechTheme.primary, side: const BorderSide(color: TechTheme.primary)),
                                 child: const Text('Decline'),
                               ),
                             ),
@@ -227,6 +228,7 @@ class _IncomingConsultationScreenState extends State<IncomingConsultationScreen>
                             Expanded(
                               child: ElevatedButton(
                                 onPressed: joining ? null : () => _accept(req.consultationId),
+                                style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
                                 child: joining
                                     ? const SizedBox(
                                         height: 18,

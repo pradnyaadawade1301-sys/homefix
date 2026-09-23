@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../core/theme.dart';
+import '../core/technician_theme.dart';
 
 /// Lets the technician set how far they're willing to travel for jobs.
 /// UI-only for now; wire the save action to your technician profile API.
@@ -43,7 +43,7 @@ class _ServiceRadiusScreenState extends State<ServiceRadiusScreen> {
             const SizedBox(height: 32),
             Center(
               child: Text('${_radiusKm.toStringAsFixed(0)} km',
-                  style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
+                  style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: TechTheme.primary)),
             ),
             const SizedBox(height: 16),
             Slider(
@@ -51,7 +51,7 @@ class _ServiceRadiusScreenState extends State<ServiceRadiusScreen> {
               min: 1,
               max: 30,
               divisions: 29,
-              activeColor: AppTheme.primaryColor,
+              activeColor: TechTheme.primary,
               label: '${_radiusKm.toStringAsFixed(0)} km',
               onChanged: (v) => setState(() => _radiusKm = v),
             ),
@@ -68,6 +68,7 @@ class _ServiceRadiusScreenState extends State<ServiceRadiusScreen> {
               height: 54,
               child: ElevatedButton(
                 onPressed: _isSaving ? null : _save,
+                style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
                 child: _isSaving
                     ? const SizedBox(
                         height: 22,

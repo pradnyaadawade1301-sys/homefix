@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/theme.dart';
+import '../../core/technician_theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
 
@@ -172,6 +172,7 @@ class _TechnicianEstimateScreenState extends State<TechnicianEstimateScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _submitting ? null : _submit,
+                style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
                 child: _submitting
                     ? const SizedBox(
                         width: 20, height: 20,
@@ -191,7 +192,7 @@ class _TechnicianEstimateScreenState extends State<TechnicianEstimateScreen> {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: AppTheme.primaryColor),
+          Icon(icon, size: 18, color: TechTheme.primary),
           const SizedBox(width: 8),
           Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
         ],
@@ -256,7 +257,7 @@ class _TechnicianEstimateScreenState extends State<TechnicianEstimateScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.primaryColor.withValues(alpha: 0.06),
+        color: TechTheme.primary.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
