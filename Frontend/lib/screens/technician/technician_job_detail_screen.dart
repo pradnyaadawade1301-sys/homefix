@@ -406,6 +406,7 @@ class _CashReceivedButtonState extends State<_CashReceivedButton> {
   Payment? _payment;
   bool _loading = true;
   bool _confirming = false;
+  String? _loadError;
   Timer? _pollTimer;
 
   @override
@@ -432,9 +433,19 @@ class _CashReceivedButtonState extends State<_CashReceivedButton> {
       setState(() {
         _payment = payment;
         _loading = false;
+        _loadError = null;
       });
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
+    } catch (e) {
+      // Swallowed before — a silent auth/lookup failure here looked
+      // identical to "the button just never appears", which is exactly the
+      // bug we kept chasing. Surface it (only shown once photos exist, so
+      // it doesn't clutter the normal in-progress state).
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadError = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
     }
   }
 
@@ -460,7 +471,19 @@ class _CashReceivedButtonState extends State<_CashReceivedButton> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading || _payment == null) return const SizedBox.shrink();
+    if (_loading) return const SizedBox.shrink();
+    if (_payment == null) {
+      if (_loadError != null) {
+        return Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            'Cash button unavailable: $_loadError',
+            style: const TextStyle(fontSize: 11, color: Colors.redAccent),
+          ),
+        );
+      }
+      return const SizedBox.shrink();
+    }
     final payment = _payment!;
     return Padding(
       padding: const EdgeInsets.only(top: 4),
