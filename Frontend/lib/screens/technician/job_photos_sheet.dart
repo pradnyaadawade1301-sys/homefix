@@ -15,14 +15,18 @@ import '../../services/service_locator.dart' show UploadService;
 /// AddJobPhoto/ListJobPhotos) — separate from the customer's own initial
 /// problem photos (Booking.images).
 ///
-/// Flow for adding a photo: pick from camera/gallery -> upload the raw file
-/// via the generic UploadService (POST /uploads -> {url}) -> attach that URL
-/// to the booking via BookingProvider.addJobPhoto. Two calls, but it keeps
-/// file storage fully decoupled from booking data, matching how every other
-/// image field in this app (KYC docs, issue photos) already works.
+/// Flow for adding a photo: pick from camera/gallery -> shown as a local
+/// preview with its own "Upload" button (a separate, explicit step, not
+/// automatic) -> upload the raw file via the generic UploadService
+/// (POST /uploads -> {url}) -> attach that URL to the booking via
+/// BookingProvider.addJobPhoto.
 class JobPhotosSheet extends StatefulWidget {
   final String bookingId;
-  const JobPhotosSheet({Key? key, required this.bookingId}) : super(key: key);
+  // True right after a job is marked complete — only the "After" section is
+  // shown then (the natural moment to capture proof of finished work), not
+  // "Before" (which belongs earlier, during the visit).
+  final bool onlyAfter;
+  const JobPhotosSheet({Key? key, required this.bookingId, this.onlyAfter = false}) : super(key: key);
 
   @override
   State<JobPhotosSheet> createState() => _JobPhotosSheetState();
@@ -30,6 +34,10 @@ class JobPhotosSheet extends StatefulWidget {
 
 class _JobPhotosSheetState extends State<JobPhotosSheet> {
   final _picker = ImagePicker();
+  // Picked but not yet uploaded — the technician confirms with the explicit
+  // "Upload" button before this actually goes anywhere.
+  File? _stagedBefore;
+  File? _stagedAfter;
   bool _uploadingBefore = false;
   bool _uploadingAfter = false;
   String? _localError;
@@ -42,7 +50,7 @@ class _JobPhotosSheetState extends State<JobPhotosSheet> {
     });
   }
 
-  Future<void> _addPhoto(String photoType) async {
+  Future<void> _pickPhoto(String photoType) async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       builder: (sheetContext) => SafeArea(
@@ -70,6 +78,30 @@ class _JobPhotosSheetState extends State<JobPhotosSheet> {
     setState(() {
       _localError = null;
       if (photoType == 'before') {
+        _stagedBefore = File(picked.path);
+      } else {
+        _stagedAfter = File(picked.path);
+      }
+    });
+  }
+
+  void _clearStaged(String photoType) {
+    setState(() {
+      if (photoType == 'before') {
+        _stagedBefore = null;
+      } else {
+        _stagedAfter = null;
+      }
+    });
+  }
+
+  Future<void> _uploadStaged(String photoType) async {
+    final file = photoType == 'before' ? _stagedBefore : _stagedAfter;
+    if (file == null) return;
+
+    setState(() {
+      _localError = null;
+      if (photoType == 'before') {
         _uploadingBefore = true;
       } else {
         _uploadingAfter = true;
@@ -78,7 +110,7 @@ class _JobPhotosSheetState extends State<JobPhotosSheet> {
 
     try {
       final uploadService = context.read<UploadService>();
-      final url = await uploadService.uploadFile(File(picked.path));
+      final url = await uploadService.uploadFile(file);
       if (!mounted) return;
       final provider = context.read<BookingProvider>();
       final ok = await provider.addJobPhoto(
@@ -88,6 +120,16 @@ class _JobPhotosSheetState extends State<JobPhotosSheet> {
       );
       if (!ok && mounted) {
         setState(() => _localError = provider.error ?? 'Failed to save photo');
+      } else if (mounted) {
+        _clearStaged(photoType);
+        // Completion flow: the "after" photo was the whole point of opening
+        // this sheet, so once it's uploaded there's nothing left to do here
+        // — close it instead of leaving the technician looking at an empty
+        // "add another photo" placeholder.
+        if (widget.onlyAfter && photoType == 'after') {
+          Navigator.of(context).pop();
+          return;
+        }
       }
     } catch (e) {
       if (mounted) setState(() => _localError = e.toString());
@@ -123,10 +165,13 @@ class _JobPhotosSheetState extends State<JobPhotosSheet> {
                       decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
                     ),
                   ),
-                  const Text('Job photos', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                  Text(widget.onlyAfter ? 'Add completion photo' : 'Job photos',
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 4),
                   Text(
-                    'Add before/after proof photos for this job. The customer can see these too.',
+                    widget.onlyAfter
+                        ? 'Add a photo of the completed work. The customer can see this too.'
+                        : 'Add before/after proof photos for this job. The customer can see these too.',
                     style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 20),
@@ -140,18 +185,22 @@ class _JobPhotosSheetState extends State<JobPhotosSheet> {
                       child: CircularProgressIndicator(strokeWidth: 2, color: TechTheme.primary),
                     ))
                   else ...[
+                    if (!widget.onlyAfter) ...[
+                      _photoSection(
+                        type: 'before',
+                        title: 'Before',
+                        photos: provider.beforePhotos,
+                        staged: _stagedBefore,
+                        uploading: _uploadingBefore,
+                      ),
+                      const SizedBox(height: 24),
+                    ],
                     _photoSection(
-                      title: 'Before',
-                      photos: provider.beforePhotos,
-                      uploading: _uploadingBefore,
-                      onAdd: () => _addPhoto('before'),
-                    ),
-                    const SizedBox(height: 24),
-                    _photoSection(
+                      type: 'after',
                       title: 'After',
                       photos: provider.afterPhotos,
+                      staged: _stagedAfter,
                       uploading: _uploadingAfter,
-                      onAdd: () => _addPhoto('after'),
                     ),
                   ],
                   const SizedBox(height: 12),
@@ -165,10 +214,11 @@ class _JobPhotosSheetState extends State<JobPhotosSheet> {
   }
 
   Widget _photoSection({
+    required String type,
     required String title,
     required List<BookingJobPhoto> photos,
+    required File? staged,
     required bool uploading,
-    required VoidCallback onAdd,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -187,28 +237,75 @@ class _JobPhotosSheetState extends State<JobPhotosSheet> {
                 ),
                 const SizedBox(width: 10),
               ],
-              GestureDetector(
-                onTap: uploading ? null : onAdd,
-                child: Container(
-                  width: 96, height: 96,
-                  decoration: BoxDecoration(
-                    color: TechTheme.primary.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: TechTheme.primary.withValues(alpha: 0.25)),
-                  ),
-                  child: uploading
-                      ? const Center(
-                          child: SizedBox(
-                            width: 20, height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: TechTheme.primary),
+              if (staged != null) ...[
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(staged, width: 96, height: 96, fit: BoxFit.cover),
+                    ),
+                    if (uploading)
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        )
-                      : const Icon(Icons.add_a_photo_outlined, color: TechTheme.primary),
+                          child: const Center(
+                            child: SizedBox(
+                              width: 20, height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      Positioned(
+                        top: -6,
+                        right: -6,
+                        child: GestureDetector(
+                          onTap: () => _clearStaged(type),
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: const BoxDecoration(color: AppTheme.errorColor, shape: BoxShape.circle),
+                            child: const Icon(Icons.close, size: 14, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ),
+                const SizedBox(width: 10),
+              ] else
+                GestureDetector(
+                  onTap: () => _pickPhoto(type),
+                  child: Container(
+                    width: 96, height: 96,
+                    decoration: BoxDecoration(
+                      color: TechTheme.primary.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: TechTheme.primary.withValues(alpha: 0.25)),
+                    ),
+                    child: const Icon(Icons.add_a_photo_outlined, color: TechTheme.primary),
+                  ),
+                ),
             ],
           ),
         ),
+        if (staged != null) ...[
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
+              onPressed: uploading ? null : () => _uploadStaged(type),
+              icon: uploading
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.cloud_upload_outlined, size: 18),
+              label: Text(uploading ? 'Uploading…' : 'Upload'),
+            ),
+          ),
+        ],
       ],
     );
   }

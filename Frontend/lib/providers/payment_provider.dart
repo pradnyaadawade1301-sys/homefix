@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/payment_model.dart';
+import '../models/wallet_model.dart';
 import '../services/service_locator.dart';
 
 class PaymentProvider extends ChangeNotifier {
@@ -11,21 +12,41 @@ class PaymentProvider extends ChangeNotifier {
   Payment? _confirmedPayment;
   List<Payment> _history = [];
   InvoiceDetail? _invoice;
+  Wallet? _wallet;
   bool _isCreatingOrder = false;
   bool _isConfirming = false;
   bool _isLoadingHistory = false;
   bool _isLoadingInvoice = false;
+  bool _isLoadingWallet = false;
   String? _error;
 
   RazorpayOrderResponse? get order => _order;
   Payment? get confirmedPayment => _confirmedPayment;
   List<Payment> get history => _history;
   InvoiceDetail? get invoice => _invoice;
+  Wallet? get wallet => _wallet;
   bool get isCreatingOrder => _isCreatingOrder;
   bool get isConfirming => _isConfirming;
   bool get isLoadingHistory => _isLoadingHistory;
   bool get isLoadingInvoice => _isLoadingInvoice;
+  bool get isLoadingWallet => _isLoadingWallet;
   String? get error => _error;
+
+  /// Technician's own wallet balance — surfaced in TechnicianSettlementScreen
+  /// so a ₹0 balance (the reason COD silently fails, see PaymentService.
+  /// getWallet) is visible before they ever hit that error.
+  Future<void> fetchWallet() async {
+    _isLoadingWallet = true;
+    notifyListeners();
+    try {
+      _wallet = await _paymentService.getWallet();
+    } catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+    } finally {
+      _isLoadingWallet = false;
+      notifyListeners();
+    }
+  }
 
   /// Step 1 — ask the backend to create a real Razorpay order for this booking's
   /// amount. Returns everything PaymentScreen needs to open Razorpay Checkout

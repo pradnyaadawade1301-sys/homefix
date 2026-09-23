@@ -4,6 +4,7 @@ import '../../core/theme.dart';
 import '../../core/technician_theme.dart';
 import '../../models/booking_model.dart';
 import '../../models/payment_model.dart';
+import '../../models/wallet_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/payment_provider.dart';
 import '../../l10n/app_localizations.dart';
@@ -42,7 +43,8 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
   }
 
   Future<void> _load() async {
-    await context.read<PaymentProvider>().loadHistory();
+    final provider = context.read<PaymentProvider>();
+    await Future.wait([provider.loadHistory(), provider.fetchWallet()]);
   }
 
   @override
@@ -72,6 +74,12 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
                     key: widget.tourKey,
                     child: _SummaryCard(totalEarned: totalEarned, jobsCompleted: completedJobs.length),
                   ),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  child: _WalletCard(wallet: paymentProvider.wallet, isLoading: paymentProvider.isLoadingWallet),
                 ),
               ),
               SliverToBoxAdapter(
@@ -188,6 +196,76 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
           Icon(icon, size: 44, color: Colors.grey[300]),
           const SizedBox(height: 12),
           Text(text, style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shows the technician's own wallet balance — this is what
+/// RazorpayService.CreateCodOrder checks against the platform commission
+/// before letting a Cash-on-Delivery job go through, so a ₹0 balance here
+/// is the reason COD keeps silently failing (see the low-balance guard).
+/// Wallet is only ever credited by completing an online-paid job or an
+/// admin top-up (AdminAPIHandler.CreditTechnicianWallet) — there's no
+/// self-serve top-up, so a low balance is flagged with a hint to contact
+/// support rather than a button that can't do anything yet.
+class _WalletCard extends StatelessWidget {
+  final Wallet? wallet;
+  final bool isLoading;
+  const _WalletCard({required this.wallet, required this.isLoading});
+
+  @override
+  Widget build(BuildContext context) {
+    final balance = wallet?.balance ?? 0;
+    final isLow = wallet != null && balance <= 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isLow ? AppTheme.errorColor.withValues(alpha: 0.3) : Colors.grey[200]!),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: TechTheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.account_balance_wallet_outlined, color: TechTheme.primary, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Wallet balance', style: TextStyle(fontSize: 12.5, color: Colors.black54)),
+                const SizedBox(height: 2),
+                isLoading && wallet == null
+                    ? const SizedBox(
+                        width: 14, height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: TechTheme.primary),
+                      )
+                    : Text(
+                        '₹${balance.toStringAsFixed(0)}',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: isLow ? AppTheme.errorColor : Colors.black87,
+                        ),
+                      ),
+                if (isLow) ...[
+                  const SizedBox(height: 2),
+                  const Text(
+                    'Low balance — Cash-on-Delivery jobs need enough here to cover the commission. Contact support to top up.',
+                    style: TextStyle(fontSize: 11, color: AppTheme.errorColor),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );

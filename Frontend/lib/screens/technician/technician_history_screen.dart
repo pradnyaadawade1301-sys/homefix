@@ -104,14 +104,28 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
     // same customer can book this technician more than once — without
     // grouping, that customer would show up as a separate row per booking
     // instead of once, like a normal messaging app.
+    // Prefer a booking that actually has a chat message over one that
+    // doesn't, so a customer with an older chatted booking and a newer
+    // silent one still shows the real last message (and not the newer
+    // booking's status) — like a normal messaging app would.
     final byCustomer = <String, Booking>{};
     for (final b in bookings.where((b) => b.customer != null)) {
       final customerId = b.customer!.id;
-      final activity = b.lastMessage?.createdAt ?? b.updatedAt;
       final existing = byCustomer[customerId];
-      final existingActivity = existing == null ? null : (existing.lastMessage?.createdAt ?? existing.updatedAt);
-      if (existing == null || activity.isAfter(existingActivity!)) {
+      if (existing == null) {
         byCustomer[customerId] = b;
+        continue;
+      }
+      final hasMsg = b.lastMessage != null;
+      final existingHasMsg = existing.lastMessage != null;
+      if (hasMsg && !existingHasMsg) {
+        byCustomer[customerId] = b;
+      } else if (hasMsg == existingHasMsg) {
+        final activity = b.lastMessage?.createdAt ?? b.updatedAt;
+        final existingActivity = existing.lastMessage?.createdAt ?? existing.updatedAt;
+        if (activity.isAfter(existingActivity)) {
+          byCustomer[customerId] = b;
+        }
       }
     }
     final grouped = byCustomer.values.toList()

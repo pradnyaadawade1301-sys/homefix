@@ -7,6 +7,7 @@ import '../models/booking_model.dart';
 import '../models/user_model.dart';
 import '../models/ai_model.dart';
 import '../models/payment_model.dart';
+import '../models/wallet_model.dart';
 
 class CategoryService {
   final HttpClient _httpClient;
@@ -144,6 +145,22 @@ class PaymentService {
       final response = await _httpClient.post(ApiConfig.paymentConfirmCash(paymentId));
       final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
       return Payment.fromJson(data);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// This technician's own in-app wallet balance — see GET /wallet. Cash
+  /// (COD) jobs debit the platform commission from here, and it's only ever
+  /// credited by an online-paid job they complete (BookingService.Complete)
+  /// or an admin top-up, so a new technician starts at ₹0 (see
+  /// RazorpayService.CreateCodOrder's low-balance guard, which is why COD
+  /// silently fails until this is above the commission).
+  Future<Wallet> getWallet() async {
+    try {
+      final response = await _httpClient.get(ApiConfig.walletBalance);
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return Wallet.fromJson(data);
     } catch (e) {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
