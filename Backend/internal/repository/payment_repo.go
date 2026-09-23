@@ -47,12 +47,12 @@ func (r *PaymentRepository) Create(ctx context.Context, p *models.Payment) (*mod
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO payments (booking_id, user_id, transaction_ref, amount, base_amount, gst_amount, gst_percent, currency,
 		                       is_repeat_customer, repeat_discount_percent, repeat_discount_amount, razorpay_order_id, payment_type, visit_fee_credit,
-		                       platform_fee_amount, visit_charge_amount, status)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'created')
+		                       platform_fee_amount, visit_charge_amount, method, status)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'created')
 		RETURNING id, status, created_at, updated_at
 	`, p.BookingID, p.UserID, p.TransactionRef, p.Amount, p.BaseAmount, p.GstAmount, p.GstPercent, p.Currency,
 		p.IsRepeatCustomer, p.RepeatDiscountPercent, p.RepeatDiscountAmount, p.RazorpayOrderID, paymentType, p.VisitFeeCredit,
-		p.PlatformFeeAmount, p.VisitChargeAmount).Scan(&p.ID, &p.Status, &p.CreatedAt, &p.UpdatedAt)
+		p.PlatformFeeAmount, p.VisitChargeAmount, p.Method).Scan(&p.ID, &p.Status, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
