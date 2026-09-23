@@ -1338,6 +1338,12 @@ class JobActionRow extends StatelessWidget {
 }
 
 Future<void> _showInvoiceDialog(BuildContext context, BookingProvider provider, Booking booking) async {
+  // Captured up front: once a job completes it moves out of the "active"
+  // tab and its list tile (and this context) can get disposed while the
+  // photo sheet is still open, which used to make the final navigation
+  // silently no-op. The NavigatorState itself lives above the list, so
+  // holding onto it directly survives that disposal.
+  final navigator = Navigator.of(context, rootNavigator: true);
   final completed = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => _InvoiceDialog(provider: provider, booking: booking),
@@ -1346,9 +1352,9 @@ Future<void> _showInvoiceDialog(BuildContext context, BookingProvider provider, 
   // photo right away — separate step from the invoice dialog itself (that
   // combination was crashing on some devices), and not required to finish
   // the job, but the natural moment to ask for it.
-  if (completed == true && context.mounted) {
+  if (completed == true) {
     await showModalBottomSheet(
-      context: context,
+      context: navigator.context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
@@ -1358,11 +1364,9 @@ Future<void> _showInvoiceDialog(BuildContext context, BookingProvider provider, 
     // received" button (which only appears once the after-photo exists) is
     // visible immediately, instead of leaving the technician on the jobs
     // list to find and re-open the job themselves.
-    if (context.mounted) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => TechnicianJobDetailScreen(booking: booking)),
-      );
-    }
+    navigator.push(
+      MaterialPageRoute(builder: (_) => TechnicianJobDetailScreen(booking: booking)),
+    );
   }
 }
 
