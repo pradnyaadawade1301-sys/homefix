@@ -124,6 +124,19 @@ func (h *AdminAPIHandler) Bookings(c *gin.Context) {
 	utils.Success(c, http.StatusOK, bookings)
 }
 
+// BookingPhotos — GET /admin/bookings/:id/photos — the technician's
+// before/after proof-of-work photos for a booking (see JobPhotosSheet on the
+// technician app, which uploads these; "after" is required before a booking
+// can be marked completed — see BookingService.Complete).
+func (h *AdminAPIHandler) BookingPhotos(c *gin.Context) {
+	photos, err := h.bookingRepo.ListServicePhotos(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, photos)
+}
+
 // Customers — GET /admin/customers
 func (h *AdminAPIHandler) Customers(c *gin.Context) {
 	customers, err := h.userRepo.ListAll(c.Request.Context(), "customer")

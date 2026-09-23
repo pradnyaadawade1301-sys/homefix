@@ -252,12 +252,91 @@ class TechnicianJobDetailScreen extends StatelessWidget {
                   const SizedBox(height: 20),
                 ],
                 const SizedBox(height: 20),
+                _JobPhotosSection(bookingId: current.id),
+                const SizedBox(height: 20),
                 JobActionRow(booking: current),
               ],
             ),
           ),
         );
       },
+    );
+  }
+}
+
+/// Read-only "before/after" proof-photo strip so the technician can see what
+/// they (or an earlier visit) already uploaded for this job — the actual
+/// upload happens via the "Generate Invoice & Complete" dialog (after photo,
+/// required) or JobPhotosSheet (before photo, optional, during the visit).
+class _JobPhotosSection extends StatefulWidget {
+  final String bookingId;
+  const _JobPhotosSection({required this.bookingId});
+
+  @override
+  State<_JobPhotosSection> createState() => _JobPhotosSectionState();
+}
+
+class _JobPhotosSectionState extends State<_JobPhotosSection> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<BookingProvider>().fetchJobPhotos(widget.bookingId);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<BookingProvider>(
+      builder: (context, provider, _) {
+        if (provider.beforePhotos.isEmpty && provider.afterPhotos.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10)],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Photos', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              if (provider.beforePhotos.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                _strip('Before', provider.beforePhotos),
+              ],
+              if (provider.afterPhotos.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                _strip('After', provider.afterPhotos),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _strip(String label, List<BookingJobPhoto> photos) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600], fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        SizedBox(
+          height: 80,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: photos.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, i) => ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.network(photos[i].imageUrl, width: 80, height: 80, fit: BoxFit.cover),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

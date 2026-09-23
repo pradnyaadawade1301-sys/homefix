@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemNavigator;
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/booking_call_launcher.dart';
 import '../../core/theme.dart';
@@ -23,6 +25,7 @@ import '../chat/booking_chat_screen.dart';
 import 'technician_job_detail_screen.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/payment_provider.dart';
+import '../../services/service_locator.dart' show UploadService;
 import 'job_brief_card.dart';
 import '../notifications/notifications_screen.dart';
 import 'manage_categories_screen.dart';
@@ -1392,6 +1395,14 @@ class _InvoiceDialogState extends State<_InvoiceDialog> {
   _WarrantyUnit _warrantyUnit = _WarrantyUnit.months;
   bool _submitting = false;
 
+  // Proof-of-completed-work photo — required before this job can be marked
+  // complete (see BookingService.Complete's server-side check for an
+  // 'after' entry in booking_job_photos). Reuses the same upload flow as
+  // JobPhotosSheet (pick -> UploadService -> BookingProvider.addJobPhoto).
+  final _picker = ImagePicker();
+  bool _uploadingPhoto = false;
+  String? _photoError;
+
   @override
   void initState() {
     super.initState();
@@ -1400,6 +1411,56 @@ class _InvoiceDialogState extends State<_InvoiceDialog> {
     );
     _warrantyAmountController = TextEditingController();
     _warrantyDescriptionController = TextEditingController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.provider.fetchJobPhotos(widget.booking.id);
+    });
+  }
+
+  Future<void> _addAfterPhoto() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Take photo'),
+              onTap: () => Navigator.of(sheetContext).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.of(sheetContext).pop(ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+
+    final picked = await _picker.pickImage(source: source, imageQuality: 85);
+    if (picked == null) return;
+
+    setState(() {
+      _photoError = null;
+      _uploadingPhoto = true;
+    });
+    try {
+      final url = await context.read<UploadService>().uploadFile(File(picked.path));
+      if (!mounted) return;
+      final ok = await widget.provider.addJobPhoto(
+        bookingId: widget.booking.id,
+        photoType: 'after',
+        imageUrl: url,
+      );
+      if (!ok && mounted) {
+        setState(() => _photoError = widget.provider.error ?? 'Failed to save photo');
+      }
+    } catch (e) {
+      if (mounted) setState(() => _photoError = e.toString());
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
   }
 
   @override
@@ -1501,6 +1562,59 @@ class _InvoiceDialogState extends State<_InvoiceDialog> {
                 ),
               ),
             ],
+            const SizedBox(height: 20),
+            const Text('Photo of completed work (required)', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            Text(
+              'The customer and admin will see this as proof the job is done.',
+              style: TextStyle(fontSize: 11.5, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 10),
+            if (_photoError != null) ...[
+              Text(_photoError!, style: const TextStyle(color: AppTheme.errorColor, fontSize: 12.5)),
+              const SizedBox(height: 8),
+            ],
+            Consumer<BookingProvider>(
+              builder: (context, provider, _) {
+                final afterPhotos = provider.afterPhotos;
+                return SizedBox(
+                  height: 90,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      for (final photo in afterPhotos) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(photo.imageUrl, width: 90, height: 90, fit: BoxFit.cover),
+                        ),
+                        const SizedBox(width: 10),
+                      ],
+                      GestureDetector(
+                        onTap: _uploadingPhoto ? null : _addAfterPhoto,
+                        child: Container(
+                          width: 90,
+                          height: 90,
+                          decoration: BoxDecoration(
+                            color: TechTheme.primary.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: TechTheme.primary.withValues(alpha: 0.25)),
+                          ),
+                          child: _uploadingPhoto
+                              ? const Center(
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: TechTheme.primary),
+                                  ),
+                                )
+                              : const Icon(Icons.add_a_photo_outlined, color: TechTheme.primary),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -1531,6 +1645,12 @@ class _InvoiceDialogState extends State<_InvoiceDialog> {
                   if (_warrantyEnabled && _warrantyDaysValue == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text(l10n.techJobsEnterValidWarranty)),
+                    );
+                    return;
+                  }
+                  if (widget.provider.afterPhotos.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please add a photo of the completed work first')),
                     );
                     return;
                   }
