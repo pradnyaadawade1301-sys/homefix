@@ -82,6 +82,66 @@ func (h *PaymentHandler) Confirm(c *gin.Context) {
 	utils.Success(c, http.StatusOK, payment)
 }
 
+type createCodOrderBody struct {
+	BookingID string  `json:"booking_id" binding:"required"`
+	Amount    float64 `json:"amount" binding:"required"`
+}
+
+// CreateCodOrder — POST /payments/cod. Cash on Delivery counterpart to
+// CreateOrder: records the payment as pending cash instead of opening
+// Razorpay Checkout. Refused up front if the assigned technician's wallet
+// can't currently cover the platform commission — see
+// RazorpayService.CreateCodOrder.
+func (h *PaymentHandler) CreateCodOrder(c *gin.Context) {
+	userID := c.GetString("user_id")
+	var body createCodOrderBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	payment, err := h.razorpay.CreateCodOrder(c.Request.Context(), body.BookingID, userID, body.Amount)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusCreated, payment)
+}
+
+// ConfirmCash — POST /payments/:id/confirm-cash. Called by the technician
+// once they've physically received the cash — marks the payment paid and
+// debits the platform's commission from their wallet. See
+// RazorpayService.ConfirmCashPayment.
+func (h *PaymentHandler) ConfirmCash(c *gin.Context) {
+	userID := c.GetString("user_id")
+	payment, err := h.razorpay.ConfirmCashPayment(c.Request.Context(), c.Param("id"), userID)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if h.fcm != nil {
+		_ = h.fcm.SendToUser(c.Request.Context(), payment.UserID, "Payment successful",
+			"Your cash payment for booking has been confirmed. Thank you!",
+			map[string]string{"booking_id": payment.BookingID, "payment_id": payment.ID, "type": "payment_success"})
+	}
+
+	utils.Success(c, http.StatusOK, payment)
+}
+
+// GetPendingCodByBooking — GET /bookings/:id/payment/cod. Lets the
+// technician's job screen show a "Cash Received" button (with the right
+// amount) before there's a real paid invoice to show. Returns null (not an
+// error) when there's no pending cash payment for this booking.
+func (h *PaymentHandler) GetPendingCodByBooking(c *gin.Context) {
+	userID := c.GetString("user_id")
+	payment, err := h.razorpay.GetPendingCodByBooking(c.Request.Context(), c.Param("id"), userID)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, payment)
+}
+
 // Refund — POST /payments/:id/refund (admin only, see router.go). Reverses a
 // verified payment: booking.payment_status -> refunded, technician earning clawed
 // back, customer credited the full amount to their in-app wallet (and, if the

@@ -83,6 +83,29 @@ class PaymentProvider extends ChangeNotifier {
     }
   }
 
+  /// Cash on Delivery counterpart to createOrder — no Razorpay Checkout to
+  /// open, just records the payment as pending cash. On success,
+  /// confirmedPayment is set straight away (still status "created"/
+  /// isPendingCash — PaymentScreen shows a "waiting for the technician to
+  /// confirm" state rather than the normal success screen).
+  Future<bool> createCodOrder(String bookingId, double amount) async {
+    _isCreatingOrder = true;
+    _error = null;
+    _order = null;
+    _confirmedPayment = null;
+    notifyListeners();
+    try {
+      _confirmedPayment = await _paymentService.createCodOrder(bookingId, amount);
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+      return false;
+    } finally {
+      _isCreatingOrder = false;
+      notifyListeners();
+    }
+  }
+
   /// If Checkout is dismissed, cancelled, or reports failure without the
   /// customer paying.
   Future<void> cancelPayment() async {
@@ -122,10 +145,20 @@ class PaymentProvider extends ChangeNotifier {
   /// actually been charged even though this in-memory provider's `_order` is
   /// gone and Checkout's success callback never reached us. Called when
   /// PaymentScreen opens, before showing "Pay Now" again, so we don't charge
-  /// the customer a second time for an already-paid booking.
+  /// the customer a second time for an already-paid booking. Also catches a
+  /// still-pending Cash on Delivery payment from an earlier visit to this
+  /// screen, so reopening it doesn't create a second COD payment for the
+  /// same booking — see PaymentScreen._initPaymentState.
   Future<bool> checkExistingPayment(String bookingId) async {
     try {
       final payments = await _paymentService.history();
+      for (final p in payments) {
+        if (p.bookingId == bookingId && p.isPendingCash) {
+          _confirmedPayment = p;
+          notifyListeners();
+          return true;
+        }
+      }
       for (final p in payments) {
         if (p.bookingId == bookingId && p.isPaid) {
           _confirmedPayment = p;
@@ -177,4 +210,14 @@ class PaymentProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Technician side: this booking's still-unconfirmed cash payment, if any
+  /// — powers the "Cash Received" button on the job detail screen. Doesn't
+  /// touch the shared loading/error state above since it's a quiet,
+  /// best-effort check rather than something the UI blocks on.
+  Future<Payment?> getPendingCodByBooking(String bookingId) => _paymentService.getPendingCodByBooking(bookingId);
+
+  /// Technician side: confirms cash was physically received — marks the
+  /// payment paid and debits the platform commission from their wallet.
+  Future<Payment> confirmCash(String paymentId) => _paymentService.confirmCash(paymentId);
 }

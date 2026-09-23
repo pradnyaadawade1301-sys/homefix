@@ -37,7 +37,9 @@ class PaymentScreen extends StatefulWidget {
   State<PaymentScreen> createState() => _PaymentScreenState();
 }
 
-enum _Stage { review, opening, verifying, success, notVerified }
+enum _Stage { review, opening, verifying, success, notVerified, pendingCash }
+
+enum _PayMethod { online, cash }
 
 class _PaymentScreenState extends State<PaymentScreen> {
   // Starts as "verifying" (not "review") so we never show the Pay button
@@ -45,6 +47,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
   // interrupted session — see _initPaymentState.
   _Stage _stage = _Stage.verifying;
   String? _statusMessage;
+  _PayMethod _method = _PayMethod.online;
+  bool _startingCod = false;
   late final Razorpay _razorpay;
 
   @override
@@ -69,7 +73,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final alreadyPaid = await provider.checkExistingPayment(widget.bookingId);
     if (!mounted) return;
     if (alreadyPaid) {
-      setState(() => _stage = _Stage.success);
+      setState(() => _stage = provider.confirmedPayment?.isPendingCash == true ? _Stage.pendingCash : _Stage.success);
       return;
     }
     provider.reset();
@@ -122,6 +126,28 @@ class _PaymentScreenState extends State<PaymentScreen> {
       if (!mounted) return;
       setState(() => _stage = _Stage.review);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open payment sheet: $e')));
+    }
+  }
+
+  /// Cash on Delivery counterpart to _startPayment — no Checkout sheet, just
+  /// records the payment as pending cash. The backend refuses this up front
+  /// if the assigned technician's wallet can't currently cover the platform
+  /// commission (see RazorpayService.CreateCodOrder) — that error surfaces
+  /// here as a snackbar rather than blocking the screen entirely, so the
+  /// customer can fall back to paying online.
+  Future<void> _startCodPayment() async {
+    if (_startingCod) return;
+    setState(() => _startingCod = true);
+    final provider = context.read<PaymentProvider>();
+    final ok = await provider.createCodOrder(widget.bookingId, widget.amount);
+    if (!mounted) return;
+    setState(() => _startingCod = false);
+    if (ok) {
+      setState(() => _stage = _Stage.pendingCash);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(provider.error ?? 'Could not start cash payment')),
+      );
     }
   }
 
@@ -205,6 +231,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   return _buildOpening();
                 case _Stage.review:
                   return _buildReview(provider);
+                case _Stage.pendingCash:
+                  return _buildPendingCash(provider);
               }
             },
           ),
@@ -214,19 +242,22 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   Widget _buildReview(PaymentProvider provider) {
+    final busy = provider.isCreatingOrder || _startingCod;
     return ListView(
       children: [
         const SizedBox(height: 12),
         _buildInvoiceCard(order: provider.order),
-        const SizedBox(height: 28),
+        const SizedBox(height: 20),
+        _buildMethodSelector(),
+        const SizedBox(height: 24),
         SizedBox(
           height: 52,
           child: ElevatedButton(
-            onPressed: provider.isCreatingOrder ? null : _startPayment,
+            onPressed: busy ? null : (_method == _PayMethod.online ? _startPayment : _startCodPayment),
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, foregroundColor: Colors.white),
-            child: provider.isCreatingOrder
+            child: busy
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Pay Now'),
+                : Text(_method == _PayMethod.online ? 'Pay Now' : 'Confirm Cash on Delivery'),
           ),
         ),
         if (provider.error != null) ...[
@@ -300,6 +331,93 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Pay Online (Razorpay Checkout) vs Cash on Delivery — pick which one
+  /// _buildReview's button below actually starts.
+  Widget _buildMethodSelector() {
+    return Row(
+      children: [
+        Expanded(child: _methodOption(_PayMethod.online, Icons.credit_card_rounded, 'Pay Online')),
+        const SizedBox(width: 10),
+        Expanded(child: _methodOption(_PayMethod.cash, Icons.payments_outlined, 'Cash on Delivery')),
+      ],
+    );
+  }
+
+  Widget _methodOption(_PayMethod method, IconData icon, String label) {
+    final selected = _method == method;
+    return GestureDetector(
+      onTap: () => setState(() => _method = method),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: selected ? AppTheme.primaryColor.withValues(alpha: 0.08) : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: selected ? AppTheme.primaryColor : Colors.grey[300]!, width: selected ? 1.6 : 1),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: selected ? AppTheme.primaryColor : Colors.grey[500], size: 22),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? AppTheme.primaryColor : Colors.grey[700],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Shown right after the customer picks Cash on Delivery — the payment is
+  /// recorded but stays unpaid/no invoice until the technician confirms
+  /// they actually received the cash (see PaymentProvider.confirmCash on the
+  /// technician side).
+  Widget _buildPendingCash(PaymentProvider provider) {
+    final payment = provider.confirmedPayment;
+    return Column(
+      children: [
+        const SizedBox(height: 40),
+        const CircleAvatar(radius: 40, backgroundColor: Color(0xFFFFF3E0), child: Icon(Icons.payments_outlined, color: Colors.orange, size: 40)),
+        const SizedBox(height: 20),
+        const Text('Pay by cash', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 6),
+        Text(
+          '₹${(payment?.amount ?? widget.amount).toStringAsFixed(2)} due — pay the technician directly when the work is done.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13.5, color: Colors.grey[600]),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'The invoice will be ready once they confirm receiving the cash.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+        ),
+        const SizedBox(height: 32),
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: OutlinedButton(
+            onPressed: () {
+              if (widget.booking != null) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => TaskCompletedScreen(booking: widget.booking!, reviewed: false)),
+                );
+              } else {
+                Navigator.of(context).pop(true);
+              }
+            },
+            child: const Text('Done'),
+          ),
+        ),
+      ],
     );
   }
 

@@ -83,6 +83,11 @@ class Payment {
   bool get isPaid => status == 'paid';
   bool get isFailed => status == 'failed';
   bool get isRefunded => status == 'refunded';
+  bool get isCash => method == 'cash';
+  // A Cash on Delivery payment sits at status "created" from the moment the
+  // customer picks it until the technician confirms they actually received
+  // the cash — see ConfirmCash on the technician side.
+  bool get isPendingCash => isCash && status == 'created';
 
   factory Payment.fromJson(Map<String, dynamic> json) {
     return Payment(

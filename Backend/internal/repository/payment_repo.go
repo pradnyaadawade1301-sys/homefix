@@ -235,6 +235,26 @@ func (r *PaymentRepository) MarkVerifiedPaidRazorpay(
 	return err
 }
 
+// MarkVerifiedPaidCash records a Cash on Delivery payment as paid once the
+// technician confirms they physically received the cash (see
+// RazorpayService.ConfirmCashPayment) — no gateway fields to store (no
+// razorpay_order_id, no upi_txn_id), just the invoice number, GST split and
+// commission split like every other payment type.
+func (r *PaymentRepository) MarkVerifiedPaidCash(
+	ctx context.Context,
+	ref, invoiceNumber string,
+	cgstAmount, sgstAmount, platformCommission, technicianEarning float64,
+) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE payments
+		SET method = 'cash', invoice_number = $1, status = 'paid',
+		    cgst_amount = $2, sgst_amount = $3,
+		    verified = true, platform_commission = $4, technician_earning = $5, updated_at = now()
+		WHERE transaction_ref = $6 AND status = 'created'
+	`, invoiceNumber, cgstAmount, sgstAmount, platformCommission, technicianEarning, ref)
+	return err
+}
+
 // MarkFailed also records the UPI app's own (non-success) response for audit —
 // e.g. so a dispute can show exactly what the UPI app reported.
 func (r *PaymentRepository) MarkFailed(ctx context.Context, ref, upiStatus, upiResponseCode string) error {
