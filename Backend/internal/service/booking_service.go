@@ -341,25 +341,6 @@ func (s *BookingService) Complete(ctx context.Context, bookingID string, finalPr
 		return errors.New("booking not found")
 	}
 
-	// Require photographic proof of completed work before the job can be
-	// marked done — backstops the technician app's own upload requirement
-	// (JobPhotosSheet/"after" photo) in case this endpoint is ever hit
-	// directly without going through that UI.
-	photos, err := s.bookingRepo.ListServicePhotos(ctx, bookingID)
-	if err != nil {
-		return err
-	}
-	hasAfterPhoto := false
-	for _, p := range photos {
-		if p.PhotoType == "after" {
-			hasAfterPhoto = true
-			break
-		}
-	}
-	if !hasAfterPhoto {
-		return errors.New("please add at least one photo of the completed work before finishing this job")
-	}
-
 	if warrantyEnabled {
 		if warrantyDays == nil {
 			return errors.New("warranty duration is required when warranty is enabled")
