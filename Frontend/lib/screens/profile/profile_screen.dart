@@ -821,14 +821,19 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
               ),
               children: [
                 _VerificationRow(
-                  // "Verified" here means an admin has actually reviewed and
+                  // "Verified" means an admin has actually reviewed and
                   // approved the KYC submission (Technicians.jsx's Approve
-                  // button on the admin panel, which flips
-                  // TechnicianProfile.IsVerified) — NOT just that a file was
-                  // uploaded. Before that review, this stays "Pending" even
-                  // though governmentIdUrl is already set.
+                  // button on the admin panel, which sets approval_status to
+                  // "approved" — see TechnicianRepository.SetApprovalStatus)
+                  // — NOT just that a file was uploaded. Deliberately keyed
+                  // off approvalStatus rather than isVerified: the latter is
+                  // a separate, manually-toggleable "verified badge" the
+                  // admin panel's Approved tab lets an admin flip on/off
+                  // independent of approval (a cosmetic trust badge, not a
+                  // record of having reviewed this document), so it can't be
+                  // used as the source of truth for "was this ID reviewed".
                   label: l10n.profileGovId,
-                  verified: profile.governmentIdUrl.isNotEmpty && profile.isVerified,
+                  verified: profile.governmentIdUrl.isNotEmpty && profile.isApproved,
                   accentColor: TechTheme.primary,
                 ),
               ]
