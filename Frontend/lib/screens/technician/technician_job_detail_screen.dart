@@ -165,7 +165,11 @@ class TechnicianJobDetailScreen extends StatelessWidget {
                           style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
                         ),
                       ],
-                      if (!current.isPaid) ...[
+                      // Only offer "Confirm cash received" once the
+                      // completion photo has actually been uploaded — the
+                      // photo (proof of finished work) should exist before
+                      // money changes hands, not the other way around.
+                      if (!current.isPaid && provider.afterPhotos.isNotEmpty) ...[
                         const SizedBox(height: 10),
                         _CashReceivedButton(bookingId: current.id),
                       ],
