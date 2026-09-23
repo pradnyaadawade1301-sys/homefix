@@ -4,6 +4,8 @@ import '../../core/theme.dart';
 import '../../core/technician_theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
+import '../../providers/payment_provider.dart';
+import '../../models/payment_model.dart';
 import '../../core/booking_call_launcher.dart';
 import '../chat/booking_chat_screen.dart';
 import 'job_brief_card.dart';
@@ -161,6 +163,10 @@ class TechnicianJobDetailScreen extends StatelessWidget {
                           style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
                         ),
                       ],
+                      if (!current.isPaid) ...[
+                        const SizedBox(height: 10),
+                        _CashReceivedButton(bookingId: current.id),
+                      ],
                     ],
                   ),
                 ),
@@ -254,6 +260,76 @@ class TechnicianJobDetailScreen extends StatelessWidget {
                 const SizedBox(height: 20),
                 JobActionRow(booking: current),
               ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// "Cash Received" action for a Cash on Delivery booking — invisible unless
+/// there's actually a pending cash payment for this booking (see
+/// PaymentProvider.getPendingCodByBooking), so it stays out of the way for
+/// every online-paid job, which is the overwhelming majority.
+class _CashReceivedButton extends StatefulWidget {
+  final String bookingId;
+  const _CashReceivedButton({required this.bookingId});
+
+  @override
+  State<_CashReceivedButton> createState() => _CashReceivedButtonState();
+}
+
+class _CashReceivedButtonState extends State<_CashReceivedButton> {
+  late Future<Payment?> _future;
+  bool _confirming = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = context.read<PaymentProvider>().getPendingCodByBooking(widget.bookingId);
+  }
+
+  Future<void> _confirm() async {
+    if (_confirming) return;
+    setState(() => _confirming = true);
+    try {
+      await context.read<PaymentProvider>().confirmCash((await _future)!.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cash payment confirmed — commission debited from your wallet.')),
+      );
+      setState(() => _future = Future.value(null));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => _confirming = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Payment?>(
+      future: _future,
+      builder: (context, snapshot) {
+        final payment = snapshot.data;
+        if (snapshot.connectionState != ConnectionState.done || payment == null) {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _confirming ? null : _confirm,
+              icon: _confirming
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.payments_outlined, size: 18),
+              label: Text(_confirming ? 'Confirming…' : 'Confirm ₹${payment.amount.toStringAsFixed(0)} cash received'),
+              style: OutlinedButton.styleFrom(foregroundColor: TechTheme.primary, side: const BorderSide(color: TechTheme.primary)),
             ),
           ),
         );

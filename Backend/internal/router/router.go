@@ -193,6 +193,9 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.GET("/payments/:id/invoice", h.Payment.GetInvoice)
 		authed.GET("/bookings/:id/invoice", h.Payment.GetInvoiceByBooking)
 		authed.POST("/payments/:id/refund", middleware.RequireRole("admin"), h.Payment.Refund)
+		authed.POST("/payments/cod", h.Payment.CreateCodOrder)
+		authed.POST("/payments/:id/confirm-cash", h.Payment.ConfirmCash)
+		authed.GET("/bookings/:id/payment/cod", h.Payment.GetPendingCodByBooking)
 
 		authed.GET("/wallet", h.Wallet.Balance)
 		authed.GET("/wallet/transactions", h.Wallet.History)

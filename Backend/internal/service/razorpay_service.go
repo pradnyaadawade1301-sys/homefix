@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -88,66 +89,12 @@ type RazorpayOrder struct {
 // did, creates a real order via the Razorpay API, and records a "created" payment
 // row tagged with that order's ID.
 func (s *RazorpayService) CreateOrder(ctx context.Context, bookingID, userID string, baseAmountRupees float64) (*RazorpayOrder, error) {
-	booking, err := s.bookingRepo.GetByID(ctx, bookingID)
+	_, charges, ref, err := s.prepareCharge(ctx, bookingID, baseAmountRupees)
 	if err != nil {
 		return nil, err
 	}
-	if booking == nil {
-		return nil, errors.New("booking not found")
-	}
-	if booking.FinalPrice != nil {
-		const epsilon = 0.01
-		diff := baseAmountRupees - *booking.FinalPrice
-		if diff < -epsilon || diff > epsilon {
-			return nil, fmt.Errorf("amount does not match invoiced amount of %.2f", *booking.FinalPrice)
-		}
-	}
-
-	// Repeat-customer discount — disabled per product decision (see
-	// invoice_screen.dart, which dropped the "Repeat customer discount" line
-	// from what customers see). Since hiding a discount from the invoice
-	// while still silently applying it would mean the displayed total no
-	// longer matches what was actually calculated, the discount itself is
-	// switched off here too rather than just hidden — pricing must match
-	// what's shown. IsRepeatCustomer/RepeatDiscount* fields are kept on the
-	// Payment model (and left unset below) purely so old rows/API consumers
-	// that still read them don't break; no new discount is ever applied.
-	var isRepeat bool
-	var repeatDiscountPercent *float64
-	var repeatDiscountAmount *float64
-	effectiveBase := baseAmountRupees
-
-	ref, err := generateTransactionRef()
-	if err != nil {
-		return nil, fmt.Errorf("razorpay: failed to generate transaction ref: %w", err)
-	}
-
-	// --- Fee line items (see config.PlatformFeeAmount / VisitFeeAmount) -------
-	// A warranty-claim booking is a free re-fix: no platform fee, no visit fee.
-	platformFee := s.platformFee
-	visitCharge := s.visitFee
-	if booking.IsWarrantyClaim {
-		platformFee = 0
-		visitCharge = 0
-	} else {
-		// The visit charge is billed once per booking. Skip it if it's already
-		// been charged on an earlier invoice for this booking, or if the
-		// customer paid a separate pre-visit fee for it.
-		if already, aErr := s.bookingRepo.IsVisitFeeCharged(ctx, bookingID); aErr != nil {
-			return nil, aErr
-		} else if already {
-			visitCharge = 0
-		} else if vf, vErr := s.paymentRepo.GetByBookingIDAndType(ctx, bookingID, models.PaymentTypeVisitFee); vErr == nil && vf != nil && vf.Status == models.PaymentPaid {
-			visitCharge = 0
-		}
-	}
-
-	// GST is charged on the whole taxable subtotal: service amount (post
-	// repeat-customer discount) + platform fee + visit charge.
-	subtotal := effectiveBase + platformFee + visitCharge
-	gstAmount := subtotal * s.gstPct / 100
-	totalAmount := subtotal + gstAmount
-
+	effectiveBase, platformFee, visitCharge, gstAmount, totalAmount := charges.effectiveBase, charges.platformFee, charges.visitCharge, charges.gstAmount, charges.totalAmount
+	isRepeat, repeatDiscountPercent, repeatDiscountAmount := false, (*float64)(nil), (*float64)(nil)
 	var visitFeeCredit *float64 // legacy field — unused now that visit fee is an explicit line
 
 	amountPaise := int64(totalAmount*100 + 0.5) // Razorpay wants amount in the smallest currency unit (paise)
@@ -201,6 +148,240 @@ func (s *RazorpayService) CreateOrder(ctx context.Context, bookingID, userID str
 		Currency:    "INR",
 	}, nil
 }
+
+// chargeBreakdown is the GST-inclusive total for one payment, computed the
+// same way regardless of how it's actually collected (online via Razorpay,
+// or cash on delivery) — see prepareCharge.
+type chargeBreakdown struct {
+	effectiveBase float64
+	platformFee   float64
+	visitCharge   float64
+	gstAmount     float64
+	totalAmount   float64
+}
+
+// prepareCharge validates baseAmountRupees against the booking's invoiced
+// final_price (if set), works out the platform fee / visit charge / GST line
+// items, and generates a fresh transaction ref — every field CreateOrder and
+// CreateCodOrder both need before they diverge on how the payment is
+// actually collected. Keeping this in one place means the two flows can
+// never quietly drift out of sync on pricing.
+func (s *RazorpayService) prepareCharge(ctx context.Context, bookingID string, baseAmountRupees float64) (*models.Booking, chargeBreakdown, string, error) {
+	booking, err := s.bookingRepo.GetByID(ctx, bookingID)
+	if err != nil {
+		return nil, chargeBreakdown{}, "", err
+	}
+	if booking == nil {
+		return nil, chargeBreakdown{}, "", errors.New("booking not found")
+	}
+	if booking.FinalPrice != nil {
+		const epsilon = 0.01
+		diff := baseAmountRupees - *booking.FinalPrice
+		if diff < -epsilon || diff > epsilon {
+			return nil, chargeBreakdown{}, "", fmt.Errorf("amount does not match invoiced amount of %.2f", *booking.FinalPrice)
+		}
+	}
+
+	ref, err := generateTransactionRef()
+	if err != nil {
+		return nil, chargeBreakdown{}, "", fmt.Errorf("failed to generate transaction ref: %w", err)
+	}
+
+	// --- Fee line items (see config.PlatformFeeAmount / VisitFeeAmount) -------
+	// A warranty-claim booking is a free re-fix: no platform fee, no visit fee.
+	platformFee := s.platformFee
+	visitCharge := s.visitFee
+	if booking.IsWarrantyClaim {
+		platformFee = 0
+		visitCharge = 0
+	} else {
+		// The visit charge is billed once per booking. Skip it if it's already
+		// been charged on an earlier invoice for this booking, or if the
+		// customer paid a separate pre-visit fee for it.
+		if already, aErr := s.bookingRepo.IsVisitFeeCharged(ctx, bookingID); aErr != nil {
+			return nil, chargeBreakdown{}, "", aErr
+		} else if already {
+			visitCharge = 0
+		} else if vf, vErr := s.paymentRepo.GetByBookingIDAndType(ctx, bookingID, models.PaymentTypeVisitFee); vErr == nil && vf != nil && vf.Status == models.PaymentPaid {
+			visitCharge = 0
+		}
+	}
+
+	// GST is charged on the whole taxable subtotal: service amount + platform
+	// fee + visit charge.
+	subtotal := baseAmountRupees + platformFee + visitCharge
+	gstAmount := subtotal * s.gstPct / 100
+	totalAmount := subtotal + gstAmount
+
+	return booking, chargeBreakdown{
+		effectiveBase: baseAmountRupees,
+		platformFee:   platformFee,
+		visitCharge:   visitCharge,
+		gstAmount:     gstAmount,
+		totalAmount:   totalAmount,
+	}, ref, nil
+}
+
+// CreateCodOrder is the Cash on Delivery counterpart to CreateOrder — same
+// pricing, but no Razorpay order: the customer will pay the technician in
+// cash, and the technician later confirms receipt (see ConfirmCashPayment),
+// which is what actually marks the payment paid and settles the platform's
+// commission.
+//
+// Since the technician never gets a wallet credit for a cash job (they
+// already hold the cash), the platform recovers its commission by DEBITING
+// it from the technician's wallet on confirmation instead — so COD is
+// refused up front if their current wallet balance can't cover it, rather
+// than confirming the job and only then failing (or letting the wallet go
+// negative).
+func (s *RazorpayService) CreateCodOrder(ctx context.Context, bookingID, userID string, baseAmountRupees float64) (*models.Payment, error) {
+	booking, charges, ref, err := s.prepareCharge(ctx, bookingID, baseAmountRupees)
+	if err != nil {
+		return nil, err
+	}
+	if booking.TechnicianID == nil {
+		return nil, errors.New("no technician is assigned to this booking yet")
+	}
+	tech, err := s.technicianRepo.GetByID(ctx, *booking.TechnicianID)
+	if err != nil {
+		return nil, err
+	}
+	if tech == nil {
+		return nil, errors.New("assigned technician not found")
+	}
+
+	platformCommission := charges.effectiveBase * s.commissionPct / 100
+	wallet, err := s.walletRepo.GetOrCreate(ctx, tech.UserID)
+	if err != nil {
+		return nil, err
+	}
+	if wallet.Balance < platformCommission {
+		return nil, fmt.Errorf(
+			"the technician's wallet balance (₹%.2f) is too low to cover the platform commission (₹%.2f) for a cash payment — ask them to add funds, or pay online instead",
+			wallet.Balance, platformCommission,
+		)
+	}
+
+	p := &models.Payment{
+		BookingID:         bookingID,
+		UserID:            userID,
+		TransactionRef:    ref,
+		Amount:            charges.totalAmount,
+		BaseAmount:        &charges.effectiveBase,
+		GstAmount:         &charges.gstAmount,
+		GstPercent:        &s.gstPct,
+		PlatformFeeAmount: &charges.platformFee,
+		VisitChargeAmount: &charges.visitCharge,
+		Currency:          "INR",
+		Method:            strPtr("cash"),
+		PaymentType:       models.PaymentTypeService,
+	}
+	return s.paymentRepo.Create(ctx, p)
+}
+
+// ConfirmCashPayment is called by the technician once they've actually
+// received the cash on site. Marks the payment paid, generates the invoice,
+// and debits the platform's commission from the technician's wallet — the
+// COD mirror of VerifyAndCapture's Razorpay-crediting path.
+func (s *RazorpayService) ConfirmCashPayment(ctx context.Context, paymentID, technicianUserID string) (*models.Payment, error) {
+	p, err := s.paymentRepo.GetByID(ctx, paymentID)
+	if err != nil {
+		return nil, err
+	}
+	if p == nil {
+		return nil, errors.New("payment not found")
+	}
+	if p.Method == nil || *p.Method != "cash" {
+		return nil, errors.New("this payment is not a cash on delivery payment")
+	}
+	if p.Status != models.PaymentCreated {
+		// Already resolved — idempotent no-op, never re-debit.
+		return p, nil
+	}
+
+	booking, err := s.bookingRepo.GetByID(ctx, p.BookingID)
+	if err != nil {
+		return nil, err
+	}
+	if booking == nil || booking.TechnicianID == nil {
+		return nil, errors.New("booking or assigned technician not found")
+	}
+	tech, err := s.technicianRepo.GetByID(ctx, *booking.TechnicianID)
+	if err != nil {
+		return nil, err
+	}
+	if tech == nil || tech.UserID != technicianUserID {
+		return nil, errors.New("you are not the technician assigned to this booking")
+	}
+
+	serviceBase := p.Amount
+	if p.BaseAmount != nil {
+		serviceBase = *p.BaseAmount
+	}
+	platformCommission := serviceBase * s.commissionPct / 100
+	technicianEarning := serviceBase - platformCommission
+
+	// Re-check the wallet balance at confirmation time too — it was already
+	// checked at CreateCodOrder, but it can have moved since (e.g. another
+	// cash job settled in between), and a debit must never push it negative.
+	wallet, err := s.walletRepo.GetOrCreate(ctx, technicianUserID)
+	if err != nil {
+		return nil, err
+	}
+	if wallet.Balance < platformCommission {
+		return nil, fmt.Errorf(
+			"your wallet balance (₹%.2f) is too low to cover the platform commission (₹%.2f) for this cash payment — add funds to your wallet, then try again",
+			wallet.Balance, platformCommission,
+		)
+	}
+
+	var cgstAmount, sgstAmount float64
+	if p.GstAmount != nil {
+		cgstAmount = *p.GstAmount / 2
+		sgstAmount = *p.GstAmount - cgstAmount
+	}
+	invoiceNumber := fmt.Sprintf("INV-%s-%s", time.Now().Format("200601"), p.ID[:8])
+
+	if err := s.paymentRepo.MarkVerifiedPaidCash(
+		ctx, p.TransactionRef, invoiceNumber, cgstAmount, sgstAmount, platformCommission, technicianEarning,
+	); err != nil {
+		return nil, err
+	}
+	if err := s.bookingRepo.SetPaymentStatus(ctx, booking.ID, "paid"); err != nil {
+		return nil, err
+	}
+	if p.VisitChargeAmount != nil && *p.VisitChargeAmount > 0 {
+		if err := s.bookingRepo.SetVisitFeeCharged(ctx, booking.ID); err != nil {
+			return nil, err
+		}
+	}
+
+	// The technician already holds the cash covering their own earning — only
+	// the platform's cut needs to move, and it moves OUT of their wallet
+	// rather than the earning moving in. The payment is already marked paid
+	// above by this point (matching VerifyAndCapture's Razorpay-side
+	// ordering), so a failure here — e.g. the balance moved between the
+	// pre-check above and this call — can't be rolled back automatically;
+	// logging it at least surfaces an uncollected commission for manual
+	// follow-up instead of silently losing it.
+	if _, err := s.walletRepo.Debit(ctx, technicianUserID, platformCommission, "cod_commission", &p.ID); err != nil {
+		log.Printf("ConfirmCashPayment: commission debit failed for payment %s (technician %s, amount %.2f): %v",
+			p.ID, technicianUserID, platformCommission, err)
+	}
+
+	if s.fcm != nil {
+		_ = s.fcm.SendToUser(ctx, booking.CustomerID, "Payment successful",
+			fmt.Sprintf("Your cash payment of ₹%.2f was confirmed. Invoice %s is ready.", p.Amount, invoiceNumber),
+			map[string]string{"booking_id": booking.ID, "type": "payment_success"})
+		_ = s.fcm.SendToUser(ctx, technicianUserID, "Cash payment confirmed",
+			fmt.Sprintf("₹%.2f platform commission was deducted from your wallet for booking %s.", platformCommission, booking.ID),
+			map[string]string{"booking_id": booking.ID, "type": "payment_success"})
+	}
+
+	return s.paymentRepo.GetByID(ctx, p.ID)
+}
+
+func strPtr(s string) *string { return &s }
 
 // ErrPaymentNotVerified is declared in upi_service.go (same package) and reused
 // here — both flows report the same failure mode to callers.
@@ -452,6 +633,36 @@ func (s *RazorpayService) GetInvoice(ctx context.Context, paymentID, requestingU
 		return nil, errors.New("invoice not found")
 	}
 	return inv, nil
+}
+
+// GetPendingCodByBooking returns this booking's still-unconfirmed cash
+// payment, if any — lets the technician's job screen show a "Cash Received"
+// button with the right amount before there's a real invoice to show (an
+// invoice only exists once GetInvoice's payment is actually paid).
+// Authorization mirrors GetInvoice: the paying customer or the assigned
+// technician, nobody else.
+func (s *RazorpayService) GetPendingCodByBooking(ctx context.Context, bookingID, requestingUserID string) (*models.Payment, error) {
+	p, err := s.paymentRepo.GetByBookingIDAndType(ctx, bookingID, models.PaymentTypeService)
+	if err != nil {
+		return nil, err
+	}
+	if p == nil || p.Method == nil || *p.Method != "cash" || p.Status != models.PaymentCreated {
+		return nil, nil
+	}
+	if p.UserID != requestingUserID {
+		authorized := false
+		booking, bErr := s.bookingRepo.GetByID(ctx, p.BookingID)
+		if bErr == nil && booking != nil && booking.TechnicianID != nil {
+			tech, tErr := s.technicianRepo.GetByID(ctx, *booking.TechnicianID)
+			if tErr == nil && tech != nil && tech.UserID == requestingUserID {
+				authorized = true
+			}
+		}
+		if !authorized {
+			return nil, errors.New("you are not authorized to view this payment")
+		}
+	}
+	return p, nil
 }
 
 // RefundVisitFee reverses a paid ₹99 visit-fee payment when a booking is

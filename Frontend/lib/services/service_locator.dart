@@ -117,6 +117,52 @@ class PaymentService {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
   }
+
+  /// Cash on Delivery counterpart to createOrder — records the payment as
+  /// pending cash instead of opening Razorpay Checkout. The backend refuses
+  /// this up front if the assigned technician's wallet can't currently cover
+  /// the platform commission (see RazorpayService.CreateCodOrder), which
+  /// surfaces here as a thrown Exception with that explanation.
+  Future<Payment> createCodOrder(String bookingId, double amount) async {
+    try {
+      final response = await _httpClient.post(
+        ApiConfig.paymentCod,
+        data: {'booking_id': bookingId, 'amount': amount},
+      );
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return Payment.fromJson(data);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Technician side: confirms cash was physically received for a pending
+  /// COD payment — marks it paid and debits the platform commission from
+  /// their wallet. See RazorpayService.ConfirmCashPayment.
+  Future<Payment> confirmCash(String paymentId) async {
+    try {
+      final response = await _httpClient.post(ApiConfig.paymentConfirmCash(paymentId));
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return Payment.fromJson(data);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// This booking's still-unconfirmed cash payment, if any — lets the
+  /// technician's job screen show a "Cash Received" button with the right
+  /// amount before there's a real paid invoice to show. Returns null when
+  /// there's no pending cash payment for this booking.
+  Future<Payment?> getPendingCodByBooking(String bookingId) async {
+    try {
+      final response = await _httpClient.get(ApiConfig.bookingPendingCod(bookingId));
+      final data = ApiEnvelope.unwrap(response);
+      if (data == null) return null;
+      return Payment.fromJson(data as Map<String, dynamic>);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
 }
 
 // Technician KYC Service — authenticated: file upload, profile registration, own profile.
