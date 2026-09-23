@@ -104,7 +104,7 @@ func main() {
 
 	// ---- Handlers ----
 	financeHandler := handler.NewFinanceHandler(paymentRepo, walletRepo, upiService)
-	adminAPIHandler := handler.NewAdminAPIHandler(userRepo, bookingRepo, techRepo, paymentRepo, disputeService)
+	adminAPIHandler := handler.NewAdminAPIHandler(userRepo, bookingRepo, techRepo, paymentRepo, disputeService, walletService)
 
 	handlers := &router.Handlers{
 		Auth:         handler.NewAuthHandler(authService, cfg.Env),

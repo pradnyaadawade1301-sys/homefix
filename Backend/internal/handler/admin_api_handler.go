@@ -22,6 +22,7 @@ type AdminAPIHandler struct {
 	technicianRepo *repository.TechnicianRepository
 	paymentRepo    *repository.PaymentRepository
 	disputeService *service.DisputeService
+	walletService  *service.WalletService
 }
 
 func NewAdminAPIHandler(
@@ -30,6 +31,7 @@ func NewAdminAPIHandler(
 	technicianRepo *repository.TechnicianRepository,
 	paymentRepo *repository.PaymentRepository,
 	disputeService *service.DisputeService,
+	walletService *service.WalletService,
 ) *AdminAPIHandler {
 	return &AdminAPIHandler{
 		userRepo:       userRepo,
@@ -37,6 +39,7 @@ func NewAdminAPIHandler(
 		technicianRepo: technicianRepo,
 		paymentRepo:    paymentRepo,
 		disputeService: disputeService,
+		walletService:  walletService,
 	}
 }
 
@@ -226,4 +229,58 @@ func (h *AdminAPIHandler) DisputeDetail(c *gin.Context) {
 		return
 	}
 	utils.Success(c, http.StatusOK, gin.H{"dispute": d, "evidence": evidence})
+}
+
+// TechnicianWallet — GET /admin/technicians/:id/wallet
+// Lets an admin check a technician's balance (and how it got there) before
+// deciding whether/how much to top up — e.g. when support gets a "COD keeps
+// failing" ticket, this is usually the first thing to check (see
+// RazorpayService.CreateCodOrder's low-balance guard).
+func (h *AdminAPIHandler) TechnicianWallet(c *gin.Context) {
+	technicianUserID := c.Param("id")
+	wallet, err := h.walletService.GetBalance(c.Request.Context(), technicianUserID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	history, err := h.walletService.History(c.Request.Context(), technicianUserID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"wallet": wallet, "transactions": history})
+}
+
+// CreditTechnicianWallet — POST /admin/technicians/:id/wallet/credit
+// The actual top-up action: manually credits a specific technician's wallet
+// (by path id, not the caller's own id — unlike the older self-serve
+// POST /wallet/credit, which can only ever credit the admin's own wallet and
+// isn't useful for this). Typical use: a new technician's wallet is ₹0 (no
+// online-paid job completed yet — see WalletService.Credit's only other
+// caller, BookingService.Complete's earning credit) so every Cash-on-Delivery
+// job silently fails the platform-commission check; support tops them up
+// here to unblock COD until they've completed a paid job of their own.
+type creditTechnicianWalletBody struct {
+	Amount float64 `json:"amount" binding:"required,gt=0"`
+	Reason string  `json:"reason"`
+}
+
+func (h *AdminAPIHandler) CreditTechnicianWallet(c *gin.Context) {
+	technicianUserID := c.Param("id")
+	var body creditTechnicianWalletBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	reason := body.Reason
+	if reason == "" {
+		reason = "admin_topup"
+	}
+	adminID := c.GetString("user_id")
+	wallet, err := h.walletService.Credit(c.Request.Context(), technicianUserID, body.Amount, reason, &adminID)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, wallet)
 }
