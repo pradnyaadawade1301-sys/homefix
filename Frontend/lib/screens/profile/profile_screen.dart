@@ -256,7 +256,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
           }
 
           return RefreshIndicator(
-            onRefresh: userProvider.fetchProfile,
+            onRefresh: () async {
+              await userProvider.fetchProfile();
+              // Also re-fetch the technician's own KYC profile so a pull-to-
+              // refresh picks up an admin approval/rejection that happened
+              // since this screen last loaded (see the Government ID row's
+              // "Pending" vs "Verified" status below).
+              if (user.isTechnician && !widget.forceCustomerView) {
+                await context.read<TechnicianKycProvider>().loadMyProfile();
+              }
+            },
             child: (user.isTechnician && !widget.forceCustomerView)
                 ? _TechnicianProfileBody(
                     user: user,
@@ -812,8 +821,14 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
               ),
               children: [
                 _VerificationRow(
+                  // "Verified" here means an admin has actually reviewed and
+                  // approved the KYC submission (Technicians.jsx's Approve
+                  // button on the admin panel, which flips
+                  // TechnicianProfile.IsVerified) — NOT just that a file was
+                  // uploaded. Before that review, this stays "Pending" even
+                  // though governmentIdUrl is already set.
                   label: l10n.profileGovId,
-                  verified: profile.governmentIdUrl.isNotEmpty,
+                  verified: profile.governmentIdUrl.isNotEmpty && profile.isVerified,
                   accentColor: TechTheme.primary,
                 ),
               ]
