@@ -1347,13 +1347,22 @@ Future<void> _showInvoiceDialog(BuildContext context, BookingProvider provider, 
   // combination was crashing on some devices), and not required to finish
   // the job, but the natural moment to ask for it.
   if (completed == true && context.mounted) {
-    showModalBottomSheet(
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => JobPhotosSheet(bookingId: booking.id, onlyAfter: true),
     );
+    // Jump straight to Job Details so a Cash-on-Delivery job's "Confirm cash
+    // received" button (which only appears once the after-photo exists) is
+    // visible immediately, instead of leaving the technician on the jobs
+    // list to find and re-open the job themselves.
+    if (context.mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => TechnicianJobDetailScreen(booking: booking)),
+      );
+    }
   }
 }
 
