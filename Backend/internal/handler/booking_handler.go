@@ -220,6 +220,23 @@ func (h *BookingHandler) Accept(c *gin.Context) {
 	utils.Success(c, http.StatusOK, gin.H{"message": "booking accepted"})
 }
 
+// Decline — POST /bookings/:id/decline. Technician turns down a job that was
+// routed specifically to them ("pending_technician") — puts it back into the
+// open pool for another technician to pick up. See BookingService.Reject.
+func (h *BookingHandler) Decline(c *gin.Context) {
+	bookingID := c.Param("id")
+	var body acceptBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.bookingService.Reject(c.Request.Context(), bookingID, body.TechnicianID); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"message": "booking declined"})
+}
+
 type statusBody struct {
 	Status string `json:"status" binding:"required"`
 	Note   string `json:"note"`
