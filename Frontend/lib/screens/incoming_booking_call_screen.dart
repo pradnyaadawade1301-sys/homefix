@@ -24,11 +24,13 @@ import 'video_call_screen.dart';
 class IncomingBookingCallScreen extends StatefulWidget {
   final String bookingId;
   final String? peerDisplayName;
+  final bool isVideo;
 
   const IncomingBookingCallScreen({
     super.key,
     required this.bookingId,
     this.peerDisplayName,
+    this.isVideo = false,
   });
 
   @override
@@ -85,7 +87,7 @@ class _IncomingBookingCallScreenState extends State<IncomingBookingCallScreen> {
           myId: myId,
           peerId: widget.bookingId,
           isCaller: false,
-          audioOnly: true,
+          audioOnly: !widget.isVideo,
           iceServers: callInfo.iceServers,
           peerDisplayName: widget.peerDisplayName,
         ),
@@ -208,7 +210,8 @@ class _IncomingBookingCallScreenState extends State<IncomingBookingCallScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const Text('Incoming audio call', style: TextStyle(color: Colors.white70, fontSize: 15)),
+                      Text(widget.isVideo ? 'Incoming video call' : 'Incoming audio call',
+                          style: const TextStyle(color: Colors.white70, fontSize: 15)),
                       const SizedBox(height: 6),
                       Text(
                         (name != null && name.isNotEmpty) ? name : 'Unknown',

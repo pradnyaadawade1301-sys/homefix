@@ -9,6 +9,7 @@ import (
 	"homefix-backend/internal/repository"
 	"log"
 	"math/big"
+	"strings"
 	"time"
 )
 
@@ -144,10 +145,21 @@ func (s *BookingService) attachUnreadCounts(ctx context.Context, list []models.B
 	counts, err := s.bookingRepo.UnreadMessageCounts(ctx, ids, viewerUserID)
 	if err != nil {
 		log.Printf("UnreadMessageCounts failed: %v", err)
+	} else {
+		for i := range list {
+			list[i].UnreadMessageCount = counts[list[i].ID]
+		}
+	}
+
+	lastMessages, err := s.bookingRepo.LastMessages(ctx, ids)
+	if err != nil {
+		log.Printf("LastMessages failed: %v", err)
 		return
 	}
 	for i := range list {
-		list[i].UnreadMessageCount = counts[list[i].ID]
+		if m, ok := lastMessages[list[i].ID]; ok {
+			list[i].LastMessage = &m
+		}
 	}
 }
 
@@ -392,7 +404,7 @@ func (s *BookingService) AuthorizeCallParticipant(ctx context.Context, userID, b
 // whichever one tapped "Call"; the other side gets the "Incoming call" FCM
 // push and auto-joins the same /ws/call/:id room (see app.dart on the
 // Flutter side).
-func (s *BookingService) InitiateCall(ctx context.Context, callerUserID, bookingID string) (*models.Booking, error) {
+func (s *BookingService) InitiateCall(ctx context.Context, callerUserID, bookingID string, isVideo bool) (*models.Booking, error) {
 	detail, err := s.GetDetail(ctx, bookingID)
 	if err != nil {
 		return nil, err
@@ -447,6 +459,11 @@ func (s *BookingService) InitiateCall(ctx context.Context, callerUserID, booking
 		}
 	}
 
+	callType := "audio"
+	if isVideo {
+		callType = "video"
+	}
+
 	if s.fcm != nil {
 		if isCustomer {
 			// Customer is calling — ring the assigned technician.
@@ -465,7 +482,7 @@ func (s *BookingService) InitiateCall(ctx context.Context, callerUserID, booking
 						"type":          "booking_call_incoming",
 						"booking_id":    bookingID,
 						"customer_name": customerName,
-						"call_type":     "audio",
+						"call_type":     callType,
 					})
 			}
 		} else {
@@ -480,7 +497,7 @@ func (s *BookingService) InitiateCall(ctx context.Context, callerUserID, booking
 					"type":            "booking_call_incoming",
 					"booking_id":      bookingID,
 					"technician_name": technicianName,
-					"call_type":       "audio",
+					"call_type":       callType,
 				})
 		}
 	}
@@ -647,8 +664,12 @@ func (s *BookingService) SendMessage(ctx context.Context, bookingID, userID, use
 			if sender, err := s.userRepo.GetByID(ctx, userID); err == nil && sender != nil {
 				senderName = sender.Name
 			}
+			notifBody := content
+			if strings.HasPrefix(content, "img::") {
+				notifBody = "📷 Photo"
+			}
 			_ = s.fcm.SendToUser(ctx, recipientID, "New message",
-				content, map[string]string{"booking_id": bookingID, "type": "booking_message", "sender_name": senderName})
+				notifBody, map[string]string{"booking_id": bookingID, "type": "booking_message", "sender_name": senderName})
 		}
 	}
 

@@ -212,6 +212,7 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.GET("/ai/sessions/:id/messages", h.AI.History)
 		authed.POST("/ai/transcribe", h.AI.Transcribe)
 		authed.GET("/notifications", h.Notification.List)
+		authed.PATCH("/notifications/read-all", h.Notification.MarkAllRead)
 		authed.PATCH("/notifications/:id/read", h.Notification.MarkRead)
 
 		// ---- New React Admin Panel (JSON API) — separate from the older

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemNavigator;
 import 'package:provider/provider.dart';
@@ -9,6 +10,7 @@ import '../../providers/category_provider.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/booking_provider.dart';
 import '../booking/bookings_screen.dart';
+import '../booking/booking_tracking_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
 import 'categories_screen.dart';
@@ -314,10 +316,20 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
   // similar to how most apps offer suggestions after every keystroke.
   List<String> _suggestions = [];
 
+  // Keeps the "Track Booking" card's mini stepper moving on its own (e.g.
+  // technician taps "On the way" on their end) instead of only updating
+  // after the user manually pulls to refresh — same 5s cadence as
+  // BookingTrackingScreen's own poll.
+  Timer? _bookingsPollTimer;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+    _bookingsPollTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => context.read<BookingProvider>().fetchUserBookings(),
+    );
     _bannerAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2200),
@@ -361,6 +373,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
     context.read<TechnicianProvider>().fetchTechnicians();
     context.read<LocationProvider>().resolveLocation();
     context.read<BookingProvider>().fetchRepeatTechnicians();
+    context.read<BookingProvider>().fetchUserBookings();
   }
 
   void _openTechnicianList({String? categoryId, String? categoryName, String? initialQuery}) {
@@ -388,6 +401,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
 
   @override
   void dispose() {
+    _bookingsPollTimer?.cancel();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _searchFocusNode.dispose();
@@ -416,6 +430,7 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
             KeyedSubtree(key: widget.categoriesKey, child: _buildCategoriesRow()),
             const SizedBox(height: 24),
             _buildRepeatTechniciansSection(),
+            _buildActiveBookingsSection(),
             _sectionTitle(l10n.homeTopPicksForYou, onViewAll: () => _openTechnicianList()),
             const SizedBox(height: 14),
             _buildTechnicianList(),
@@ -510,6 +525,130 @@ class _HomeTabState extends State<_HomeTab> with SingleTickerProviderStateMixin 
         );
       },
     );
+  }
+
+  static const _activeBookingStatuses = ['requested', 'pending_technician', 'accepted', 'on_the_way', 'arrived', 'inspecting', 'in_progress'];
+  // Mirrors BookingTrackingScreen's own _stages — the 7-step flow shown
+  // there (Pending Assignment -> ... -> Service Completed) — so the mini
+  // stepper on this card lines up with what the full tracking screen shows
+  // once tapped, just compressed to fit a small row card.
+  static const _stages = ['requested', 'pending_technician', 'accepted', 'on_the_way', 'arrived', 'in_progress', 'completed'];
+
+  int _stageIndex(String status) {
+    if (status == 'awaiting_estimate_approval' || status == 'inspecting') return _stages.indexOf('in_progress');
+    final i = _stages.indexOf(status);
+    return i < 0 ? 0 : i;
+  }
+
+  /// Small "Track Booking" card between My Technicians and Top Picks — just
+  /// the single most recently updated booking that's neither completed nor
+  /// cancelled yet (not every active booking — one card, not a row of
+  /// them), so the customer sees what's actually in flight right now
+  /// without digging into the Bookings tab. Disappears the moment that
+  /// booking is marked completed (or cancelled), since it then drops out of
+  /// _activeBookingStatuses.
+  Widget _buildActiveBookingsSection() {
+    return Consumer<BookingProvider>(
+      builder: (context, provider, _) {
+        // A booking stuck in 'requested'/'pending_technician' for a long
+        // time (never accepted, never explicitly cancelled) is effectively
+        // abandoned — without this cutoff it would resurface here as a
+        // "new" booking the moment the customer's actual current job
+        // finishes, even though they never booked it.
+        final recentCutoff = DateTime.now().subtract(const Duration(hours: 24));
+        final active = provider.bookings
+            .where((b) => _activeBookingStatuses.contains(b.status) && b.updatedAt.isAfter(recentCutoff))
+            .toList()
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+        if (active.isEmpty) return const SizedBox.shrink();
+        final b = active.first;
+        final techName = b.technician?.name.isNotEmpty == true ? b.technician!.name : 'Technician';
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sectionTitle('Track Booking', onViewAll: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => BookingTrackingScreen(bookingId: b.id)),
+                )),
+            const SizedBox(height: 14),
+            GestureDetector(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => BookingTrackingScreen(bookingId: b.id)),
+              ),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.grey[200]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 14,
+                          backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.12),
+                          child: Text(
+                            techName.isNotEmpty ? techName[0].toUpperCase() : '?',
+                            style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            techName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        Text(
+                          b.categoryName.isNotEmpty ? b.categoryName : 'Service booking',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 11.5, color: Colors.grey[500]),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _MiniStepper(currentIndex: _stageIndex(b.status), stageCount: _stages.length),
+                    const SizedBox(height: 8),
+                    Text(
+                      _activeBookingStatusLabel(b.status),
+                      style: const TextStyle(fontSize: 11.5, color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        );
+      },
+    );
+  }
+
+  String _activeBookingStatusLabel(String status) {
+    switch (status) {
+      case 'requested':
+        return 'Finding technician';
+      case 'pending_technician':
+        return 'Awaiting confirmation';
+      case 'accepted':
+        return 'Technician assigned';
+      case 'on_the_way':
+        return 'On the way';
+      case 'arrived':
+        return 'Technician arrived';
+      case 'inspecting':
+        return 'Inspecting';
+      case 'in_progress':
+        return 'Service in progress';
+      default:
+        return status.replaceAll('_', ' ');
+    }
   }
 
   Widget _buildHeader(BuildContext context) {
@@ -1114,6 +1253,46 @@ class _TechnicianCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Compact horizontal version of BookingTrackingScreen's vertical stepper —
+/// a dot per stage connected by lines, filled up to currentIndex — so the
+/// "Track Booking" card on Home conveys the same multi-step flow at a
+/// glance, without repeating every stage's label (no room for that at this
+/// card size; the full labelled stepper is one tap away).
+class _MiniStepper extends StatelessWidget {
+  final int currentIndex;
+  final int stageCount;
+
+  const _MiniStepper({required this.currentIndex, required this.stageCount});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List.generate(stageCount * 2 - 1, (i) {
+        if (i.isOdd) {
+          // connecting line between dot (i-1)/2 and (i+1)/2
+          final filled = (i ~/ 2) < currentIndex;
+          return Expanded(
+            child: Container(
+              height: 2,
+              color: filled ? AppTheme.primaryColor : Colors.grey[300],
+            ),
+          );
+        }
+        final stage = i ~/ 2;
+        final done = stage <= currentIndex;
+        return Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: done ? AppTheme.primaryColor : Colors.grey[300],
+          ),
+        );
+      }),
     );
   }
 }

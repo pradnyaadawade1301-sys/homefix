@@ -45,6 +45,24 @@ Future<void> startBookingAudioCall(
   BuildContext context, {
   required String bookingId,
   required String peerDisplayName,
+}) =>
+    _startBookingCall(context, bookingId: bookingId, peerDisplayName: peerDisplayName, isVideo: false);
+
+/// Same as [startBookingAudioCall] but with the camera on — the same
+/// peer-to-peer /ws/call/:id relay and signaling handle both; only the
+/// media constraints (see WebRTCService's audioOnly branch) differ.
+Future<void> startBookingVideoCall(
+  BuildContext context, {
+  required String bookingId,
+  required String peerDisplayName,
+}) =>
+    _startBookingCall(context, bookingId: bookingId, peerDisplayName: peerDisplayName, isVideo: true);
+
+Future<void> _startBookingCall(
+  BuildContext context, {
+  required String bookingId,
+  required String peerDisplayName,
+  required bool isVideo,
 }) async {
   final bookingProvider = context.read<BookingProvider>();
   final authProvider = context.read<AuthProvider>();
@@ -59,7 +77,7 @@ Future<void> startBookingAudioCall(
   );
 
   try {
-    final callInfo = await bookingProvider.initiateCall(bookingId);
+    final callInfo = await bookingProvider.initiateCall(bookingId, isVideo: isVideo);
     final token = await authProvider.getValidAccessToken();
     final myId = authProvider.currentUser?.id ?? '';
 
@@ -84,7 +102,7 @@ Future<void> startBookingAudioCall(
         myId: myId,
         peerId: bookingId, // room only ever has 2 sockets — exact id unused by the relay
         isCaller: true,
-        audioOnly: true,
+        audioOnly: !isVideo,
         iceServers: callInfo.iceServers,
         peerDisplayName: peerDisplayName,
       ),

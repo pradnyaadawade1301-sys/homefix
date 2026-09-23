@@ -511,6 +511,34 @@ func (r *BookingRepository) UnreadMessageCounts(ctx context.Context, bookingIDs 
 	return out, rows.Err()
 }
 
+// LastMessages returns, for every booking in bookingIDs that has at least one
+// chat message, the most recent message (either side) on that booking —
+// powers the WhatsApp-style preview line on the chat list. Bookings with no
+// messages yet are simply absent from the map.
+func (r *BookingRepository) LastMessages(ctx context.Context, bookingIDs []string) (map[string]models.BookingMessage, error) {
+	out := map[string]models.BookingMessage{}
+	if len(bookingIDs) == 0 {
+		return out, nil
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT DISTINCT ON (booking_id) id, booking_id, sender_id, sender_role, content, created_at, read_at
+		FROM booking_messages
+		WHERE booking_id = ANY($1)
+		ORDER BY booking_id, created_at DESC`, bookingIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var m models.BookingMessage
+		if err := rows.Scan(&m.ID, &m.BookingID, &m.SenderID, &m.SenderRole, &m.Content, &m.CreatedAt, &m.ReadAt); err != nil {
+			return nil, err
+		}
+		out[m.BookingID] = m
+	}
+	return out, rows.Err()
+}
+
 // --- Detailed listings (joined with customer/technician/address/category) ---
 //
 // detailedSelect is shared by GetDetailByID / ListByCustomerDetailed /

@@ -22,7 +22,8 @@ class BookingProvider extends ChangeNotifier {
   /// Passthrough so the "Call" button (either side — see
   /// booking_call_launcher.dart) can start a booking audio call without
   /// needing BookingService wired up as its own top-level Provider.
-  Future<BookingCallInfo> initiateCall(String bookingId) => _bookingService.initiateCall(bookingId);
+  Future<BookingCallInfo> initiateCall(String bookingId, {bool isVideo = false}) =>
+      _bookingService.initiateCall(bookingId, isVideo: isVideo);
 
   List<Booking> get bookings => _bookings;
   Booking? get selectedBooking => _selectedBooking;

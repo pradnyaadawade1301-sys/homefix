@@ -501,8 +501,9 @@ func (h *BookingHandler) CallInfo(c *gin.Context) {
 func (h *BookingHandler) InitiateCall(c *gin.Context) {
 	userID := c.GetString("user_id")
 	bookingID := c.Param("id")
+	isVideo := c.Query("video") == "true"
 
-	b, err := h.bookingService.InitiateCall(c.Request.Context(), userID, bookingID)
+	b, err := h.bookingService.InitiateCall(c.Request.Context(), userID, bookingID, isVideo)
 	if err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return

@@ -71,6 +71,7 @@ class ApiConfig {
 
   static const String notificationsList = '/notifications';
   static const String notificationsMarkRead = '/notifications'; // + /:id/read
+  static const String notificationsMarkAllRead = '/notifications/read-all';
 
   static const String aiSessions = '/ai/sessions';
   static const String aiTranscribe = '/ai/transcribe';

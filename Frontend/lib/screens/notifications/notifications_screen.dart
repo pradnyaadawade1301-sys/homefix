@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/notification_navigation.dart';
 import '../../services/service_locator.dart';
-import 'notification_detail_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({Key? key}) : super(key: key);
@@ -15,6 +15,7 @@ class NotificationsScreen extends StatefulWidget {
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
   late Future<List> _future;
+  bool _markingAllRead = false;
 
   @override
   void initState() {
@@ -27,6 +28,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       _future = context.read<NotificationService>().getNotifications();
     });
     await _future;
+  }
+
+  Future<void> _markAllRead() async {
+    if (_markingAllRead) return;
+    setState(() => _markingAllRead = true);
+    try {
+      await context.read<NotificationService>().markAllRead();
+      if (!mounted) return;
+      await _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not mark all as read: ${e.toString().replaceFirst('Exception: ', '')}')),
+      );
+    } finally {
+      if (mounted) setState(() => _markingAllRead = false);
+    }
   }
 
   IconData _iconFor(String? type) {
@@ -69,16 +87,35 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
 
     if (!mounted) return;
-    await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => NotificationDetailScreen(title: title, body: body, data: data, createdAt: createdAt),
-    ));
+    await openNotificationTarget(context, title: title, body: body, data: data, createdAt: createdAt);
     if (mounted) _refresh();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Notifications')),
+      appBar: AppBar(
+        title: const Text('Notifications'),
+        actions: [
+          FutureBuilder<List>(
+            future: _future,
+            builder: (context, snapshot) {
+              final hasUnread = (snapshot.data ?? []).any((n) => (n as Map<String, dynamic>)['is_read'] == false);
+              if (!hasUnread) return const SizedBox.shrink();
+              return TextButton(
+                onPressed: _markingAllRead ? null : _markAllRead,
+                child: _markingAllRead
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryColor),
+                      )
+                    : const Text('Mark all read'),
+              );
+            },
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: FutureBuilder<List>(
