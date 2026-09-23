@@ -13,6 +13,7 @@ import '../../services/service_locator.dart' show UploadService;
 import '../booking/bookings_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../technician/technician_jobs_screen.dart';
+import '../technician/technician_kyc_screen.dart';
 import '../technician/manage_categories_screen.dart';
 import '../technician/repeat_customers_screen.dart';
 import '../technician/technician_reviews_screen.dart';
@@ -738,7 +739,7 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                 },
               ),
               extra: Wrap(
-                alignment: WrapAlignment.center,
+                alignment: WrapAlignment.start,
                 spacing: 8,
                 runSpacing: 8,
                 children: [
@@ -805,10 +806,15 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
             const SizedBox(height: 16),
             _SectionCard(
               title: l10n.profileSectionDocuments,
+              accentColor: TechTheme.primary,
+              onViewAll: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const TechnicianKycScreen()),
+              ),
               children: [
                 _VerificationRow(
                   label: l10n.profileGovId,
                   verified: profile.governmentIdUrl.isNotEmpty,
+                  accentColor: TechTheme.primary,
                 ),
               ]
             ),
@@ -966,6 +972,75 @@ class _ProfileHeader extends StatelessWidget {
         ),
       );
 
+  Widget _avatar() {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        GestureDetector(
+          onTap: onEditPhoto,
+          child: Container(
+            width: 78,
+            height: 78,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 10, offset: const Offset(0, 4))],
+            ),
+            padding: const EdgeInsets.all(3),
+            child: ClipOval(
+              child: isUploading
+                  ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.4)))
+                  : (photoUrl != null
+                      ? Image.network(
+                          photoUrl!,
+                          width: 72,
+                          height: 72,
+                          fit: BoxFit.cover,
+                          // A broken/expired URL should never leave the
+                          // avatar visually blank (see the technician
+                          // profile bug where profile_photo_url pointed
+                          // at a dead link) — fall back to the
+                          // name-initial avatar instead.
+                          errorBuilder: (context, error, stack) => _initialAvatar(),
+                          loadingBuilder: (context, child, progress) =>
+                              progress == null ? child : _initialAvatar(),
+                        )
+                      : _initialAvatar()),
+            ),
+          ),
+        ),
+        if (onEditPhoto != null)
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: GestureDetector(
+              onTap: onEditPhoto,
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: _accent,
+                  shape: BoxShape.circle,
+                  border: const Border.fromBorderSide(BorderSide(color: Colors.white, width: 2)),
+                ),
+                child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 12),
+              ),
+            ),
+          )
+        else if (verifiedBadge)
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+              child: Icon(Icons.verified_rounded, color: _accent, size: 17),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -979,93 +1054,42 @@ class _ProfileHeader extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [BoxShadow(color: _accent.withValues(alpha: 0.25), blurRadius: 14, offset: const Offset(0, 6))],
       ),
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Stack(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              GestureDetector(
-                onTap: onEditPhoto,
-                child: Container(
-                  width: 84,
-                  height: 84,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 10, offset: const Offset(0, 4))],
-                  ),
-                  padding: const EdgeInsets.all(3),
-                  child: ClipOval(
-                    child: isUploading
-                        ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.4)))
-                        : (photoUrl != null
-                            ? Image.network(
-                                photoUrl!,
-                                width: 78,
-                                height: 78,
-                                fit: BoxFit.cover,
-                                // A broken/expired URL should never leave the
-                                // avatar visually blank (see the technician
-                                // profile bug where profile_photo_url pointed
-                                // at a dead link) — fall back to the
-                                // name-initial avatar instead.
-                                errorBuilder: (context, error, stack) => _initialAvatar(),
-                                loadingBuilder: (context, child, progress) =>
-                                    progress == null ? child : _initialAvatar(),
-                              )
-                            : _initialAvatar()),
-                  ),
+              _avatar(),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Colors.white)),
+                    const SizedBox(height: 3),
+                    Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        roleLabel,
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              if (onEditPhoto != null)
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: GestureDetector(
-                    onTap: onEditPhoto,
-                    child: Container(
-                      width: 26,
-                      height: 26,
-                      decoration: BoxDecoration(
-                        color: _accent,
-                        shape: BoxShape.circle,
-                        border: const Border.fromBorderSide(BorderSide(color: Colors.white, width: 2)),
-                      ),
-                      child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 13),
-                    ),
-                  ),
-                )
-              else if (verifiedBadge)
-                Positioned(
-                  bottom: 2,
-                  right: 2,
-                  child: Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                    child: Icon(Icons.verified_rounded, color: _accent, size: 18),
-                  ),
-                ),
             ],
           ),
-          const SizedBox(height: 14),
-          Text(name, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Colors.white)),
-          const SizedBox(height: 3),
-          Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              roleLabel,
-              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
-            ),
-          ),
           if (extra != null) ...[
-            const SizedBox(height: 12),
-            extra!,
+            const SizedBox(height: 14),
+            Align(alignment: Alignment.centerLeft, child: extra!),
           ],
         ],
       ),
@@ -1076,11 +1100,17 @@ class _ProfileHeader extends StatelessWidget {
 class _SectionCard extends StatelessWidget {
   final String title;
   final List<Widget> children;
+  // "View All" link next to the section title — used by the technician's
+  // Documents section to jump to the full KYC/documents screen. Null hides
+  // it entirely for every other section.
+  final VoidCallback? onViewAll;
+  final Color accentColor;
 
-  const _SectionCard({required this.title, required this.children});
+  const _SectionCard({required this.title, required this.children, this.onViewAll, this.accentColor = AppTheme.primaryColor});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1091,9 +1121,25 @@ class _SectionCard extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                if (onViewAll != null)
+                  GestureDetector(
+                    onTap: onViewAll,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(l10n.homeViewAllShort, style: TextStyle(color: accentColor, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                        Icon(Icons.chevron_right_rounded, size: 16, color: accentColor),
+                      ],
+                    ),
+                  ),
+              ],
             ),
           ),
           ...children,
@@ -1115,7 +1161,12 @@ class _ActionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: Icon(icon, color: accentColor, size: 22),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(color: accentColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+        child: Icon(icon, color: accentColor, size: 20),
+      ),
       title: Text(label, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
       trailing: const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
       onTap: onTap,
@@ -1153,22 +1204,59 @@ class _InfoRow extends StatelessWidget {
 class _VerificationRow extends StatelessWidget {
   final String label;
   final bool verified;
+  final Color accentColor;
 
-  const _VerificationRow({required this.label, required this.verified});
+  const _VerificationRow({required this.label, required this.verified, this.accentColor = AppTheme.primaryColor});
+
+  Widget _statusPill(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (verified) ...[
+            Icon(Icons.check_circle_rounded, size: 14, color: color),
+            const SizedBox(width: 4),
+          ],
+          Text(text, style: TextStyle(color: color, fontSize: 12.5, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final statusColor = verified ? AppTheme.successColor : Colors.grey;
     return ListTile(
-      leading: Icon(
-        verified ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-        color: verified ? AppTheme.successColor : Colors.grey,
-        size: 22,
+      leading: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: accentColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+            child: Icon(Icons.description_outlined, color: accentColor, size: 20),
+          ),
+          if (verified)
+            Positioned(
+              bottom: -3,
+              left: -3,
+              child: Container(
+                padding: const EdgeInsets.all(1.5),
+                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                child: const Icon(Icons.check_circle_rounded, size: 15, color: AppTheme.successColor),
+              ),
+            ),
+        ],
       ),
       title: Text(label, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
-      trailing: verified
-          ? Text(l10n.profileVerifiedStatus, style: const TextStyle(color: AppTheme.successColor, fontSize: 12.5))
-          : Text(l10n.profilePendingStatus, style: const TextStyle(color: Colors.grey, fontSize: 12.5)),
+      subtitle: Text(
+        verified ? l10n.profileVerifiedStatus : l10n.profilePendingStatus,
+        style: TextStyle(color: statusColor, fontSize: 12.5),
+      ),
+      trailing: _statusPill(verified ? l10n.profileVerifiedStatus : l10n.profilePendingStatus, statusColor),
     );
   }
 }
@@ -1182,10 +1270,13 @@ class _StatChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Solid light fill (not a low-alpha tint of `color`) so the chip stays
+    // legible sitting on the header's own colored gradient, rather than
+    // nearly disappearing into it.
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: Colors.white.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -1193,7 +1284,7 @@ class _StatChip extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(width: 4),
-          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
         ],
       ),
     );
