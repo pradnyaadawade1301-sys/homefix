@@ -197,16 +197,16 @@ class HomeScreenState extends State<HomeScreen> {
           child: InkWell(
             borderRadius: BorderRadius.circular(24),
             onTap: () => Navigator.of(context).pop(),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 18),
-                  const SizedBox(width: 8),
+                  Icon(Icons.arrow_back_rounded, color: Colors.white, size: 18),
+                  SizedBox(width: 8),
                   Text(
                     'Booking as yourself — tap to go back',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12.5),
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12.5),
                   ),
                 ],
               ),

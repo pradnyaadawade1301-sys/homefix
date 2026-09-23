@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
@@ -9,6 +10,7 @@ import '../../models/payment_model.dart';
 import '../../core/booking_call_launcher.dart';
 import '../chat/booking_chat_screen.dart';
 import 'job_brief_card.dart';
+import 'job_photos_sheet.dart';
 import 'technician_jobs_screen.dart' show JobActionRow;
 
 /// Full-detail view of a single job, reached by tapping the customer block on
@@ -270,10 +272,11 @@ class TechnicianJobDetailScreen extends StatelessWidget {
   }
 }
 
-/// Read-only "before/after" proof-photo strip so the technician can see what
-/// they (or an earlier visit) already uploaded for this job — the actual
-/// upload happens via the "Generate Invoice & Complete" dialog (after photo,
-/// required) or JobPhotosSheet (before photo, optional, during the visit).
+/// "Before/after" proof-photo strip — shows what's already been uploaded for
+/// this job, and always offers an "Add Photos" action (opens
+/// [JobPhotosSheet] with both sections) so the technician can add a "Before"
+/// shot any time during the visit, not just the "After" shot prompted right
+/// after completion (see _showInvoiceDialog).
 class _JobPhotosSection extends StatefulWidget {
   final String bookingId;
   const _JobPhotosSection({required this.bookingId});
@@ -291,13 +294,20 @@ class _JobPhotosSectionState extends State<_JobPhotosSection> {
     });
   }
 
+  void _openSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => JobPhotosSheet(bookingId: widget.bookingId),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<BookingProvider>(
       builder: (context, provider, _) {
-        if (provider.beforePhotos.isEmpty && provider.afterPhotos.isEmpty) {
-          return const SizedBox.shrink();
-        }
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -308,7 +318,20 @@ class _JobPhotosSectionState extends State<_JobPhotosSection> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Photos', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Photos', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  TextButton.icon(
+                    onPressed: _openSheet,
+                    icon: const Icon(Icons.add_a_photo_outlined, size: 16),
+                    label: const Text('Add Photos'),
+                    style: TextButton.styleFrom(foregroundColor: TechTheme.primary, padding: EdgeInsets.zero),
+                  ),
+                ],
+              ),
+              if (provider.beforePhotos.isEmpty && provider.afterPhotos.isEmpty)
+                Text('No photos added yet.', style: TextStyle(fontSize: 12.5, color: Colors.grey[600])),
               if (provider.beforePhotos.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 _strip('Before', provider.beforePhotos),
@@ -360,25 +383,51 @@ class _CashReceivedButton extends StatefulWidget {
 }
 
 class _CashReceivedButtonState extends State<_CashReceivedButton> {
-  late Future<Payment?> _future;
+  Payment? _payment;
+  bool _loading = true;
   bool _confirming = false;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
-    _future = context.read<PaymentProvider>().getPendingCodByBooking(widget.bookingId);
+    _load();
+    // The customer may pick "Cash on Delivery" (which creates the pending
+    // cash Payment this button watches for) AFTER the technician already has
+    // this screen open — without polling, the button would never appear
+    // until they manually left and reopened the job.
+    _pollTimer = Timer.periodic(const Duration(seconds: 6), (_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final payment = await context.read<PaymentProvider>().getPendingCodByBooking(widget.bookingId);
+      if (!mounted) return;
+      setState(() {
+        _payment = payment;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   Future<void> _confirm() async {
-    if (_confirming) return;
+    if (_confirming || _payment == null) return;
     setState(() => _confirming = true);
     try {
-      await context.read<PaymentProvider>().confirmCash((await _future)!.id);
+      await context.read<PaymentProvider>().confirmCash(_payment!.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cash payment confirmed — commission debited from your wallet.')),
       );
-      setState(() => _future = Future.value(null));
+      setState(() => _payment = null);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -391,28 +440,21 @@ class _CashReceivedButtonState extends State<_CashReceivedButton> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<Payment?>(
-      future: _future,
-      builder: (context, snapshot) {
-        final payment = snapshot.data;
-        if (snapshot.connectionState != ConnectionState.done || payment == null) {
-          return const SizedBox.shrink();
-        }
-        return Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _confirming ? null : _confirm,
-              icon: _confirming
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.payments_outlined, size: 18),
-              label: Text(_confirming ? 'Confirming…' : 'Confirm ₹${payment.amount.toStringAsFixed(0)} cash received'),
-              style: OutlinedButton.styleFrom(foregroundColor: TechTheme.primary, side: const BorderSide(color: TechTheme.primary)),
-            ),
-          ),
-        );
-      },
+    if (_loading || _payment == null) return const SizedBox.shrink();
+    final payment = _payment!;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: _confirming ? null : _confirm,
+          icon: _confirming
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.payments_outlined, size: 18),
+          label: Text(_confirming ? 'Confirming…' : 'Confirm ₹${payment.amount.toStringAsFixed(0)} cash received'),
+          style: OutlinedButton.styleFrom(foregroundColor: TechTheme.primary, side: const BorderSide(color: TechTheme.primary)),
+        ),
+      ),
     );
   }
 }

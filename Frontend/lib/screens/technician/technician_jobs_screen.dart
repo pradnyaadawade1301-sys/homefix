@@ -607,7 +607,7 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
             Container(
               width: 38,
               height: 38,
-              decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
               child: Icon(icon, color: color, size: 19),
             ),
             const SizedBox(width: 10),
@@ -1352,7 +1352,7 @@ Future<void> _showInvoiceDialog(BuildContext context, BookingProvider provider, 
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => JobPhotosSheet(bookingId: booking.id),
+      builder: (_) => JobPhotosSheet(bookingId: booking.id, onlyAfter: true),
     );
   }
 }

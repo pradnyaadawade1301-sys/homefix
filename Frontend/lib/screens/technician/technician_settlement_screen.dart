@@ -385,20 +385,58 @@ class _VisitTile extends StatelessWidget {
   }
 }
 
-class _PaymentTile extends StatelessWidget {
+class _PaymentTile extends StatefulWidget {
   final Payment payment;
   const _PaymentTile({required this.payment});
 
+  @override
+  State<_PaymentTile> createState() => _PaymentTileState();
+}
+
+class _PaymentTileState extends State<_PaymentTile> {
+  bool _confirming = false;
+  bool _confirmed = false;
+
+  Payment get payment => widget.payment;
+
   Color get _statusColor {
-    if (payment.isPaid) return AppTheme.successColor;
+    if (payment.isPaid || _confirmed) return AppTheme.successColor;
     if (payment.isFailed) return AppTheme.errorColor;
     if (payment.isRefunded) return AppTheme.warningColor;
     return Colors.grey;
   }
 
+  /// The direct "cash liya, ab confirm karo" action, surfaced right on the
+  /// Payment History row — same backend call as the job detail screen's
+  /// _CashReceivedButton (PaymentProvider.confirmCash), just reachable
+  /// without navigating into the job first. Debits the platform commission
+  /// from the technician's wallet the moment it's tapped.
+  Future<void> _confirmCash() async {
+    if (_confirming) return;
+    setState(() => _confirming = true);
+    try {
+      await context.read<PaymentProvider>().confirmCash(payment.id);
+      if (!mounted) return;
+      setState(() => _confirmed = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cash payment confirmed — commission debited from your wallet.')),
+      );
+      // Refresh so the wallet-balance card up top reflects the debit too.
+      context.read<PaymentProvider>().fetchWallet();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => _confirming = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final date = payment.createdAt;
+    final showConfirmButton = payment.isPendingCash && !_confirmed;
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: () => Navigator.of(context).push(
@@ -412,7 +450,10 @@ class _PaymentTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
         children: [
           Container(
             width: 40,
@@ -435,7 +476,7 @@ class _PaymentTile extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(color: _statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-                      child: Text(payment.status, style: TextStyle(fontSize: 10.5, color: _statusColor, fontWeight: FontWeight.w600)),
+                      child: Text(_confirmed ? 'paid' : payment.status, style: TextStyle(fontSize: 10.5, color: _statusColor, fontWeight: FontWeight.w600)),
                     ),
                   ],
                 ),
@@ -453,6 +494,22 @@ class _PaymentTile extends StatelessWidget {
               ],
             ),
           ),
+        ],
+          ),
+          if (showConfirmButton) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _confirming ? null : _confirmCash,
+                icon: _confirming
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.payments_outlined, size: 18),
+                label: Text(_confirming ? 'Confirming…' : 'Confirm cash received'),
+                style: OutlinedButton.styleFrom(foregroundColor: TechTheme.primary, side: const BorderSide(color: TechTheme.primary)),
+              ),
+            ),
+          ],
         ],
       ),
       ),

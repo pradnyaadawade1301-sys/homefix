@@ -410,7 +410,7 @@ class BookingService {
         '${ApiConfig.bookingDetail}/$bookingId/photos',
         data: {
           'photo_type': photoType,
-          'image_url': imageUrl,
+          'photo_url': imageUrl,
           if (caption != null && caption.isNotEmpty) 'caption': caption,
         },
       );

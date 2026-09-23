@@ -491,9 +491,9 @@ class BookingJobPhoto {
     return BookingJobPhoto(
       id: json['id'] as String,
       bookingId: json['booking_id'] as String,
-      technicianId: json['technician_id'] as String,
+      technicianId: (json['technician_id'] as String?) ?? '',
       photoType: (json['photo_type'] as String?) ?? '',
-      imageUrl: (json['image_url'] as String?) ?? '',
+      imageUrl: (json['photo_url'] as String?) ?? '',
       caption: json['caption'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
     );

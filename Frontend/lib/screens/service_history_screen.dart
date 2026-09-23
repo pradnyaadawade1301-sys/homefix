@@ -317,17 +317,17 @@ class _HistoryCard extends StatelessWidget {
                       child: InkWell(
                         borderRadius: BorderRadius.circular(11),
                         onTap: () => _bookAgain(context, tech),
-                        child: Row(
+                        child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.replay_rounded, size: 15, color: Colors.white),
-                            const SizedBox(width: 6),
+                            Icon(Icons.replay_rounded, size: 15, color: Colors.white),
+                            SizedBox(width: 6),
                             Flexible(
                               child: Text(
                                 'Book Again',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
                               ),
                             ),
                           ],

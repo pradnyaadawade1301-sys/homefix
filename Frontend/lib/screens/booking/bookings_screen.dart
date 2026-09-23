@@ -379,7 +379,7 @@ class _BookingCard extends StatelessWidget {
             Row(
               children: [
                 if (isFutureScheduled) ...[
-                  Icon(Icons.event_rounded, size: 13, color: AppTheme.primaryColor),
+                  const Icon(Icons.event_rounded, size: 13, color: AppTheme.primaryColor),
                   const SizedBox(width: 4),
                 ],
                 Text(

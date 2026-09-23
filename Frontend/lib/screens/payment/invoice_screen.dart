@@ -163,11 +163,12 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               pw.Divider(color: PdfColors.grey300),
               pw.SizedBox(height: 12),
 
-              // Service ID + date
+              // Service ID + date + payment method
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   _pdfLabelValue('Service ID', inv.serviceCode),
+                  _pdfLabelValue('Payment Method', inv.payment.method == 'cash' ? 'Cash on Delivery (COD)' : 'Online'),
                   _pdfLabelValue('Date', dateFmt.format(inv.paidAt)),
                 ],
               ),
@@ -353,6 +354,18 @@ class _InvoiceBody extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(dateFmt.format(invoice.paidAt), style: TextStyle(fontSize: 12.5, color: Colors.grey[600])),
                   ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppTheme.successColor.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  invoice.payment.method == 'cash' ? 'COD' : 'Online',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.successColor),
                 ),
               ),
             ],
