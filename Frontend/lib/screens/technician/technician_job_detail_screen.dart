@@ -290,12 +290,28 @@ class _JobPhotosSection extends StatefulWidget {
 }
 
 class _JobPhotosSectionState extends State<_JobPhotosSection> {
+  Timer? _pollTimer;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<BookingProvider>().fetchJobPhotos(widget.bookingId);
     });
+    // The completion-photo upload happens in a bottom sheet stacked on top
+    // of this same screen (see _showInvoiceDialog in technician_jobs_screen
+    // .dart) — a plain one-shot fetch here can race with that upload, so
+    // poll to stay in sync (also what lets the "Confirm cash received"
+    // button above react once the after-photo actually lands).
+    _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      context.read<BookingProvider>().fetchJobPhotos(widget.bookingId);
+    });
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
   }
 
   void _openSheet() {
