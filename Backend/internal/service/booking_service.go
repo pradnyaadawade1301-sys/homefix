@@ -696,6 +696,28 @@ func (s *BookingService) ListMessages(ctx context.Context, bookingID, userID, us
 	return s.bookingRepo.ListMessages(ctx, bookingID)
 }
 
+// ListPreviousMessages returns chat history from this customer+technician
+// pair's earlier bookings together (not this booking's own thread — see
+// ListMessages for that), so a returning customer/technician can see
+// "we've talked before" context. Empty, not an error, when no technician is
+// assigned yet or this is their first booking together.
+func (s *BookingService) ListPreviousMessages(ctx context.Context, bookingID, userID, userRole string) ([]models.BookingMessage, error) {
+	b, err := s.bookingRepo.GetByID(ctx, bookingID)
+	if err != nil {
+		return nil, err
+	}
+	if b == nil {
+		return nil, errors.New("booking not found")
+	}
+	if _, err := s.resolveBookingParticipantRole(ctx, b, userID, userRole); err != nil {
+		return nil, err
+	}
+	if b.TechnicianID == nil {
+		return nil, nil
+	}
+	return s.bookingRepo.ListPreviousMessages(ctx, b.CustomerID, *b.TechnicianID, bookingID)
+}
+
 func (s *BookingService) resolveBookingParticipantRole(ctx context.Context, b *models.Booking, userID, userRole string) (string, error) {
 	if userID == b.CustomerID {
 		return "customer", nil

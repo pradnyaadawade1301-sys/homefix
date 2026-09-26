@@ -134,6 +134,7 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.POST("/bookings/:id/cancel", h.Booking.Cancel)
 		authed.POST("/bookings/:id/messages", h.Booking.SendMessage)
 		authed.GET("/bookings/:id/messages", h.Booking.ListMessages)
+		authed.GET("/bookings/:id/messages/previous", h.Booking.ListPreviousMessages)
 
 		// OTP verification before the technician can start work on-site.
 		// GetOTP is polled by the customer's app to show the on-screen code;
