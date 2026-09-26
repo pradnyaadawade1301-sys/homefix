@@ -167,6 +167,36 @@ func (r *PaymentRepository) ListByTechnician(ctx context.Context, technicianID s
 	return out, rows.Err()
 }
 
+// MethodsByBooking returns, for every booking in bookingIDs that has at
+// least one payment row, the method ("cash" or an online one) of its most
+// recent payment — powers the "Cash or Online" column on the admin panel's
+// Bookings table. A booking with no payment row yet (nobody's tried to pay)
+// is simply absent from the map.
+func (r *PaymentRepository) MethodsByBooking(ctx context.Context, bookingIDs []string) (map[string]string, error) {
+	out := map[string]string{}
+	if len(bookingIDs) == 0 {
+		return out, nil
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT DISTINCT ON (booking_id) booking_id, method
+		FROM payments
+		WHERE booking_id = ANY($1) AND method IS NOT NULL
+		ORDER BY booking_id, created_at DESC`, bookingIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var bookingID string
+		var method string
+		if err := rows.Scan(&bookingID, &method); err != nil {
+			return nil, err
+		}
+		out[bookingID] = method
+	}
+	return out, rows.Err()
+}
+
 // ListAll powers the admin panel's Payment Monitoring screen. status == "" lists
 // every payment regardless of status.
 func (r *PaymentRepository) ListAll(ctx context.Context, status string) ([]models.Payment, error) {
