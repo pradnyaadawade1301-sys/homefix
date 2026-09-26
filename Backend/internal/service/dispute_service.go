@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 
 	"context"
 
@@ -11,6 +12,7 @@ import (
 
 type DisputeService struct {
 	disputeRepo     *repository.DisputeRepository
+	disputeMsgRepo  *repository.DisputeMessageRepository
 	bookingRepo     *repository.BookingRepository
 	consultRepo     *repository.ConsultationRepository
 	techRepo        *repository.TechnicianRepository
@@ -18,8 +20,8 @@ type DisputeService struct {
 	paymentRepo     *repository.PaymentRepository
 }
 
-func NewDisputeService(disputeRepo *repository.DisputeRepository, bookingRepo *repository.BookingRepository, consultRepo *repository.ConsultationRepository, techRepo *repository.TechnicianRepository, razorpayService *RazorpayService, paymentRepo *repository.PaymentRepository) *DisputeService {
-	return &DisputeService{disputeRepo: disputeRepo, bookingRepo: bookingRepo, consultRepo: consultRepo, techRepo: techRepo, razorpayService: razorpayService, paymentRepo: paymentRepo}
+func NewDisputeService(disputeRepo *repository.DisputeRepository, disputeMsgRepo *repository.DisputeMessageRepository, bookingRepo *repository.BookingRepository, consultRepo *repository.ConsultationRepository, techRepo *repository.TechnicianRepository, razorpayService *RazorpayService, paymentRepo *repository.PaymentRepository) *DisputeService {
+	return &DisputeService{disputeRepo: disputeRepo, disputeMsgRepo: disputeMsgRepo, bookingRepo: bookingRepo, consultRepo: consultRepo, techRepo: techRepo, razorpayService: razorpayService, paymentRepo: paymentRepo}
 }
 
 // isPartyTo reports whether userID (a raw JWT user ID — could be a customer
@@ -225,4 +227,92 @@ func (s *DisputeService) Resolve(ctx context.Context, id, status, adminNotes, re
 
 func (s *DisputeService) CountOpen(ctx context.Context) (int, error) {
 	return s.disputeRepo.CountOpen(ctx)
+}
+
+// SendMessage — the customer or technician who is a party to this dispute
+// sends a chat message, optionally with a photo/video attachment (already
+// uploaded via POST /uploads; attachmentURL is that returned URL). Reuses
+// isPartyTo so a stranger can't post into someone else's complaint thread
+// just by guessing the dispute ID.
+func (s *DisputeService) SendMessage(ctx context.Context, disputeID, senderUserID, message, attachmentURL, attachmentType string) (*models.DisputeMessage, error) {
+	if strings.TrimSpace(message) == "" && attachmentURL == "" {
+		return nil, errors.New("message or attachment is required")
+	}
+	if attachmentURL != "" && attachmentType != "image" && attachmentType != "video" {
+		return nil, errors.New("attachment_type must be \"image\" or \"video\"")
+	}
+
+	d, err := s.disputeRepo.GetByID(ctx, disputeID)
+	if err != nil {
+		return nil, err
+	}
+	if d == nil {
+		return nil, errors.New("dispute not found")
+	}
+	ok, err := s.isPartyTo(ctx, d.BookingID, d.ConsultationID, senderUserID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, errors.New("this dispute does not belong to you")
+	}
+	sid := senderUserID
+	m := &models.DisputeMessage{
+		DisputeID:  disputeID,
+		SenderID:   &sid,
+		SenderRole: "user",
+		Message:    message,
+	}
+	if attachmentURL != "" {
+		m.AttachmentURL = &attachmentURL
+		m.AttachmentType = &attachmentType
+	}
+	return s.disputeMsgRepo.Create(ctx, m)
+}
+
+// ListMessages — same ownership check as SendMessage, so a user can only
+// read the thread on disputes that are actually theirs.
+func (s *DisputeService) ListMessages(ctx context.Context, disputeID, requestingUserID string) ([]models.DisputeMessage, error) {
+	d, err := s.disputeRepo.GetByID(ctx, disputeID)
+	if err != nil {
+		return nil, err
+	}
+	if d == nil {
+		return nil, errors.New("dispute not found")
+	}
+	ok, err := s.isPartyTo(ctx, d.BookingID, d.ConsultationID, requestingUserID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, errors.New("this dispute does not belong to you")
+	}
+	return s.disputeMsgRepo.ListByDispute(ctx, disputeID)
+}
+
+// AdminListMessages / AdminReply — no "must be a party to it" check, mirroring
+// GetForAdmin: the whole point is that support can open and reply to any
+// dispute's thread from the hidden /admin panel.
+func (s *DisputeService) AdminListMessages(ctx context.Context, disputeID string) ([]models.DisputeMessage, error) {
+	return s.disputeMsgRepo.ListByDispute(ctx, disputeID)
+}
+
+func (s *DisputeService) AdminReply(ctx context.Context, disputeID, message, attachmentURL, attachmentType string) (*models.DisputeMessage, error) {
+	if strings.TrimSpace(message) == "" && attachmentURL == "" {
+		return nil, errors.New("message or attachment is required")
+	}
+	if attachmentURL != "" && attachmentType != "image" && attachmentType != "video" {
+		return nil, errors.New("attachment_type must be \"image\" or \"video\"")
+	}
+	m := &models.DisputeMessage{
+		DisputeID:  disputeID,
+		SenderID:   nil,
+		SenderRole: "admin",
+		Message:    message,
+	}
+	if attachmentURL != "" {
+		m.AttachmentURL = &attachmentURL
+		m.AttachmentType = &attachmentType
+	}
+	return s.disputeMsgRepo.Create(ctx, m)
 }

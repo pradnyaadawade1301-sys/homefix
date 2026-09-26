@@ -211,6 +211,8 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.GET("/disputes/me", h.Dispute.ListMine)
 		authed.GET("/disputes/:id", h.Dispute.Get)
 		authed.POST("/disputes/:id/evidence", h.Dispute.AddEvidence)
+		authed.POST("/disputes/:id/messages", h.Dispute.SendMessage)
+		authed.GET("/disputes/:id/messages", h.Dispute.ListMessages)
 
 		authed.POST("/ai/sessions", h.AI.StartSession)
 		authed.POST("/ai/sessions/:id/messages", h.AI.SendMessage)
@@ -238,6 +240,8 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 			adminAPI.GET("/disputes/:id/evidence", h.AdminAPI.DisputeDetail)
 			adminAPI.PATCH("/disputes/:id/review", h.AdminAPI.ReviewDispute)
 			adminAPI.PATCH("/disputes/:id/resolve", h.AdminAPI.ResolveDispute)
+			adminAPI.GET("/disputes/:id/messages", h.AdminAPI.DisputeMessages)
+			adminAPI.POST("/disputes/:id/messages", h.AdminAPI.ReplyToDispute)
 		}
 
 		// ---- New React Finance Panel (JSON API) ----

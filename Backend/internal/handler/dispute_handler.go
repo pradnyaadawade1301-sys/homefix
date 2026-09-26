@@ -93,3 +93,43 @@ func (h *DisputeHandler) ListMine(c *gin.Context) {
 	}
 	utils.Success(c, http.StatusOK, list)
 }
+
+// Message is intentionally not "required" here — a message can be just a
+// photo/video with no caption. DisputeService.SendMessage is what actually
+// rejects a truly empty (no text, no attachment) message.
+type sendDisputeMessageBody struct {
+	Message        string `json:"message"`
+	AttachmentURL  string `json:"attachment_url"`
+	AttachmentType string `json:"attachment_type"` // "image" | "video"
+}
+
+// SendMessage — POST /disputes/:id/messages (customer/technician side).
+// To attach a photo/video: upload it first via POST /uploads (multipart,
+// returns {"url": ...}), then pass that URL here as attachment_url along
+// with attachment_type "image" or "video".
+func (h *DisputeHandler) SendMessage(c *gin.Context) {
+	userID := c.GetString("user_id")
+	var body sendDisputeMessageBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	m, err := h.svc.SendMessage(c.Request.Context(), c.Param("id"), userID, body.Message, body.AttachmentURL, body.AttachmentType)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusCreated, m)
+}
+
+// ListMessages — GET /disputes/:id/messages (customer/technician side).
+// Frontend polls this every few seconds while the chat screen is open.
+func (h *DisputeHandler) ListMessages(c *gin.Context) {
+	userID := c.GetString("user_id")
+	list, err := h.svc.ListMessages(c.Request.Context(), c.Param("id"), userID)
+	if err != nil {
+		utils.Error(c, http.StatusForbidden, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, list)
+}

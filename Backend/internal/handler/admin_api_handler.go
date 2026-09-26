@@ -256,6 +256,41 @@ func (h *AdminAPIHandler) DisputeDetail(c *gin.Context) {
 	utils.Success(c, http.StatusOK, gin.H{"dispute": d, "evidence": evidence})
 }
 
+// DisputeMessages — GET /admin/disputes/:id/messages
+// The live-chat thread for this complaint, so the React panel can show it
+// alongside the reason/evidence when an admin opens a dispute.
+func (h *AdminAPIHandler) DisputeMessages(c *gin.Context) {
+	messages, err := h.disputeService.AdminListMessages(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, messages)
+}
+
+// ReplyToDispute — POST /admin/disputes/:id/messages
+// Support sends a chat reply; the customer's app sees it next time it polls
+// GET /disputes/:id/messages.
+type replyDisputeBody struct {
+	Message        string `json:"message"`
+	AttachmentURL  string `json:"attachment_url"`
+	AttachmentType string `json:"attachment_type"` // "image" | "video"
+}
+
+func (h *AdminAPIHandler) ReplyToDispute(c *gin.Context) {
+	var body replyDisputeBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	m, err := h.disputeService.AdminReply(c.Request.Context(), c.Param("id"), body.Message, body.AttachmentURL, body.AttachmentType)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusCreated, m)
+}
+
 // TechnicianWallet — GET /admin/technicians/:id/wallet
 // Lets an admin check a technician's balance (and how it got there) before
 // deciding whether/how much to top up — e.g. when support gets a "COD keeps

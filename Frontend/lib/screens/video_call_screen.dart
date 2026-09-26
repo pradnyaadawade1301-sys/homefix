@@ -70,6 +70,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   bool _initDone = false;
   bool _micOn = true;
   bool _cameraOn = true;
+  bool _speakerOn = false;
   bool _ringing = false;
   DateTime? _connectedAt;
 
@@ -191,6 +192,16 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   Future<void> _switchCamera() async {
     await _webrtc.switchCamera();
+  }
+
+  Future<void> _toggleSpeaker() async {
+    final next = !_speakerOn;
+    try {
+      await Helper.setSpeakerphoneOn(next);
+      setState(() => _speakerOn = next);
+    } catch (_) {
+      // Non-fatal — some platforms/devices may not support switching.
+    }
   }
 
   bool _ended = false;
@@ -413,6 +424,12 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                   icon: _micOn ? Icons.mic : Icons.mic_off,
                   onPressed: _toggleMic,
                   active: _micOn,
+                ),
+                const SizedBox(width: 24),
+                _controlButton(
+                  icon: _speakerOn ? Icons.volume_up : Icons.volume_up_outlined,
+                  onPressed: _toggleSpeaker,
+                  active: _speakerOn,
                 ),
                 const SizedBox(width: 24),
                 FloatingActionButton(

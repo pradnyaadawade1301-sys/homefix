@@ -84,6 +84,53 @@ class DisputeEvidence {
   }
 }
 
+/// One message in the live-chat thread attached to a dispute — the
+/// customer/technician talking directly to HomeFix support, separate from
+/// the one-shot reason + evidence. senderRole is "user" (customer/tech) or
+/// "admin" (support); attachmentUrl/attachmentType are set when the message
+/// is (or includes) a photo or video instead of just text.
+class DisputeMessage {
+  final String id;
+  final String disputeId;
+  final String? senderId;
+  final String senderRole; // user | admin
+  final String message;
+  final String? attachmentUrl;
+  final String? attachmentType; // image | video
+  final DateTime createdAt;
+  final String? senderName;
+
+  DisputeMessage({
+    required this.id,
+    required this.disputeId,
+    this.senderId,
+    required this.senderRole,
+    required this.message,
+    this.attachmentUrl,
+    this.attachmentType,
+    required this.createdAt,
+    this.senderName,
+  });
+
+  bool get isFromSupport => senderRole == 'admin';
+  bool get hasImage => attachmentType == 'image' && attachmentUrl != null;
+  bool get hasVideo => attachmentType == 'video' && attachmentUrl != null;
+
+  factory DisputeMessage.fromJson(Map<String, dynamic> json) {
+    return DisputeMessage(
+      id: json['id'] as String? ?? '',
+      disputeId: json['dispute_id'] as String? ?? '',
+      senderId: json['sender_id'] as String?,
+      senderRole: json['sender_role'] as String? ?? 'user',
+      message: json['message'] as String? ?? '',
+      attachmentUrl: json['attachment_url'] as String?,
+      attachmentType: json['attachment_type'] as String?,
+      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ?? DateTime.now(),
+      senderName: json['sender_name'] as String?,
+    );
+  }
+}
+
 /// GET /disputes/:id returns {"dispute": ..., "evidence": [...]}.
 class DisputeDetail {
   final Dispute dispute;

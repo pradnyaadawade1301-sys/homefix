@@ -52,15 +52,40 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
   // can start a call); fetched separately since this screen is only ever
   // given a bookingId + peerName by its callers, not the full Booking.
   bool _callable = false;
+  // Messages from this same customer+technician pair's *other* bookings —
+  // chat is normally booking-scoped, so this is what lets a returning
+  // customer/technician see they've talked before. Shown collapsed by
+  // default above the current booking's thread; empty when this is their
+  // first booking together.
+  List<BookingMessage> _previousMessages = [];
+  bool _isLoadingPrevious = true;
+  bool _previousExpanded = false;
 
   @override
   void initState() {
     super.initState();
     _load();
     _loadCallability();
+    _loadPreviousMessages();
     // Simple polling so new messages from the other side show up without a
     // websocket layer — cheap for a booking-scoped 1:1 thread like this.
     _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _load(silent: true));
+  }
+
+  Future<void> _loadPreviousMessages() async {
+    try {
+      final messages = await context.read<BookingService>().getPreviousMessages(widget.bookingId);
+      if (!mounted) return;
+      setState(() {
+        _previousMessages = messages;
+        _isLoadingPrevious = false;
+      });
+    } catch (_) {
+      // Best-effort — the current booking's thread still loads fine without
+      // this; just skip showing the "previous conversation" section.
+      if (!mounted) return;
+      setState(() => _isLoadingPrevious = false);
+    }
   }
 
   @override
@@ -198,6 +223,16 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
     }
   }
 
+  // Shown when the customer taps the audio/video call icon before a
+  // technician is assigned to this booking (or the booking is no longer
+  // in a callable state) — previously the buttons just looked disabled
+  // with no explanation.
+  void _showNotAvailable() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Technician is not available right now. Please try again later.')),
+    );
+  }
+
   void _openImage(String url) {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => Scaffold(
@@ -219,16 +254,16 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
           IconButton(
             icon: const Icon(Icons.call_outlined),
             tooltip: 'Audio call',
-            onPressed: _callable
-                ? () => startBookingAudioCall(context, bookingId: widget.bookingId, peerDisplayName: widget.peerName)
-                : null,
+            onPressed: () => _callable
+                ? startBookingAudioCall(context, bookingId: widget.bookingId, peerDisplayName: widget.peerName)
+                : _showNotAvailable(),
           ),
           IconButton(
             icon: const Icon(Icons.videocam_outlined),
             tooltip: 'Video call',
-            onPressed: _callable
-                ? () => startBookingVideoCall(context, bookingId: widget.bookingId, peerDisplayName: widget.peerName)
-                : null,
+            onPressed: () => _callable
+                ? startBookingVideoCall(context, bookingId: widget.bookingId, peerDisplayName: widget.peerName)
+                : _showNotAvailable(),
           ),
         ],
       ),
@@ -258,7 +293,8 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
         ),
       );
     }
-    if (_messages.isEmpty) {
+    final showPrevious = !_isLoadingPrevious && _previousMessages.isNotEmpty;
+    if (_messages.isEmpty && !showPrevious) {
       return Center(
         child: Text(
           l10n.chatEmptyState,
@@ -266,79 +302,149 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
         ),
       );
     }
+    if (_messages.isEmpty) {
+      // No messages on this booking yet, but they've chatted on an earlier
+      // one together — lead with that instead of the empty state.
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _previousConversationSection(myId),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 24),
+              child: Text(l10n.chatEmptyState, style: TextStyle(color: Colors.grey[500])),
+            ),
+          ),
+        ],
+      );
+    }
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(16),
-      itemCount: _messages.length,
+      itemCount: (showPrevious ? 1 : 0) + _messages.length,
       itemBuilder: (context, i) {
-        final msg = _messages[i];
-        final isMine = msg.senderId == myId;
-        final isImage = msg.content.startsWith(_imageMessagePrefix);
-        final imageUrl = isImage ? msg.content.substring(_imageMessagePrefix.length) : null;
-        return Align(
-          alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: isImage
-                ? const EdgeInsets.all(6)
-                : const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
-            decoration: BoxDecoration(
-              color: isMine
-                  ? (context.watch<AuthProvider>().currentUser?.isTechnician == true ? TechTheme.primary : AppTheme.primaryColor)
-                  : Colors.grey[200],
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(14),
-                topRight: const Radius.circular(14),
-                bottomLeft: Radius.circular(isMine ? 14 : 2),
-                bottomRight: Radius.circular(isMine ? 2 : 14),
+        if (showPrevious) {
+          if (i == 0) return _previousConversationSection(myId);
+          i -= 1;
+        }
+        return _messageBubble(_messages[i], myId);
+      },
+    );
+  }
+
+  // Collapsible header + (when expanded) the messages themselves from this
+  // pair's earlier bookings, rendered above the current booking's thread.
+  Widget _previousConversationSection(String? myId) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => setState(() => _previousExpanded = !_previousExpanded),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(Icons.history, size: 18, color: Colors.grey[700]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Previous conversation (${_previousMessages.length})',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey[800]),
+                    ),
+                  ),
+                  Icon(
+                    _previousExpanded ? Icons.expand_less : Icons.expand_more,
+                    color: Colors.grey[700],
+                  ),
+                ],
               ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (isImage)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: GestureDetector(
-                      onTap: () => _openImage(imageUrl),
-                      child: SizedBox(
-                        width: 200,
-                        height: 200,
-                        child: Image.network(
-                          imageUrl!,
-                          fit: BoxFit.cover,
-                          loadingBuilder: (context, child, progress) {
-                            if (progress == null) return child;
-                            return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-                          },
-                          errorBuilder: (_, __, ___) => Container(
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
-                          ),
-                        ),
+          ),
+          if (_previousExpanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: Column(
+                children: _previousMessages.map((m) => _messageBubble(m, myId)).toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _messageBubble(BookingMessage msg, String? myId) {
+    final isMine = msg.senderId == myId;
+    final isImage = msg.content.startsWith(_imageMessagePrefix);
+    final imageUrl = isImage ? msg.content.substring(_imageMessagePrefix.length) : null;
+    return Align(
+      alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: isImage
+            ? const EdgeInsets.all(6)
+            : const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+        decoration: BoxDecoration(
+          color: isMine
+              ? (context.watch<AuthProvider>().currentUser?.isTechnician == true ? TechTheme.primary : AppTheme.primaryColor)
+              : Colors.grey[200],
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(14),
+            topRight: const Radius.circular(14),
+            bottomLeft: Radius.circular(isMine ? 14 : 2),
+            bottomRight: Radius.circular(isMine ? 2 : 14),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isImage)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: GestureDetector(
+                  onTap: () => _openImage(imageUrl),
+                  child: SizedBox(
+                    width: 200,
+                    height: 200,
+                    child: Image.network(
+                      imageUrl!,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                      },
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
                       ),
                     ),
-                  )
-                else
-                  Text(
-                    msg.content,
-                    style: TextStyle(color: isMine ? Colors.white : Colors.black87, fontSize: 14),
-                  ),
-                const SizedBox(height: 4),
-                Text(
-                  _formatTime(msg.createdAt),
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    color: isMine ? Colors.white70 : Colors.grey[600],
                   ),
                 ),
-              ],
+              )
+            else
+              Text(
+                msg.content,
+                style: TextStyle(color: isMine ? Colors.white : Colors.black87, fontSize: 14),
+              ),
+            const SizedBox(height: 4),
+            Text(
+              _formatTime(msg.createdAt),
+              style: TextStyle(
+                fontSize: 10.5,
+                color: isMine ? Colors.white70 : Colors.grey[600],
+              ),
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 
