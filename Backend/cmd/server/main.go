@@ -245,5 +245,49 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 		log.Printf("startup migration: failed to ensure technician_categories table exists: %v", err)
 	}
 
+	// 035_dispute_messages — same "Render never applies migrations/ files"
+	// issue as above. Live-chat thread attached to a dispute (complaint),
+	// so the customer/technician and admin/support can go back and forth
+	// instead of only a one-shot reason + resolution. Safe no-op once it
+	// exists.
+	if _, err := pool.Exec(ctx,
+		`CREATE TABLE IF NOT EXISTS dispute_messages (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			dispute_id UUID NOT NULL REFERENCES disputes(id) ON DELETE CASCADE,
+			sender_id UUID NULL REFERENCES users(id) ON DELETE SET NULL,
+			sender_role VARCHAR(16) NOT NULL CHECK (sender_role IN ('user', 'admin')),
+			message TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		 );
+		 CREATE INDEX IF NOT EXISTS idx_dispute_messages_dispute_id ON dispute_messages(dispute_id, created_at);`); err != nil {
+		log.Printf("startup migration: failed to ensure dispute_messages table exists: %v", err)
+	}
+
+	// 036_dispute_message_attachments — same "Render never applies
+	// migrations/ files" issue as above. Lets a dispute chat message carry
+	// a photo/video attachment instead of (or alongside) text, and relaxes
+	// message to nullable so an attachment-only message doesn't need a
+	// caption. Safe no-op once the columns/constraints already exist.
+	if _, err := pool.Exec(ctx,
+		`ALTER TABLE dispute_messages ADD COLUMN IF NOT EXISTS attachment_url TEXT NULL;
+		 ALTER TABLE dispute_messages ADD COLUMN IF NOT EXISTS attachment_type VARCHAR(16) NULL;
+		 ALTER TABLE dispute_messages ALTER COLUMN message DROP NOT NULL;
+		 ALTER TABLE dispute_messages ALTER COLUMN message SET DEFAULT '';`); err != nil {
+		log.Printf("startup migration: failed to ensure dispute_messages attachment columns exist: %v", err)
+	}
+	if _, err := pool.Exec(ctx,
+		`ALTER TABLE dispute_messages ADD CONSTRAINT dispute_messages_attachment_type_check
+			CHECK (attachment_type IN ('image', 'video'));`); err != nil {
+		// Postgres has no "ADD CONSTRAINT IF NOT EXISTS" — this fails (harmlessly,
+		// already logged not fatal) with a "constraint already exists" error on
+		// every boot after the first, which is expected and fine to ignore.
+		log.Printf("startup migration: dispute_messages_attachment_type_check: %v", err)
+	}
+	if _, err := pool.Exec(ctx,
+		`ALTER TABLE dispute_messages ADD CONSTRAINT dispute_messages_has_content
+			CHECK ((message IS NOT NULL AND length(trim(message)) > 0) OR attachment_url IS NOT NULL);`); err != nil {
+		log.Printf("startup migration: dispute_messages_has_content: %v", err)
+	}
+
 	log.Println("startup migrations: done")
 }
