@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"context"
@@ -53,14 +53,16 @@ func main() {
 	callLogRepo := repository.NewCallLogRepository(pool)
 	paymentRepo := repository.NewPaymentRepository(pool)
 	walletRepo := repository.NewWalletRepository(pool)
+
 	dueRepo := repository.NewDueRepository(pool)
 	cashOtpRepo := repository.NewCashOtpRepository(pool)
+
 	reviewRepo := repository.NewReviewRepository(pool)
 	aiRepo := repository.NewAIRepository(pool)
 	notifRepo := repository.NewNotificationRepository(pool)
 	disputeRepo := repository.NewDisputeRepository(pool)
 	disputeMsgRepo := repository.NewDisputeMessageRepository(pool)
-	supportMsgRepo := repository.NewSupportMessageRepository(pool)
+	supportRepo := repository.NewSupportMessageRepository(pool)
 	inventoryRepo := repository.NewInventoryRepository(pool)
 	cmsRepo := repository.NewCmsRepository(pool)
 	auditRepo := repository.NewAuditRepository(pool)
@@ -106,8 +108,7 @@ func main() {
 	walletService := service.NewWalletService(walletRepo)
 	reviewService := service.NewReviewService(reviewRepo, bookingRepo)
 	disputeService := service.NewDisputeService(disputeRepo, disputeMsgRepo, bookingRepo, consultRepo, techRepo, razorpayService, paymentRepo)
-	supportService := service.NewSupportService(supportMsgRepo)
-	supportService.SetAI(groqService) // AI-written replies for questions the FAQ rules don't cover
+	supportService := service.NewSupportService(supportRepo)
 	inventoryService := service.NewInventoryService(inventoryRepo)
 	cmsService := service.NewCmsService(cmsRepo)
 	analyticsService := service.NewAnalyticsService(analyticsRepo)
@@ -134,7 +135,6 @@ func main() {
 		Consultation: handler.NewConsultationHandler(consultService, cfg.StunURLs, cfg.TurnURL, cfg.TurnSecret, cfg.TurnTTLSecond),
 		WebRTC:       handler.NewWebRTCHandler(cfg.StunURLs, cfg.TurnURL, cfg.TurnSecret, cfg.TurnTTLSecond),
 		Dispute:      handler.NewDisputeHandler(disputeService),
-		Due:          handler.NewDueHandler(dueService),
 		Support:      handler.NewSupportHandler(supportService),
 		Cms:          handler.NewCmsHandler(cmsService),
 		Finance:      financeHandler,
@@ -180,6 +180,25 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 		 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS otp_verified_at TIMESTAMP NULL;
 		 ALTER TABLE consultations ADD COLUMN IF NOT EXISTS decline_reason TEXT;`); err != nil {
 		log.Printf("startup migration: failed to ensure otp columns exist: %v", err)
+	}
+
+	// 012_email_verification / 011_user_photo / 018_google_auth — same "Render
+	// never applies migrations/ files" issue as above. Without these, any query
+	// that selects users (login, Google sign-in) fails with:
+	//   column "email_otp_code" does not exist (SQLSTATE 42703)
+	// Safe no-op once the columns exist.
+	if _, err := pool.Exec(ctx,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_otp_code VARCHAR(10);
+		 ALTER TABLE users ADD COLUMN IF NOT EXISTS email_otp_expires_at TIMESTAMPTZ NULL;
+		 ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT false;
+		 ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN NOT NULL DEFAULT false;
+		 ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT NULL;
+		 ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255) NULL;
+		 ALTER TABLE users ADD COLUMN IF NOT EXISTS fcm_token TEXT NULL;
+		 ALTER TABLE users ALTER COLUMN phone DROP NOT NULL;
+		 ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+		 CREATE UNIQUE INDEX IF NOT EXISTS users_google_id_key ON users (google_id) WHERE google_id IS NOT NULL;`); err != nil {
+		log.Printf("startup migration: failed to ensure users auth columns exist: %v", err)
 	}
 
 	// 030_seed_more_categories_2 — only ever ran via `make migrate` against
