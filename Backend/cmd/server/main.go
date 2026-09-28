@@ -53,6 +53,7 @@ func main() {
 	callLogRepo := repository.NewCallLogRepository(pool)
 	paymentRepo := repository.NewPaymentRepository(pool)
 	walletRepo := repository.NewWalletRepository(pool)
+	dueRepo := repository.NewDueRepository(pool)
 	reviewRepo := repository.NewReviewRepository(pool)
 	aiRepo := repository.NewAIRepository(pool)
 	notifRepo := repository.NewNotificationRepository(pool)
@@ -90,6 +91,10 @@ func main() {
 		paymentRepo, bookingRepo, techRepo, walletRepo, fcmService,
 	)
 
+	// COD commission dues ledger — replaces the wallet-balance gate for cash jobs.
+	dueService := service.NewDueService(dueRepo, cfg.RazorpayKeyID, cfg.RazorpayKeySecret, cfg.CodDueLimit, cfg.CodDueMaxDays)
+	razorpayService.SetDueService(dueService)
+
 	// ---- Domain services ----
 	authService := service.NewAuthService(userRepo, mailService, cfg.JWTAccessSecret, cfg.JWTRefreshSecret, cfg.JWTAccessTTLMin, cfg.JWTRefreshTTLHrs, cfg.GoogleClientID)
 	userService := service.NewUserService(userRepo)
@@ -126,6 +131,7 @@ func main() {
 		Consultation: handler.NewConsultationHandler(consultService, cfg.StunURLs, cfg.TurnURL, cfg.TurnSecret, cfg.TurnTTLSecond),
 		WebRTC:       handler.NewWebRTCHandler(cfg.StunURLs, cfg.TurnURL, cfg.TurnSecret, cfg.TurnTTLSecond),
 		Dispute:      handler.NewDisputeHandler(disputeService),
+		Due:          handler.NewDueHandler(dueService),
 		Support:      handler.NewSupportHandler(supportService),
 		Cms:          handler.NewCmsHandler(cmsService),
 		Finance:      financeHandler,
@@ -316,6 +322,34 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 		// No "ADD CONSTRAINT IF NOT EXISTS" in Postgres — harmless
 		// "already exists" error on every boot after the first.
 		log.Printf("startup migration: support_messages_has_content: %v", err)
+	}
+
+	// 038_technician_dues — same "Render never applies migrations/ files"
+	// issue as above. COD commission dues ledger + Razorpay settlements.
+	if _, err := pool.Exec(ctx,
+		`CREATE TABLE IF NOT EXISTS technician_dues (
+			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+			technician_user_id UUID NOT NULL REFERENCES users(id),
+			payment_id UUID NOT NULL UNIQUE REFERENCES payments(id),
+			booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
+			amount NUMERIC(12,2) NOT NULL,
+			status VARCHAR(10) NOT NULL DEFAULT 'pending',
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			paid_at TIMESTAMPTZ
+		);
+		CREATE INDEX IF NOT EXISTS idx_technician_dues_user_status ON technician_dues(technician_user_id, status);
+		CREATE TABLE IF NOT EXISTS due_settlements (
+			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+			technician_user_id UUID NOT NULL REFERENCES users(id),
+			amount NUMERIC(12,2) NOT NULL,
+			due_ids UUID[] NOT NULL,
+			razorpay_order_id TEXT NOT NULL UNIQUE,
+			razorpay_payment_id TEXT,
+			status VARCHAR(10) NOT NULL DEFAULT 'created',
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			paid_at TIMESTAMPTZ
+		);`); err != nil {
+		log.Printf("startup migration: failed to ensure technician_dues tables exist: %v", err)
 	}
 
 	log.Println("startup migrations: done")

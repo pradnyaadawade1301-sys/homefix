@@ -74,6 +74,13 @@ type Config struct {
 	// REPEAT_CUSTOMER_DISCOUNT_PERCENT env var. Set to 0 to disable.
 	RepeatCustomerDiscountPercent float64
 
+	// CodDueLimit is the max unpaid platform-commission dues (₹) a technician can
+	// carry before new cash-on-delivery jobs are blocked. Default 500; COD_DUE_LIMIT.
+	CodDueLimit float64
+	// CodDueMaxDays blocks COD once the oldest unpaid due is older than this many
+	// days. Default 3; COD_DUE_MAX_DAYS. 0 disables the age check.
+	CodDueMaxDays int
+
 	// PlatformFeeAmount is a flat convenience fee added as its own line item to
 	// every final service invoice (a warranty-claim booking is exempt). Part of
 	// the GST-taxable subtotal. Default ₹50; override via PLATFORM_FEE_AMOUNT.
@@ -152,6 +159,14 @@ func Load() *Config {
 	gstPct, err := strconv.ParseFloat(getOr("GST_PERCENT", "18"), 64)
 	if err != nil {
 		gstPct = 18
+	}
+	codDueLimit, err := strconv.ParseFloat(getOr("COD_DUE_LIMIT", "500"), 64)
+	if err != nil {
+		codDueLimit = 500
+	}
+	codDueMaxDays, err := strconv.Atoi(getOr("COD_DUE_MAX_DAYS", "3"))
+	if err != nil {
+		codDueMaxDays = 3
 	}
 	smtpPort, err := strconv.Atoi(getOr("SMTP_PORT", "587"))
 	if err != nil {
@@ -232,6 +247,8 @@ func Load() *Config {
 		TurnTTLSecond: turnTTL,
 
 		PlatformCommissionPercent:     commissionPct,
+		CodDueLimit:                   codDueLimit,
+		CodDueMaxDays:                 codDueMaxDays,
 		GSTPercent:                    gstPct,
 		RepeatCustomerDiscountPercent: repeatDiscountPct,
 		PlatformFeeAmount:             platformFeeAmount,

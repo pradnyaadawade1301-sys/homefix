@@ -17,6 +17,7 @@ type Handlers struct {
 	Technician   *handler.TechnicianHandler
 	Booking      *handler.BookingHandler
 	Payment      *handler.PaymentHandler
+	Due          *handler.DueHandler
 	Wallet       *handler.WalletHandler
 	Review       *handler.ReviewHandler
 	AI           *handler.AIHandler
@@ -200,6 +201,11 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.POST("/payments/:id/confirm-cash", h.Payment.ConfirmCash)
 		authed.GET("/bookings/:id/payment/cod", h.Payment.GetPendingCodByBooking)
 
+		// Technician COD commission dues (replaces wallet-balance gating)
+		authed.GET("/technician/dues", middleware.RequireRole("technician"), h.Due.Summary)
+		authed.POST("/technician/dues/pay", middleware.RequireRole("technician"), h.Due.Pay)
+		authed.POST("/technician/dues/verify", middleware.RequireRole("technician"), h.Due.Verify)
+
 		authed.GET("/wallet", h.Wallet.Balance)
 		authed.GET("/wallet/transactions", h.Wallet.History)
 		authed.POST("/wallet/credit", middleware.RequireRole("admin"), h.Wallet.Credit)
@@ -240,8 +246,8 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 			adminAPI.GET("/bookings", h.AdminAPI.Bookings)
 			adminAPI.GET("/bookings/:id/photos", h.AdminAPI.BookingPhotos)
 			adminAPI.GET("/technicians", h.AdminAPI.Technicians)
-		adminAPI.GET("/technicians/:id/wallet", h.AdminAPI.TechnicianWallet)
-		adminAPI.POST("/technicians/:id/wallet/credit", h.AdminAPI.CreditTechnicianWallet)
+			adminAPI.GET("/technicians/:id/wallet", h.AdminAPI.TechnicianWallet)
+			adminAPI.POST("/technicians/:id/wallet/credit", h.AdminAPI.CreditTechnicianWallet)
 			adminAPI.GET("/disputes", h.AdminAPI.Disputes)
 			adminAPI.GET("/disputes/:id/evidence", h.AdminAPI.DisputeDetail)
 			adminAPI.PATCH("/disputes/:id/review", h.AdminAPI.ReviewDispute)

@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -40,7 +39,11 @@ type RazorpayService struct {
 	technicianRepo    *repository.TechnicianRepository
 	walletRepo        *repository.WalletRepository
 	fcm               *FirebaseService
+	dueService        *DueService // COD commission dues ledger (see SetDueService)
 }
+
+// SetDueService wires the COD dues ledger (replaces the old wallet-balance gate).
+func (s *RazorpayService) SetDueService(d *DueService) { s.dueService = d }
 
 func NewRazorpayService(
 	keyID, keySecret string,
@@ -228,12 +231,9 @@ func (s *RazorpayService) prepareCharge(ctx context.Context, bookingID string, b
 // which is what actually marks the payment paid and settles the platform's
 // commission.
 //
-// Since the technician never gets a wallet credit for a cash job (they
-// already hold the cash), the platform recovers its commission by DEBITING
-// it from the technician's wallet on confirmation instead — so COD is
-// refused up front if their current wallet balance can't cover it, rather
-// than confirming the job and only then failing (or letting the wallet go
-// negative).
+// Since the technician keeps the cash, the platform recovers its commission
+// as a pending "due" (see DueService). COD is refused up front once the
+// technician's unpaid dues reach the limit or any due is overdue.
 func (s *RazorpayService) CreateCodOrder(ctx context.Context, bookingID, userID string, baseAmountRupees float64) (*models.Payment, error) {
 	booking, charges, ref, err := s.prepareCharge(ctx, bookingID, baseAmountRupees)
 	if err != nil {
@@ -251,15 +251,12 @@ func (s *RazorpayService) CreateCodOrder(ctx context.Context, bookingID, userID 
 	}
 
 	platformCommission := charges.effectiveBase * s.commissionPct / 100
-	wallet, err := s.walletRepo.GetOrCreate(ctx, tech.UserID)
-	if err != nil {
-		return nil, err
-	}
-	if wallet.Balance < platformCommission {
-		return nil, fmt.Errorf(
-			"the technician's wallet balance (₹%.2f) is too low to cover the platform commission (₹%.2f) for a cash payment — ask them to add funds, or pay online instead",
-			wallet.Balance, platformCommission,
-		)
+	// COD is allowed only while the technician's unpaid commission dues stay
+	// within the limit (and none is overdue) — see DueService.CheckCodAllowed.
+	if s.dueService != nil {
+		if err := s.dueService.CheckCodAllowed(ctx, tech.UserID, platformCommission); err != nil {
+			return nil, err
+		}
 	}
 
 	p := &models.Payment{
@@ -281,7 +278,7 @@ func (s *RazorpayService) CreateCodOrder(ctx context.Context, bookingID, userID 
 
 // ConfirmCashPayment is called by the technician once they've actually
 // received the cash on site. Marks the payment paid, generates the invoice,
-// and debits the platform's commission from the technician's wallet — the
+// and adds the platform's commission to the technician's dues — the
 // COD mirror of VerifyAndCapture's Razorpay-crediting path.
 func (s *RazorpayService) ConfirmCashPayment(ctx context.Context, paymentID, technicianUserID string) (*models.Payment, error) {
 	p, err := s.paymentRepo.GetByID(ctx, paymentID)
@@ -321,18 +318,13 @@ func (s *RazorpayService) ConfirmCashPayment(ctx context.Context, paymentID, tec
 	platformCommission := serviceBase * s.commissionPct / 100
 	technicianEarning := serviceBase - platformCommission
 
-	// Re-check the wallet balance at confirmation time too — it was already
-	// checked at CreateCodOrder, but it can have moved since (e.g. another
-	// cash job settled in between), and a debit must never push it negative.
-	wallet, err := s.walletRepo.GetOrCreate(ctx, technicianUserID)
-	if err != nil {
-		return nil, err
-	}
-	if wallet.Balance < platformCommission {
-		return nil, fmt.Errorf(
-			"your wallet balance (₹%.2f) is too low to cover the platform commission (₹%.2f) for this cash payment — add funds to your wallet, then try again",
-			wallet.Balance, platformCommission,
-		)
+	// Record the commission as a due BEFORE marking the payment paid. It's
+	// idempotent per payment, and if it fails we abort so the technician can
+	// retry — a paid cash job never ends up without its due.
+	if s.dueService != nil {
+		if err := s.dueService.AddDue(ctx, technicianUserID, p.ID, p.BookingID, platformCommission); err != nil {
+			return nil, err
+		}
 	}
 
 	var cgstAmount, sgstAmount float64
@@ -356,25 +348,15 @@ func (s *RazorpayService) ConfirmCashPayment(ctx context.Context, paymentID, tec
 		}
 	}
 
-	// The technician already holds the cash covering their own earning — only
-	// the platform's cut needs to move, and it moves OUT of their wallet
-	// rather than the earning moving in. The payment is already marked paid
-	// above by this point (matching VerifyAndCapture's Razorpay-side
-	// ordering), so a failure here — e.g. the balance moved between the
-	// pre-check above and this call — can't be rolled back automatically;
-	// logging it at least surfaces an uncollected commission for manual
-	// follow-up instead of silently losing it.
-	if _, err := s.walletRepo.Debit(ctx, technicianUserID, platformCommission, "cod_commission", &p.ID); err != nil {
-		log.Printf("ConfirmCashPayment: commission debit failed for payment %s (technician %s, amount %.2f): %v",
-			p.ID, technicianUserID, platformCommission, err)
-	}
+	// The technician already holds the cash, so nothing moves in a wallet: the
+	// platform's cut is now a pending due they settle via Razorpay.
 
 	if s.fcm != nil {
 		_ = s.fcm.SendToUser(ctx, booking.CustomerID, "Payment successful",
 			fmt.Sprintf("Your cash payment of ₹%.2f was confirmed. Invoice %s is ready.", p.Amount, invoiceNumber),
 			map[string]string{"booking_id": booking.ID, "type": "payment_success"})
 		_ = s.fcm.SendToUser(ctx, technicianUserID, "Cash payment confirmed",
-			fmt.Sprintf("₹%.2f platform commission was deducted from your wallet for booking %s.", platformCommission, booking.ID),
+			fmt.Sprintf("₹%.2f platform commission was added to your dues for booking %s. Pay it from the Dues section.", platformCommission, booking.ID),
 			map[string]string{"booking_id": booking.ID, "type": "payment_success"})
 	}
 
