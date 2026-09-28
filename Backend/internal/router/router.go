@@ -49,6 +49,10 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 	// review images, etc.) — swap for a real S3/CDN URL when AWS storage is configured.
 	r.Static("/uploads", uploadDir)
 
+	// Support staff inbox for Live Chat (sign in with an admin account; the page
+	// itself only calls the role-protected /api/v1/admin/support/* endpoints).
+	r.GET("/support-inbox", handler.SupportInboxPage)
+
 	api := r.Group("/api/v1")
 
 	// ---- Public ----

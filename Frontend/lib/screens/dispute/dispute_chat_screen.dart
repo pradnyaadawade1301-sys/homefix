@@ -242,7 +242,7 @@ class _DisputeChatScreenState extends State<DisputeChatScreen> {
     if (_messages.isEmpty) {
       return Center(
         child: Text(
-          'Complaint darj ho gayi hai. Yahan aap seedha support team se baat kar sakte hain.',
+          'Your complaint has been registered. You can chat with our support team here.',
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.grey[500]),
         ),
@@ -373,7 +373,7 @@ class _DisputeChatScreenState extends State<DisputeChatScreen> {
                 maxLines: 4,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
-                  hintText: 'Apna message likhein...',
+                  hintText: 'Type your message...',
                   filled: true,
                   fillColor: Colors.grey[100],
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),

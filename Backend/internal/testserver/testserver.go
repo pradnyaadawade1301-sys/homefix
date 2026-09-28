@@ -89,6 +89,7 @@ func New(pool *pgxpool.Pool) *Server {
 		Consultation: handler.NewConsultationHandler(consultService, []string{"stun:stun.l.google.com:19302"}, "", "", 3600),
 		WebRTC:       handler.NewWebRTCHandler([]string{"stun:stun.l.google.com:19302"}, "", "", 3600),
 		Dispute:      handler.NewDisputeHandler(disputeService),
+		Support:      handler.NewSupportHandler(service.NewSupportService(repository.NewSupportMessageRepository(pool))),
 		Cms:          handler.NewCmsHandler(cmsService),
 	}
 

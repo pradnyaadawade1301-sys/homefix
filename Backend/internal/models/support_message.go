@@ -21,10 +21,10 @@ type SupportMessage struct {
 // message so support can see what needs attention without opening every
 // thread.
 type SupportChatSummary struct {
-	UserID         string    `json:"user_id"`
-	UserName       string    `json:"user_name"`
-	UserPhone      string    `json:"user_phone,omitempty"`
-	LastMessage    string    `json:"last_message"`
-	LastMessageAt  time.Time `json:"last_message_at"`
-	LastSenderRole string    `json:"last_sender_role"`
+	UserID          string    `json:"user_id"`
+	UserName        string    `json:"user_name"`
+	UserPhone       string    `json:"user_phone,omitempty"`
+	LastMessage     string    `json:"last_message"`
+	LastMessageAt   time.Time `json:"last_message_at"`
+	LastSenderRole  string    `json:"last_sender_role"`
 }

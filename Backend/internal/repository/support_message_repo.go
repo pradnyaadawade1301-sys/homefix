@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -80,4 +81,17 @@ func (r *SupportMessageRepository) ListChats(ctx context.Context) ([]models.Supp
 		out = append(out, c)
 	}
 	return out, rows.Err()
+}
+
+// HasAdminMessageSince reports whether support (human or automatic) has
+// already replied to this user since the given time.
+func (r *SupportMessageRepository) HasAdminMessageSince(ctx context.Context, userID string, since time.Time) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM support_messages
+			WHERE user_id = $1 AND sender_role = 'admin' AND created_at > $2
+		)
+	`, userID, since).Scan(&exists)
+	return exists, err
 }
