@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'app.dart';
 import 'services/notification_service.dart';
 
@@ -11,8 +13,27 @@ final FcmNotificationService fcmNotificationService = FcmNotificationService();
 /// push a screen onto the app's navigator.
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+/// Makes a reinstall start logged out. Tokens live in secure storage, which
+/// can survive an uninstall (iOS Keychain always does; Android can restore
+/// it from backup), so a reinstalled app would otherwise still be signed in.
+/// SharedPreferences is normally wiped on uninstall, so a missing marker
+/// means "fresh install": clear any leftover session before the app reads it.
+Future<void> _clearSessionOnFreshInstall() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('install_marker') ?? false) return;
+    await const FlutterSecureStorage().deleteAll();
+    await prefs.setBool('install_marker', true);
+  } catch (_) {
+    // Never block app start over this.
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Must run before the app (HttpClient/AuthService) reads stored tokens.
+  await _clearSessionOnFreshInstall();
 
   // This sets up everything: Firebase init, creates the Android notification
   // channels ("homefix_notifications" / "incoming_calls") that the backend's
