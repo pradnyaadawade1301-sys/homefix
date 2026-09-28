@@ -68,6 +68,8 @@ class ApiConfig {
 
   static const String paymentCod = '/payments/cod';
   static String paymentConfirmCash(String paymentId) => '/payments/$paymentId/confirm-cash';
+  static String paymentCashOtp(String paymentId) => '/payments/$paymentId/cash-otp';
+  static String paymentCashOtpRefresh(String paymentId) => '/payments/$paymentId/cash-otp/refresh';
   static String bookingPendingCod(String bookingId) => '/bookings/$bookingId/payment/cod';
 
   static const String technicianDues = '/technician/dues';

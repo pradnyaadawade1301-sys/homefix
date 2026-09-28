@@ -300,6 +300,10 @@ class PaymentProvider extends ChangeNotifier {
   Future<Payment?> getPendingCodByBooking(String bookingId) => _paymentService.getPendingCodByBooking(bookingId);
 
   /// Technician side: confirms cash was physically received — marks the
-  /// payment paid and debits the platform commission from their wallet.
-  Future<Payment> confirmCash(String paymentId) => _paymentService.confirmCash(paymentId);
+  /// payment paid (needs the customer's OTP) and adds the commission to dues.
+  Future<Payment> confirmCash(String paymentId, String otp) => _paymentService.confirmCash(paymentId, otp);
+
+  /// Customer side: cash-on-delivery confirmation OTP for a pending cash payment.
+  Future<String> getCashOtp(String paymentId) => _paymentService.getCashOtp(paymentId);
+  Future<String> refreshCashOtp(String paymentId) => _paymentService.refreshCashOtp(paymentId);
 }

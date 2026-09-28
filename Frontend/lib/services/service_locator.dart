@@ -141,11 +141,34 @@ class PaymentService {
   /// Technician side: confirms cash was physically received for a pending
   /// COD payment — marks it paid and debits the platform commission from
   /// their dues. See RazorpayService.ConfirmCashPayment.
-  Future<Payment> confirmCash(String paymentId) async {
+  Future<Payment> confirmCash(String paymentId, String otp) async {
     try {
-      final response = await _httpClient.post(ApiConfig.paymentConfirmCash(paymentId));
+      final response = await _httpClient.post(ApiConfig.paymentConfirmCash(paymentId), data: {'otp': otp});
       final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
       return Payment.fromJson(data);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Customer side: the 4-digit code the customer reads out to the technician
+  /// after handing over cash. Only the payment's own customer can fetch it.
+  Future<String> getCashOtp(String paymentId) async {
+    try {
+      final response = await _httpClient.get(ApiConfig.paymentCashOtp(paymentId));
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return (data['otp'] as String?) ?? '';
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Customer side: issues a new cash OTP (also clears the wrong-attempt lock).
+  Future<String> refreshCashOtp(String paymentId) async {
+    try {
+      final response = await _httpClient.post(ApiConfig.paymentCashOtpRefresh(paymentId));
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return (data['otp'] as String?) ?? '';
     } catch (e) {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
