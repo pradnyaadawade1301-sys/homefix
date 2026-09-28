@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"context"
@@ -326,5 +326,12 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 		log.Printf("startup migration: failed to ensure cash_otp columns exist: %v", err)
 	}
 
-	log.Println("startup migrations: done")
+	// call_logs.call_type - audio vs video, so the booking chat can show
+    // "Missed video call" / "Voice call". Safe no-op once the column exists.
+    if _, err := pool.Exec(ctx,
+        `ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS call_type VARCHAR(8) NOT NULL DEFAULT 'audio';`); err != nil {
+        log.Printf("startup migration: failed to ensure call_logs.call_type column exists: %v", err)
+    }
+
+    log.Println("startup migrations: done")
 }
