@@ -353,5 +353,14 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 		log.Printf("startup migration: failed to ensure technician_dues tables exist: %v", err)
 	}
 
+	// 039_cash_otp — same "Render never applies migrations/ files" issue as
+	// above. Cash-on-delivery OTP columns on payments.
+	if _, err := pool.Exec(ctx,
+		`ALTER TABLE payments ADD COLUMN IF NOT EXISTS cash_otp VARCHAR(4);
+		ALTER TABLE payments ADD COLUMN IF NOT EXISTS cash_otp_attempts INT NOT NULL DEFAULT 0;
+		ALTER TABLE payments ADD COLUMN IF NOT EXISTS cash_otp_verified_at TIMESTAMPTZ;`); err != nil {
+		log.Printf("startup migration: failed to ensure payments.cash_otp columns exist: %v", err)
+	}
+
 	log.Println("startup migrations: done")
 }

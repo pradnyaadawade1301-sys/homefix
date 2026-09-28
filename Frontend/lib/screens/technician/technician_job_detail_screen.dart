@@ -456,7 +456,7 @@ class _CashReceivedButtonState extends State<_CashReceivedButton> {
       await context.read<PaymentProvider>().confirmCash(_payment!.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cash payment confirmed — commission debited from your wallet.')),
+        const SnackBar(content: Text('Cash payment confirmed — commission added to your dues (pay it from Settlement).')),
       );
       setState(() => _payment = null);
     } catch (e) {
