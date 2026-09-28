@@ -53,8 +53,7 @@ func (s *SupportService) SendMessage(ctx context.Context, userID, message, attac
 }
 
 // autoReplyAckWindow — the generic "we received your message" reply is sent
-// at most once per this window, so a customer typing several messages in a
-// row doesn't get the same acknowledgement after every one.
+// worded in full only once per this window; follow-ups get a shorter one.
 const autoReplyAckWindow = 10 * time.Minute
 
 // autoReply saves an instant support reply (sender_role "admin", shown as
@@ -65,15 +64,19 @@ const autoReplyAckWindow = 10 * time.Minute
 func (s *SupportService) autoReply(ctx context.Context, userID, message string) {
 	reply := matchFAQReply(message)
 	if reply == "" {
+		// Never leave the customer without an answer. First unmatched
+		// message in the window gets the full acknowledgement; follow-ups
+		// get a shorter one instead of repeating it (or staying silent).
 		recent, err := s.repo.HasAdminMessageSince(ctx, userID, time.Now().Add(-autoReplyAckWindow))
 		if err != nil {
 			log.Printf("support auto-reply: recent check failed: %v", err)
 			return
 		}
 		if recent {
-			return
+			reply = "Thanks, we have added this to your request. Please share any more details (you can attach photos or a video) and our support team will get back to you shortly."
+		} else {
+			reply = "Your message has been received. A HomeFix support agent will reply shortly."
 		}
-		reply = "Your message has been received. A HomeFix support agent will reply shortly."
 	}
 	if _, err := s.repo.Create(ctx, &models.SupportMessage{
 		UserID:     userID,
@@ -108,6 +111,25 @@ func matchFAQReply(message string) string {
 		}
 		return false
 	}
+	// Collapse repeated letters so "hii", "hiii", "hellooo" count as greetings.
+	collapse := func(w string) string {
+		var b strings.Builder
+		var prev rune
+		for _, r := range w {
+			if r != prev {
+				b.WriteRune(r)
+			}
+			prev = r
+		}
+		return b.String()
+	}
+	isGreeting := false
+	for _, w := range words {
+		switch collapse(w) {
+		case "hi", "helo", "hey", "namaste", "namaskar":
+			isGreeting = true
+		}
+	}
 	switch {
 	case has("cancel"):
 		return "You can cancel a booking from My Bookings by opening the booking and choosing Cancel. If you need help with a cancellation or a refund, reply here and our team will assist you."
@@ -121,7 +143,9 @@ func matchFAQReply(message string) string {
 		return "Sorry about the payment issue. Please share your booking details and what went wrong, and our team will look into it."
 	case has("complaint", "complain", "bad service", "rude", "misbehav", "damage"):
 		return "We are sorry about your experience. Your complaint has been noted; please describe what happened (you can also attach photos or a video) and our team will review it."
-	case hasWord("hi", "hello", "hey", "namaste") && len(words) <= 3:
+	case hasWord("issue", "issues", "problem", "problems", "help", "query", "doubt", "trouble") || has("not working", "kaam nahi", "dikkat", "samasya"):
+		return "Sorry to hear that. Please tell us more about the issue: which service or booking is it about, and what went wrong? You can also attach photos or a video."
+	case isGreeting && len(words) <= 3:
 		return "Hello! Welcome to HomeFix Support. How can we help you today?"
 	}
 	return ""
