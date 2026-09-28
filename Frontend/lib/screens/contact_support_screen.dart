@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/theme.dart';
+import 'support_chat_screen.dart';
 
 /// Contact Support — quick channels (call, email) for cases that don't fit
 /// Report an Issue. Both actually open the phone dialer / email app via
@@ -53,6 +54,15 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
             Text('Reach us directly',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
+            _ContactTile(
+              icon: Icons.chat_bubble_outline_rounded,
+              title: 'Live Chat',
+              subtitle: 'Chat directly with our support team',
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const SupportChatScreen(),
+              )),
+            ),
+            const SizedBox(height: 10),
             _ContactTile(
               icon: Icons.call_outlined,
               title: 'Call us',
