@@ -40,6 +40,7 @@ class Payment {
   final String currency;
   final String? method;
   final String status; // created | paid | failed | refunded
+  final String paymentType; // service | visit_fee
   final bool verified; // true only once the Razorpay signature was independently re-verified server-side
   final bool isRepeatCustomer;
   final double? repeatDiscountPercent;
@@ -66,6 +67,7 @@ class Payment {
     required this.currency,
     this.method,
     required this.status,
+    this.paymentType = 'service',
     this.verified = false,
     this.isRepeatCustomer = false,
     this.repeatDiscountPercent,
@@ -80,6 +82,7 @@ class Payment {
     required this.updatedAt,
   });
 
+  bool get isVisitFee => paymentType == 'visit_fee';
   bool get isPaid => status == 'paid';
   bool get isFailed => status == 'failed';
   bool get isRefunded => status == 'refunded';
@@ -103,6 +106,7 @@ class Payment {
       currency: (json['currency'] as String?) ?? 'INR',
       method: json['method'] as String?,
       status: (json['status'] as String?) ?? 'created',
+      paymentType: (json['payment_type'] as String?) ?? 'service',
       verified: json['verified'] as bool? ?? false,
       isRepeatCustomer: json['is_repeat_customer'] as bool? ?? false,
       repeatDiscountPercent: (json['repeat_discount_percent'] as num?)?.toDouble(),

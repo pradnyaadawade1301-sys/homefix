@@ -57,12 +57,40 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
         builder: (context, bookingProvider, paymentProvider, _) {
           final completedJobs = bookingProvider.bookings.where((b) => b.status == 'completed').toList()
             ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-          final payments = List<Payment>.from(paymentProvider.history)
-            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-          final totalEarned = payments
-              .where((p) => p.isPaid)
-              .fold<double>(0, (sum, p) => sum + (p.technicianEarning ?? p.amount));
+          // Payment History: one row per booking payment. Paid rows always
+          // show; a payment that was only ever "created" (an abandoned or
+          // still-open checkout) shows as "unpaid" — but only if that same
+          // booking has no paid payment, and only its latest attempt, so a
+          // paid job never also lists its stale "created" duplicates.
+          final all = List<Payment>.from(paymentProvider.history)
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          final paidKeys = <String>{
+            for (final p in all)
+              if (p.isPaid) '${p.bookingId}|${p.paymentType}',
+          };
+          final seenUnpaid = <String>{};
+          final payments = <Payment>[];
+          for (final p in all) {
+            final key = '${p.bookingId}|${p.paymentType}';
+            if (p.isPaid || p.isRefunded) {
+              payments.add(p);
+            } else if (!paidKeys.contains(key) && seenUnpaid.add(key)) {
+              payments.add(p); // latest unpaid attempt only
+            }
+          }
+
+          // Total Earned = the technician's share of every PAID service
+          // payment, counted once per booking. Visit-fee payments and
+          // unpaid/created/refunded rows never count, and a missing share is
+          // never replaced by the full customer amount (which includes GST
+          // and platform fees the technician doesn't earn).
+          final earnedByBooking = <String, double>{};
+          for (final p in all) {
+            if (!p.isPaid || p.isVisitFee) continue;
+            earnedByBooking.putIfAbsent(p.bookingId, () => p.technicianEarning ?? 0);
+          }
+          final totalEarned = earnedByBooking.values.fold<double>(0, (sum, v) => sum + v);
 
           final isLoadingPayments = paymentProvider.isLoadingHistory && payments.isEmpty;
 
@@ -385,7 +413,7 @@ class _SummaryCard extends StatelessWidget {
                 Text(AppLocalizations.of(context).techSettlementTotalEarned, style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
                 const SizedBox(height: 6),
                 Text(
-                  '₹${totalEarned.toStringAsFixed(0)}',
+                  '₹${totalEarned.toStringAsFixed(2)}',
                   style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -531,12 +559,12 @@ class _PaymentTileState extends State<_PaymentTile> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(color: _statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-                      child: Text(payment.status, style: TextStyle(fontSize: 10.5, color: _statusColor, fontWeight: FontWeight.w600)),
+                      child: Text(payment.isPaid ? 'paid' : (payment.isRefunded ? 'refunded' : 'unpaid'), style: TextStyle(fontSize: 10.5, color: _statusColor, fontWeight: FontWeight.w600)),
                     ),
                   ],
                 ),
                 const SizedBox(height: 3),
-                if (payment.technicianEarning != null)
+                if (payment.isPaid && !payment.isVisitFee && payment.technicianEarning != null)
                   Text(AppLocalizations.of(context).techSettlementYourShare(payment.technicianEarning!.toStringAsFixed(2)),
                       style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                 const SizedBox(height: 3),
