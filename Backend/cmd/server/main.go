@@ -100,6 +100,7 @@ func main() {
 	reviewService := service.NewReviewService(reviewRepo, bookingRepo)
 	disputeService := service.NewDisputeService(disputeRepo, disputeMsgRepo, bookingRepo, consultRepo, techRepo, razorpayService, paymentRepo)
 	supportService := service.NewSupportService(supportMsgRepo)
+	supportService.SetAI(groqService) // AI-written replies for questions the FAQ rules don't cover
 	inventoryService := service.NewInventoryService(inventoryRepo)
 	cmsService := service.NewCmsService(cmsRepo)
 	analyticsService := service.NewAnalyticsService(analyticsRepo)

@@ -18,7 +18,27 @@ import (
 // DisputeService for the booking-scoped equivalent.
 type SupportService struct {
 	repo *repository.SupportMessageRepository
+	ai   SupportAI // optional; nil means canned replies only
 }
+
+// SupportAI is the slice of GroqService the support chat needs, kept as an
+// interface so the chat still works (with canned replies) if AI is not
+// configured or fails.
+type SupportAI interface {
+	Chat(ctx context.Context, system string, turns []ChatTurn) (string, error)
+}
+
+// SetAI enables AI-written replies for messages the FAQ rules don't cover.
+func (s *SupportService) SetAI(ai SupportAI) { s.ai = ai }
+
+const supportAISystemPrompt = `You are the customer support assistant for HomeFix, a home-services app where customers book technicians (plumbing, electrical, AC, appliance repair, etc).
+Reply to the customer's latest message in simple, clear, polite English (customers may write in Hindi/Hinglish; understand it, but answer in English).
+Rules:
+- Keep it to 1-3 short sentences. Plain text only, no markdown, no lists.
+- Be empathetic. If they report a problem or poor service, apologise, and ask for the one most useful detail (booking/service involved, what went wrong) or invite photos/video.
+- Ask at most one question. Do not repeat what was already said earlier in the conversation.
+- Never promise refunds, compensation, discounts, technician visits, timelines or outcomes, and never invent policies, prices or phone numbers.
+- If the issue needs action, say the support team will review it and follow up in this chat.`
 
 func NewSupportService(repo *repository.SupportMessageRepository) *SupportService {
 	return &SupportService{repo: repo}
@@ -62,21 +82,29 @@ const autoReplyAckWindow = 10 * time.Minute
 // a specific answer; anything else gets a one-time acknowledgement. The app
 // picks the reply up on its next fetch.
 func (s *SupportService) autoReply(ctx context.Context, userID, message string) {
-	reply := matchFAQReply(message)
+	// 1) Known question -> instant canned answer.
+	if reply := matchFAQReply(message); reply != "" {
+		s.saveAutoReply(ctx, userID, reply)
+		return
+	}
+	// 2) Anything else -> AI-written reply, generated in the background so
+	// sending the message isn't slowed down (the app picks the reply up on
+	// its next poll). Falls back to a canned acknowledgement if AI is
+	// unavailable.
+	go func() {
+		bg, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+		defer cancel()
+		reply := s.aiReply(bg, userID)
+		if reply == "" {
+			reply = s.fallbackReply(bg, userID)
+		}
+		s.saveAutoReply(bg, userID, reply)
+	}()
+}
+
+func (s *SupportService) saveAutoReply(ctx context.Context, userID, reply string) {
 	if reply == "" {
-		// Never leave the customer without an answer. First unmatched
-		// message in the window gets the full acknowledgement; follow-ups
-		// get a shorter one instead of repeating it (or staying silent).
-		recent, err := s.repo.HasAdminMessageSince(ctx, userID, time.Now().Add(-autoReplyAckWindow))
-		if err != nil {
-			log.Printf("support auto-reply: recent check failed: %v", err)
-			return
-		}
-		if recent {
-			reply = "Thanks, we have added this to your request. Please share any more details (you can attach photos or a video) and our support team will get back to you shortly."
-		} else {
-			reply = "Your message has been received. A HomeFix support agent will reply shortly."
-		}
+		return
 	}
 	if _, err := s.repo.Create(ctx, &models.SupportMessage{
 		UserID:     userID,
@@ -85,6 +113,56 @@ func (s *SupportService) autoReply(ctx context.Context, userID, message string) 
 	}); err != nil {
 		log.Printf("support auto-reply: save failed: %v", err)
 	}
+}
+
+// aiReply asks the AI for a reply based on the recent thread. Returns ""
+// on any failure so the caller can fall back.
+func (s *SupportService) aiReply(ctx context.Context, userID string) string {
+	if s.ai == nil {
+		return ""
+	}
+	msgs, err := s.repo.ListByUser(ctx, userID)
+	if err != nil {
+		log.Printf("support auto-reply: load thread failed: %v", err)
+		return ""
+	}
+	if len(msgs) > 12 {
+		msgs = msgs[len(msgs)-12:]
+	}
+	var turns []ChatTurn
+	for _, m := range msgs {
+		text := strings.TrimSpace(m.Message)
+		if text == "" {
+			text = "[customer sent a photo or video]"
+		}
+		role := "user"
+		if m.SenderRole == "admin" {
+			role = "assistant"
+		}
+		turns = append(turns, ChatTurn{Role: role, Content: text})
+	}
+	if len(turns) == 0 || turns[len(turns)-1].Role != "user" {
+		return ""
+	}
+	reply, err := s.ai.Chat(ctx, supportAISystemPrompt, turns)
+	if err != nil {
+		log.Printf("support auto-reply: AI failed: %v", err)
+		return ""
+	}
+	if len(reply) > 700 {
+		reply = reply[:700]
+	}
+	return reply
+}
+
+// fallbackReply is used when AI is unavailable: full acknowledgement first,
+// a shorter one for follow-ups within the window.
+func (s *SupportService) fallbackReply(ctx context.Context, userID string) string {
+	recent, err := s.repo.HasAdminMessageSince(ctx, userID, time.Now().Add(-autoReplyAckWindow))
+	if err == nil && recent {
+		return "Thanks, we have added this to your request. Please share any more details (you can attach photos or a video) and our support team will get back to you shortly."
+	}
+	return "Your message has been received. A HomeFix support agent will reply shortly."
 }
 
 // matchFAQReply returns a canned answer for common questions (English and

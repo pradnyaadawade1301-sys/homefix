@@ -427,3 +427,72 @@ func (s *GroqService) TranscribeAudio(ctx context.Context, audioData []byte, fil
 	}
 	return "", fmt.Errorf("groq transcribe: all configured API keys exhausted: %w", lastErr)
 }
+
+// ChatTurn is one message of a plain-text conversation passed to Chat.
+// Role is "user" or "assistant".
+type ChatTurn struct {
+	Role    string
+	Content string
+}
+
+// Chat runs a plain-text (non-JSON) completion with the given system prompt
+// and conversation, reusing the same key rotation as SendMessage. Used by
+// the support chat's automatic replies; nothing is persisted here.
+func (s *GroqService) Chat(ctx context.Context, system string, turns []ChatTurn) (string, error) {
+	messages := []groqMessage{{Role: "system", Content: system}}
+	for _, t := range turns {
+		messages = append(messages, groqMessage{Role: t.Role, Content: t.Content})
+	}
+	payload, err := json.Marshal(groqRequest{Model: s.model, Messages: messages})
+	if err != nil {
+		return "", err
+	}
+
+	var lastErr error
+	for i := 0; i < s.keys.count(); i++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.apiURL, bytes.NewReader(payload))
+		if err != nil {
+			return "", err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+s.keys.current())
+
+		resp, err := s.client.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("groq: request failed: %w", err)
+			s.keys.advance()
+			continue
+		}
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			lastErr = err
+			s.keys.advance()
+			continue
+		}
+		var gr groqResponse
+		if err := json.Unmarshal(body, &gr); err != nil {
+			lastErr = fmt.Errorf("groq: failed to parse response: %w", err)
+			s.keys.advance()
+			continue
+		}
+		if gr.Error != nil {
+			lastErr = fmt.Errorf("groq: api error: %s", gr.Error.Message)
+			if isKeyExhaustedError(resp.StatusCode, gr.Error.Message) {
+				s.keys.advance()
+				continue
+			}
+			return "", lastErr
+		}
+		if len(gr.Choices) == 0 {
+			lastErr = fmt.Errorf("groq: empty response from model")
+			s.keys.advance()
+			continue
+		}
+		return strings.TrimSpace(gr.Choices[0].Message.Content), nil
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("groq: no API keys configured")
+	}
+	return "", lastErr
+}
