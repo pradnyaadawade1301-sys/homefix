@@ -185,7 +185,6 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                         pw.Text('Billed to', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600, fontWeight: pw.FontWeight.bold)),
                         pw.SizedBox(height: 3),
                         pw.Text(inv.customerName, style: const pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-                        if (inv.customerPhone.isNotEmpty) pw.Text(inv.customerPhone, style: const pw.TextStyle(fontSize: 10)),
                         if (inv.addressFormatted.isNotEmpty)
                           pw.Padding(
                             padding: const pw.EdgeInsets.only(top: 3),
@@ -202,7 +201,6 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                           pw.Text('Service by', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600, fontWeight: pw.FontWeight.bold)),
                           pw.SizedBox(height: 3),
                           pw.Text(inv.technicianName, style: const pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-                          if (inv.technicianPhone.isNotEmpty) pw.Text(inv.technicianPhone, style: const pw.TextStyle(fontSize: 10)),
                         ],
                       ),
                     ),
@@ -409,10 +407,10 @@ class _InvoiceBody extends StatelessWidget {
                 Text(invoice.problemDescription, style: TextStyle(fontSize: 13, color: Colors.grey[700])),
               ],
               const Divider(height: 24),
-              _personRow(Icons.person_outline_rounded, 'Billed to', invoice.customerName, invoice.customerPhone),
+              _personRow(Icons.person_outline_rounded, 'Billed to', invoice.customerName, ''),
               if (invoice.technicianName.isNotEmpty) ...[
                 const SizedBox(height: 10),
-                _personRow(Icons.build_outlined, 'Service by', invoice.technicianName, invoice.technicianPhone),
+                _personRow(Icons.build_outlined, 'Service by', invoice.technicianName, ''),
               ],
               if (invoice.addressFormatted.isNotEmpty) ...[
                 const SizedBox(height: 10),
