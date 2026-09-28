@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'signaling_service.dart';
 
@@ -41,10 +42,16 @@ class WebRTCService {
         };
 
   Future<void> init() async {
+    debugPrint('[CALL] ICE servers: ${_rtcConfig['iceServers']}');
     peerConnection = await createPeerConnection(_rtcConfig);
+
+    peerConnection!.onIceConnectionState = (state) => debugPrint('[CALL] ICE connection state: $state');
+    peerConnection!.onSignalingState = (state) => debugPrint('[CALL] signaling state: $state');
 
     peerConnection!.onIceCandidate = (candidate) {
       if (candidate.candidate == null) return;
+      // "typ relay" = TURN is working; only host/srflx = no TURN path.
+      debugPrint('[CALL] local candidate: ${candidate.candidate}');
       signaling.send(SignalingMessage(
         type: 'ice-candidate',
         from: myId,
@@ -54,6 +61,7 @@ class WebRTCService {
     };
 
     peerConnection!.onTrack = (event) {
+      debugPrint('[CALL] remote track: kind=${event.track.kind} enabled=${event.track.enabled}');
       if (event.streams.isNotEmpty) {
         remoteStream = event.streams[0];
         onRemoteStream?.call(remoteStream!);
@@ -72,6 +80,7 @@ class WebRTCService {
       'audio': true,
       'video': audioOnly ? false : {'facingMode': 'user'},
     });
+    debugPrint('[CALL] local audio tracks: ${localStream!.getAudioTracks().length}');
     onLocalStream?.call(localStream!);
 
     for (final track in localStream!.getTracks()) {
