@@ -24,6 +24,7 @@ type SupportChatSummary struct {
 	UserID          string    `json:"user_id"`
 	UserName        string    `json:"user_name"`
 	UserPhone       string    `json:"user_phone,omitempty"`
+	UserRole        string    `json:"user_role"` // customer | technician — who is writing in
 	LastMessage     string    `json:"last_message"`
 	LastMessageAt   time.Time `json:"last_message_at"`
 	LastSenderRole  string    `json:"last_sender_role"`

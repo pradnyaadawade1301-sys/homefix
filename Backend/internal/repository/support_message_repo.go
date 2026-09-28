@@ -57,7 +57,7 @@ func (r *SupportMessageRepository) ListByUser(ctx context.Context, userID string
 // recently active first, for the admin panel's support inbox.
 func (r *SupportMessageRepository) ListChats(ctx context.Context) ([]models.SupportChatSummary, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT latest.user_id, COALESCE(u.name, 'Unknown'), COALESCE(u.phone, ''),
+		SELECT latest.user_id, COALESCE(u.name, 'Unknown'), COALESCE(u.phone, ''), COALESCE(u.role, ''),
 		       COALESCE(latest.message, ''), latest.created_at, latest.sender_role
 		FROM (
 			SELECT DISTINCT ON (user_id) user_id, message, created_at, sender_role
@@ -75,7 +75,7 @@ func (r *SupportMessageRepository) ListChats(ctx context.Context) ([]models.Supp
 	var out []models.SupportChatSummary
 	for rows.Next() {
 		var c models.SupportChatSummary
-		if err := rows.Scan(&c.UserID, &c.UserName, &c.UserPhone, &c.LastMessage, &c.LastMessageAt, &c.LastSenderRole); err != nil {
+		if err := rows.Scan(&c.UserID, &c.UserName, &c.UserPhone, &c.UserRole, &c.LastMessage, &c.LastMessageAt, &c.LastSenderRole); err != nil {
 			return nil, err
 		}
 		out = append(out, c)
