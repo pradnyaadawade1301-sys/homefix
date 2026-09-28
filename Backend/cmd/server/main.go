@@ -54,6 +54,7 @@ func main() {
 	paymentRepo := repository.NewPaymentRepository(pool)
 	walletRepo := repository.NewWalletRepository(pool)
 	dueRepo := repository.NewDueRepository(pool)
+	cashOtpRepo := repository.NewCashOtpRepository(pool)
 	reviewRepo := repository.NewReviewRepository(pool)
 	aiRepo := repository.NewAIRepository(pool)
 	notifRepo := repository.NewNotificationRepository(pool)
@@ -94,6 +95,7 @@ func main() {
 	// COD commission dues ledger — replaces the wallet-balance gate for cash jobs.
 	dueService := service.NewDueService(dueRepo, cfg.RazorpayKeyID, cfg.RazorpayKeySecret, cfg.CodDueLimit, cfg.CodDueMaxDays)
 	razorpayService.SetDueService(dueService)
+	razorpayService.SetCashOtpRepo(cashOtpRepo)
 
 	// ---- Domain services ----
 	authService := service.NewAuthService(userRepo, mailService, cfg.JWTAccessSecret, cfg.JWTRefreshSecret, cfg.JWTAccessTTLMin, cfg.JWTRefreshTTLHrs, cfg.GoogleClientID)
@@ -360,6 +362,15 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 		ALTER TABLE payments ADD COLUMN IF NOT EXISTS cash_otp_attempts INT NOT NULL DEFAULT 0;
 		ALTER TABLE payments ADD COLUMN IF NOT EXISTS cash_otp_verified_at TIMESTAMPTZ;`); err != nil {
 		log.Printf("startup migration: failed to ensure payments.cash_otp columns exist: %v", err)
+	}
+
+	// 040_email_otp_columns — email OTP login/verification uses these two
+	// users columns but no earlier migration ever created them, so a fresh
+	// database failed with "email_otp_code does not exist". Idempotent.
+	if _, err := pool.Exec(ctx,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_otp_code VARCHAR(6);
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS email_otp_expires_at TIMESTAMPTZ;`); err != nil {
+		log.Printf("startup migration: failed to ensure users.email_otp columns exist: %v", err)
 	}
 
 	log.Println("startup migrations: done")

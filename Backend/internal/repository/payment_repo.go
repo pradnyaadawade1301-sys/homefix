@@ -279,10 +279,55 @@ func (r *PaymentRepository) MarkVerifiedPaidCash(
 		UPDATE payments
 		SET method = 'cash', invoice_number = $1, status = 'paid',
 		    cgst_amount = $2, sgst_amount = $3,
-		    verified = true, platform_commission = $4, technician_earning = $5, updated_at = now()
+		    verified = true, platform_commission = $4, technician_earning = $5,
+		    cash_otp = NULL, cash_otp_verified_at = now(), updated_at = now()
 		WHERE transaction_ref = $6 AND status = 'created'
 	`, invoiceNumber, cgstAmount, sgstAmount, platformCommission, technicianEarning, ref)
 	return err
+}
+
+// SetCashOTP stores the freshly generated cash-handover OTP for a COD payment
+// and resets the wrong-attempt counter.
+func (r *PaymentRepository) SetCashOTP(ctx context.Context, paymentID, otp string) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE payments SET cash_otp = $1, cash_otp_attempts = 0, updated_at = now() WHERE id = $2
+	`, otp, paymentID)
+	return err
+}
+
+// GetCashOTPState returns the stored cash OTP (nil if none) and how many wrong
+// attempts have been made against it.
+func (r *PaymentRepository) GetCashOTPState(ctx context.Context, paymentID string) (*string, int, error) {
+	var otp *string
+	var attempts int
+	err := r.db.QueryRow(ctx, `SELECT cash_otp, cash_otp_attempts FROM payments WHERE id = $1`, paymentID).Scan(&otp, &attempts)
+	if err != nil {
+		return nil, 0, err
+	}
+	return otp, attempts, nil
+}
+
+// BumpCashOTPAttempts records one wrong OTP guess and returns the new count.
+func (r *PaymentRepository) BumpCashOTPAttempts(ctx context.Context, paymentID string) (int, error) {
+	var attempts int
+	err := r.db.QueryRow(ctx, `
+		UPDATE payments SET cash_otp_attempts = cash_otp_attempts + 1 WHERE id = $1 RETURNING cash_otp_attempts
+	`, paymentID).Scan(&attempts)
+	return attempts, err
+}
+
+// AttachCashOTP fills p.CashOTP for a still-pending cash payment. Call it ONLY
+// when the response is going to the paying customer.
+func (r *PaymentRepository) AttachCashOTP(ctx context.Context, p *models.Payment) error {
+	if p == nil || p.Method == nil || *p.Method != "cash" || p.Status != models.PaymentCreated {
+		return nil
+	}
+	otp, _, err := r.GetCashOTPState(ctx, p.ID)
+	if err != nil {
+		return err
+	}
+	p.CashOTP = otp
+	return nil
 }
 
 // MarkFailed also records the UPI app's own (non-success) response for audit —

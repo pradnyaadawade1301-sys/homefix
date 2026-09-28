@@ -203,6 +203,8 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.POST("/payments/:id/refund", middleware.RequireRole("admin"), h.Payment.Refund)
 		authed.POST("/payments/cod", h.Payment.CreateCodOrder)
 		authed.POST("/payments/:id/confirm-cash", h.Payment.ConfirmCash)
+		authed.GET("/payments/:id/cash-otp", h.Payment.GetCashOTP)
+		authed.POST("/payments/:id/cash-otp/refresh", h.Payment.RefreshCashOTP)
 		authed.GET("/bookings/:id/payment/cod", h.Payment.GetPendingCodByBooking)
 
 		// Technician COD commission dues (replaces wallet-balance gating)

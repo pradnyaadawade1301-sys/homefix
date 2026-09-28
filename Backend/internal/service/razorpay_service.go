@@ -39,7 +39,8 @@ type RazorpayService struct {
 	technicianRepo    *repository.TechnicianRepository
 	walletRepo        *repository.WalletRepository
 	fcm               *FirebaseService
-	dueService        *DueService // COD commission dues ledger (see SetDueService)
+	dueService        *DueService                   // COD commission dues ledger (see SetDueService)
+	cashOtpRepo       *repository.CashOtpRepository // COD confirmation OTP (see SetCashOtpRepo)
 }
 
 // SetDueService wires the COD dues ledger (replaces the old wallet-balance gate).
@@ -273,14 +274,24 @@ func (s *RazorpayService) CreateCodOrder(ctx context.Context, bookingID, userID 
 		Method:            strPtr("cash"),
 		PaymentType:       models.PaymentTypeService,
 	}
-	return s.paymentRepo.Create(ctx, p)
+	created, err := s.paymentRepo.Create(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	// Cash OTP: shown on the customer's "Pay by cash" screen, entered by the
+	// technician to confirm. Best-effort here — GetCashOTP lazily generates
+	// one if this fails, so the payment is never left without an OTP.
+	if s.cashOtpRepo != nil {
+		_ = s.cashOtpRepo.Set(ctx, created.ID, generateOTP())
+	}
+	return created, nil
 }
 
 // ConfirmCashPayment is called by the technician once they've actually
 // received the cash on site. Marks the payment paid, generates the invoice,
 // and adds the platform's commission to the technician's dues — the
 // COD mirror of VerifyAndCapture's Razorpay-crediting path.
-func (s *RazorpayService) ConfirmCashPayment(ctx context.Context, paymentID, technicianUserID string) (*models.Payment, error) {
+func (s *RazorpayService) ConfirmCashPayment(ctx context.Context, paymentID, technicianUserID, otp string) (*models.Payment, error) {
 	p, err := s.paymentRepo.GetByID(ctx, paymentID)
 	if err != nil {
 		return nil, err
@@ -309,6 +320,27 @@ func (s *RazorpayService) ConfirmCashPayment(ctx context.Context, paymentID, tec
 	}
 	if tech == nil || tech.UserID != technicianUserID {
 		return nil, errors.New("you are not the technician assigned to this booking")
+	}
+
+	// Security: the technician must enter the OTP the customer sees on their
+	// own phone (shown only after they hand over the cash), so "cash received"
+	// can't be marked without the customer's involvement.
+	if s.cashOtpRepo != nil {
+		if strings.TrimSpace(otp) == "" {
+			return nil, errors.New("enter the OTP shown on the customer's phone")
+		}
+		res, remaining, err := s.cashOtpRepo.Verify(ctx, p.ID, strings.TrimSpace(otp))
+		if err != nil {
+			return nil, err
+		}
+		switch res {
+		case repository.CashOtpMissing:
+			return nil, errors.New("the customer's cash OTP isn't ready yet — ask them to open the payment screen, then try again")
+		case repository.CashOtpLocked:
+			return nil, errors.New("too many wrong OTP attempts — ask the customer to tap 'New OTP' in their app")
+		case repository.CashOtpWrong:
+			return nil, fmt.Errorf("incorrect OTP (%d attempts left)", remaining)
+		}
 	}
 
 	serviceBase := p.Amount
