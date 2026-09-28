@@ -444,6 +444,11 @@ func (s *BookingService) InitiateCall(ctx context.Context, callerUserID, booking
 	// Write the call_logs row up front. Whoever tapped "Call" is the caller;
 	// the other participant is the callee. This is what makes a missed call
 	// still show up in both sides' Call history.
+	callType := "audio"
+	if isVideo {
+		callType = "video"
+	}
+
 	if s.callLogRepo != nil {
 		calleeUserID := b.CustomerID
 		if isCustomer {
@@ -453,15 +458,10 @@ func (s *BookingService) InitiateCall(ctx context.Context, callerUserID, booking
 		}
 		if calleeUserID != "" && calleeUserID != callerUserID {
 			bID := bookingID
-			if _, err := s.callLogRepo.Create(ctx, &bID, nil, callerUserID, calleeUserID); err != nil {
+			if _, err := s.callLogRepo.Create(ctx, &bID, nil, callerUserID, calleeUserID, callType); err != nil {
 				log.Printf("call log: create failed: %v", err)
 			}
 		}
-	}
-
-	callType := "audio"
-	if isVideo {
-		callType = "video"
 	}
 
 	if s.fcm != nil {

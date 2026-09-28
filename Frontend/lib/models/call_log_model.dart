@@ -27,6 +27,7 @@ class CallLogEntry {
   final String categoryName;
   final bool isOutgoing;
   final CallLogStatus status;
+  final String callType; // "audio" | "video"
   final DateTime startedAt;
   final DateTime? answeredAt;
   final DateTime? endedAt;
@@ -41,6 +42,7 @@ class CallLogEntry {
     required this.categoryName,
     required this.isOutgoing,
     required this.status,
+    this.callType = 'audio',
     required this.startedAt,
     this.answeredAt,
     this.endedAt,
@@ -57,6 +59,7 @@ class CallLogEntry {
       categoryName: (json['category_name'] as String?) ?? '',
       isOutgoing: json['is_outgoing'] == true,
       status: _statusFromString(json['status'] as String? ?? 'ringing'),
+      callType: (json['call_type'] as String?) == 'video' ? 'video' : 'audio',
       startedAt: DateTime.parse(json['started_at'] as String).toLocal(),
       answeredAt: json['answered_at'] != null ? DateTime.parse(json['answered_at'] as String).toLocal() : null,
       endedAt: json['ended_at'] != null ? DateTime.parse(json['ended_at'] as String).toLocal() : null,
@@ -65,4 +68,5 @@ class CallLogEntry {
   }
 
   bool get isMissed => status == CallLogStatus.missed;
+  bool get isVideo => callType == 'video';
 }

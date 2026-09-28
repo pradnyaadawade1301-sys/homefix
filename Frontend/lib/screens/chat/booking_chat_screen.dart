@@ -7,6 +7,8 @@ import '../../core/booking_call_launcher.dart';
 import '../../core/theme.dart';
 import '../../core/technician_theme.dart';
 import '../../models/booking_model.dart';
+import '../../models/call_log_model.dart';
+import '../../providers/call_log_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/booking_service.dart';
 import '../../services/service_locator.dart' show UploadService;
@@ -42,6 +44,9 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
   final _scrollController = ScrollController();
   final _imagePicker = ImagePicker();
   List<BookingMessage> _messages = [];
+  // Audio/video calls on this booking — shown inline in the thread (like
+  // WhatsApp's "Missed voice call" rows), merged with messages by time.
+  List<CallLogEntry> _calls = [];
   bool _isLoading = true;
   bool _isSending = false;
   bool _isUploadingImage = false;
@@ -110,8 +115,14 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
     if (!silent) setState(() => _isLoading = true);
     try {
       final messages = await context.read<BookingService>().getMessages(widget.bookingId);
+      // Best-effort: a failure loading call history must never hide the chat.
+      List<CallLogEntry> calls = _calls;
+      try {
+        calls = await context.read<CallLogProvider>().callsForBooking(widget.bookingId);
+      } catch (_) {}
       if (!mounted) return;
       setState(() {
+        _calls = calls;
         _messages = messages;
         _isLoading = false;
         _error = null;
@@ -294,7 +305,7 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
       );
     }
     final showPrevious = !_isLoadingPrevious && _previousMessages.isNotEmpty;
-    if (_messages.isEmpty && !showPrevious) {
+    if (_messages.isEmpty && _calls.isEmpty && !showPrevious) {
       return Center(
         child: Text(
           l10n.chatEmptyState,
@@ -302,7 +313,7 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
         ),
       );
     }
-    if (_messages.isEmpty) {
+    if (_messages.isEmpty && _calls.isEmpty) {
       // No messages on this booking yet, but they've chatted on an earlier
       // one together — lead with that instead of the empty state.
       return ListView(
@@ -318,16 +329,23 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
         ],
       );
     }
+    // Messages and calls interleaved oldest -> newest.
+    final timeline = <({DateTime at, BookingMessage? msg, CallLogEntry? call})>[
+      for (final m in _messages) (at: m.createdAt, msg: m, call: null),
+      for (final c in _calls) (at: c.startedAt, msg: null, call: c),
+    ]..sort((a, b) => a.at.compareTo(b.at));
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(16),
-      itemCount: (showPrevious ? 1 : 0) + _messages.length,
+      itemCount: (showPrevious ? 1 : 0) + timeline.length,
       itemBuilder: (context, i) {
         if (showPrevious) {
           if (i == 0) return _previousConversationSection(myId);
           i -= 1;
         }
-        return _messageBubble(_messages[i], myId);
+        final item = timeline[i];
+        if (item.call != null) return _callRow(item.call!);
+        return _messageBubble(item.msg!, myId);
       },
     );
   }
@@ -377,6 +395,81 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
         ],
       ),
     );
+  }
+
+  // WhatsApp-style call entry: a centered pill with an arrow-in-icon, the
+  // call type, and either "Missed", "No answer" or the duration.
+  Widget _callRow(CallLogEntry c) {
+    final missedIncoming = c.isMissed && !c.isOutgoing;
+    final kind = c.isVideo ? 'video call' : 'voice call';
+    String title;
+    String subtitle;
+    switch (c.status) {
+      case CallLogStatus.missed:
+        title = c.isOutgoing ? (c.isVideo ? 'Video call' : 'Voice call') : 'Missed $kind';
+        subtitle = c.isOutgoing ? 'No answer' : 'Tap call button to call back';
+        break;
+      case CallLogStatus.rejected:
+        title = c.isVideo ? 'Video call' : 'Voice call';
+        subtitle = 'Declined';
+        break;
+      case CallLogStatus.ringing:
+        title = c.isVideo ? 'Video call' : 'Voice call';
+        subtitle = c.isOutgoing ? 'Calling…' : 'Ringing…';
+        break;
+      case CallLogStatus.received:
+        title = c.isVideo ? 'Video call' : 'Voice call';
+        subtitle = _formatDuration(c.durationSeconds);
+        break;
+    }
+    final color = missedIncoming ? Colors.red[700]! : Colors.grey[800]!;
+    final arrow = missedIncoming
+        ? Icons.call_missed
+        : (c.isOutgoing ? Icons.call_made : Icons.call_received);
+    return Align(
+      alignment: Alignment.center,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: missedIncoming ? Colors.red.shade100 : Colors.grey.shade300),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(c.isVideo ? Icons.videocam_rounded : Icons.call_rounded, size: 20, color: color),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(title, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: color)),
+                const SizedBox(height: 2),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(arrow, size: 13, color: missedIncoming ? Colors.red[700] : Colors.green[700]),
+                    const SizedBox(width: 4),
+                    Text('$subtitle · ${_formatTime(c.startedAt)}',
+                        style: TextStyle(fontSize: 11.5, color: Colors.grey[600])),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDuration(int? seconds) {
+    final s = seconds ?? 0;
+    if (s <= 0) return 'Answered';
+    final m = s ~/ 60;
+    final r = s % 60;
+    return m > 0 ? '${m}m ${r.toString().padLeft(2, '0')}s' : '${r}s';
   }
 
   Widget _messageBubble(BookingMessage msg, String? myId) {
