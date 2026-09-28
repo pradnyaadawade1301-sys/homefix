@@ -8,6 +8,7 @@ import '../models/user_model.dart';
 import '../models/ai_model.dart';
 import '../models/payment_model.dart';
 import '../models/wallet_model.dart';
+import '../models/due_model.dart';
 
 class CategoryService {
   final HttpClient _httpClient;
@@ -139,7 +140,7 @@ class PaymentService {
 
   /// Technician side: confirms cash was physically received for a pending
   /// COD payment — marks it paid and debits the platform commission from
-  /// their wallet. See RazorpayService.ConfirmCashPayment.
+  /// their dues. See RazorpayService.ConfirmCashPayment.
   Future<Payment> confirmCash(String paymentId) async {
     try {
       final response = await _httpClient.post(ApiConfig.paymentConfirmCash(paymentId));
@@ -161,6 +162,47 @@ class PaymentService {
       final response = await _httpClient.get(ApiConfig.walletBalance);
       final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
       return Wallet.fromJson(data);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Technician's COD commission dues — see GET /technician/dues. Cash jobs
+  /// add the platform commission here; COD is blocked once it crosses the
+  /// limit until the technician pays it (see DueService).
+  Future<DueSummary> getDues() async {
+    try {
+      final response = await _httpClient.get(ApiConfig.technicianDues);
+      return DueSummary.fromJson(ApiEnvelope.unwrap(response) as Map<String, dynamic>);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Creates a Razorpay order for all pending dues (POST /technician/dues/pay).
+  Future<DueOrder> createDueOrder() async {
+    try {
+      final response = await _httpClient.post(ApiConfig.technicianDuesPay);
+      return DueOrder.fromJson(ApiEnvelope.unwrap(response) as Map<String, dynamic>);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Sends Razorpay Checkout's response back so the server can verify the
+  /// signature and clear the dues (POST /technician/dues/verify).
+  Future<DueSummary> verifyDuePayment({
+    required String orderId,
+    required String paymentId,
+    required String signature,
+  }) async {
+    try {
+      final response = await _httpClient.post(ApiConfig.technicianDuesVerify, data: {
+        'razorpay_order_id': orderId,
+        'razorpay_payment_id': paymentId,
+        'razorpay_signature': signature,
+      });
+      return DueSummary.fromJson(ApiEnvelope.unwrap(response) as Map<String, dynamic>);
     } catch (e) {
       throw Exception(ApiEnvelope.errorMessage(e));
     }

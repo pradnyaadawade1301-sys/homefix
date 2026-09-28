@@ -2,21 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme.dart';
-import '../../core/technician_theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/category_provider.dart' show TechnicianKycProvider;
 
-/// Technician-facing Service History screen for a single (repeat) customer —
-/// every past booking they've made with this technician, with pricing/tier
-/// info (first-time vs repeat-customer discount) attached. Reached by tapping
-/// a customer on the "My Customers" (repeat customers) screen. Backed by
-/// GET /technicians/:id/customers/:customerId/history.
-///
-/// Named CustomerServiceHistoryScreen (not ServiceHistoryScreen) because
-/// lib/screens/service_history_screen.dart already owns that name for the
-/// customer's own "My Bookings history" — two different screens for two
-/// different audiences that happened to get the same name in an earlier pass.
+        
 class CustomerServiceHistoryScreen extends StatefulWidget {
   final RepeatCustomer customer;
   const CustomerServiceHistoryScreen({Key? key, required this.customer}) : super(key: key);
@@ -35,7 +25,7 @@ class _CustomerServiceHistoryScreenState extends State<CustomerServiceHistoryScr
   Future<void> _load() async {
     final kyc = context.read<TechnicianKycProvider>();
     if (kyc.profile == null) {
-      await kyc.loadMyProfile();
+      await kyc.loadMyProfile();        
     }
     final technicianId = kyc.profile?.id;
     if (technicianId != null && mounted) {
@@ -98,7 +88,7 @@ class _ServiceHistoryCard extends StatelessWidget {
       case 'in_progress':
         return AppTheme.warningColor;
       default:
-        return TechTheme.primary;
+        return AppTheme.primaryColor;
     }
   }
 
@@ -251,15 +241,11 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: AppTheme.errorColor),
+            const Icon(Icons.error_outline, size: 48, color: Color.fromARGB(255, 219, 94, 91)),
             const SizedBox(height: 12),
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: onRetry,
-              style: ElevatedButton.styleFrom(backgroundColor: TechTheme.primary, foregroundColor: Colors.white),
-              child: const Text('Retry'),
-            ),
+            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
       ),

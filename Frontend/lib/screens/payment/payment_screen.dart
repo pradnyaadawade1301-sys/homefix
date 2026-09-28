@@ -131,8 +131,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   /// Cash on Delivery counterpart to _startPayment — no Checkout sheet, just
   /// records the payment as pending cash. The backend refuses this up front
-  /// if the assigned technician's wallet can't currently cover the platform
-  /// commission (see RazorpayService.CreateCodOrder) — that error surfaces
+  /// if the assigned technician's unpaid commission dues have hit the limit
+  /// (platform commission dues) (see RazorpayService.CreateCodOrder) — that error surfaces
   /// here as a snackbar rather than blocking the screen entirely, so the
   /// customer can fall back to paying online.
   Future<void> _startCodPayment() async {

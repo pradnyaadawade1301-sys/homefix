@@ -70,6 +70,10 @@ class ApiConfig {
   static String paymentConfirmCash(String paymentId) => '/payments/$paymentId/confirm-cash';
   static String bookingPendingCod(String bookingId) => '/bookings/$bookingId/payment/cod';
 
+  static const String technicianDues = '/technician/dues';
+  static const String technicianDuesPay = '/technician/dues/pay';
+  static const String technicianDuesVerify = '/technician/dues/verify';
+
   static const String walletBalance = '/wallet';
   static const String walletTransactions = '/wallet/transactions';
 

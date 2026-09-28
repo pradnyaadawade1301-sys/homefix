@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/payment_model.dart';
 import '../models/wallet_model.dart';
+import '../models/due_model.dart';
 import '../services/service_locator.dart';
 
 class PaymentProvider extends ChangeNotifier {
@@ -13,6 +14,9 @@ class PaymentProvider extends ChangeNotifier {
   List<Payment> _history = [];
   InvoiceDetail? _invoice;
   Wallet? _wallet;
+  DueSummary? _dues;
+  bool _isLoadingDues = false;
+  bool _isPayingDues = false;
   bool _isCreatingOrder = false;
   bool _isConfirming = false;
   bool _isLoadingHistory = false;
@@ -25,12 +29,69 @@ class PaymentProvider extends ChangeNotifier {
   List<Payment> get history => _history;
   InvoiceDetail? get invoice => _invoice;
   Wallet? get wallet => _wallet;
+  DueSummary? get dues => _dues;
+  bool get isLoadingDues => _isLoadingDues;
+  bool get isPayingDues => _isPayingDues;
   bool get isCreatingOrder => _isCreatingOrder;
   bool get isConfirming => _isConfirming;
   bool get isLoadingHistory => _isLoadingHistory;
   bool get isLoadingInvoice => _isLoadingInvoice;
   bool get isLoadingWallet => _isLoadingWallet;
   String? get error => _error;
+
+  /// Technician's COD commission dues (replaces the wallet-balance gate).
+  Future<void> fetchDues() async {
+    _isLoadingDues = true;
+    notifyListeners();
+    try {
+      _dues = await _paymentService.getDues();
+    } catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+    } finally {
+      _isLoadingDues = false;
+      notifyListeners();
+    }
+  }
+
+  /// Step 1 of paying dues: asks the backend for a Razorpay order. Returns
+  /// null (and sets [error]) on failure.
+  Future<DueOrder?> createDueOrder() async {
+    _isPayingDues = true;
+    _error = null;
+    notifyListeners();
+    try {
+      return await _paymentService.createDueOrder();
+    } catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+      return null;
+    } finally {
+      _isPayingDues = false;
+      notifyListeners();
+    }
+  }
+
+  /// Step 2: after Razorpay Checkout succeeds, the server verifies the
+  /// signature and clears the dues.
+  Future<bool> verifyDuePayment({
+    required String orderId,
+    required String paymentId,
+    required String signature,
+  }) async {
+    _isPayingDues = true;
+    _error = null;
+    notifyListeners();
+    try {
+      _dues = await _paymentService.verifyDuePayment(
+          orderId: orderId, paymentId: paymentId, signature: signature);
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+      return false;
+    } finally {
+      _isPayingDues = false;
+      notifyListeners();
+    }
+  }
 
   /// Technician's own wallet balance — surfaced in TechnicianSettlementScreen
   /// so a ₹0 balance (the reason COD silently fails, see PaymentService.
