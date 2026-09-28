@@ -126,7 +126,27 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   }
 
   Future<pw.Document> _buildPdf(InvoiceDetail inv) async {
-    final doc = pw.Document();
+    // The PDF package's built-in font (Helvetica) has no Devanagari glyphs, so
+    // Hindi/Marathi text (e.g. from voice-typed issue descriptions) came out
+    // as empty boxes. Noto Sans covers Latin + ₹, with Noto Sans Devanagari as
+    // the fallback for Hindi/Marathi. Fonts are fetched once and cached; if the
+    // download fails (offline) we fall back to the default font instead of
+    // failing the whole download.
+    pw.ThemeData? theme;
+    try {
+      final base = await PdfGoogleFonts.notoSansRegular();
+      final bold = await PdfGoogleFonts.notoSansBold();
+      final deva = await PdfGoogleFonts.notoSansDevanagariRegular();
+      final devaBold = await PdfGoogleFonts.notoSansDevanagariBold();
+      theme = pw.ThemeData.withFont(
+        base: base,
+        bold: bold,
+        fontFallback: [deva, devaBold],
+      );
+    } catch (_) {
+      theme = null;
+    }
+    final doc = pw.Document(theme: theme);
     final dateFmt = DateFormat('d MMM yyyy, h:mm a');
     const teal = PdfColor.fromInt(0xFF0F766E);
 

@@ -814,7 +814,7 @@ class _TrustBadge extends StatelessWidget {
           height: 40,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: const Color(0xFF0F766E).withValues(alpha: 0.08),
+            color: const    Color(0xFF0F766E).withValues(alpha: 0.08),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: const Color(0xFF0F766E), size: 20),

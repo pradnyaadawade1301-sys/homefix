@@ -21,13 +21,16 @@ func NewCallLogRepository(database *pgxpool.Pool) *CallLogRepository {
 // Create writes a new 'ringing' row the moment a call is initiated — this is
 // what makes the call show up in history even if it's never answered
 // (a missed call still needs its own row).
-func (r *CallLogRepository) Create(ctx context.Context, bookingID, consultationID *string, callerUserID, calleeUserID string) (*models.CallLog, error) {
+func (r *CallLogRepository) Create(ctx context.Context, bookingID, consultationID *string, callerUserID, calleeUserID, callType string) (*models.CallLog, error) {
+	if callType != "video" {
+		callType = "audio"
+	}
 	row := r.db.QueryRow(ctx, `
-		INSERT INTO call_logs (booking_id, consultation_id, caller_user_id, callee_user_id, status)
-		VALUES ($1, $2, $3, $4, 'ringing')
+		INSERT INTO call_logs (booking_id, consultation_id, caller_user_id, callee_user_id, status, call_type)
+		VALUES ($1, $2, $3, $4, 'ringing', $5)
 		RETURNING id, booking_id, consultation_id, caller_user_id, callee_user_id, status,
-		          started_at, answered_at, ended_at, duration_seconds, created_at
-	`, bookingID, consultationID, callerUserID, calleeUserID)
+		          started_at, answered_at, ended_at, duration_seconds, created_at, call_type
+	`, bookingID, consultationID, callerUserID, calleeUserID, callType)
 	return scanCallLog(row)
 }
 
@@ -75,7 +78,7 @@ func (r *CallLogRepository) ListForUser(ctx context.Context, userID string, limi
 	}
 	rows, err := r.db.Query(ctx, `
 		SELECT cl.id, cl.booking_id, cl.consultation_id, cl.caller_user_id, cl.callee_user_id,
-		       cl.status, cl.started_at, cl.answered_at, cl.ended_at, cl.duration_seconds, cl.created_at,
+		       cl.status, cl.started_at, cl.answered_at, cl.ended_at, cl.duration_seconds, cl.created_at, cl.call_type,
 		       peer.name, peer.role,
 		       COALESCE(cat.name, '') AS category_name
 		FROM call_logs cl
@@ -97,7 +100,7 @@ func (r *CallLogRepository) ListForUser(ctx context.Context, userID string, limi
 		var e models.CallLogEntry
 		if err := rows.Scan(
 			&e.ID, &e.BookingID, &e.ConsultationID, &e.CallerUserID, &e.CalleeUserID,
-			&e.Status, &e.StartedAt, &e.AnsweredAt, &e.EndedAt, &e.DurationSeconds, &e.CreatedAt,
+			&e.Status, &e.StartedAt, &e.AnsweredAt, &e.EndedAt, &e.DurationSeconds, &e.CreatedAt, &e.CallType,
 			&e.PeerName, &e.PeerRole, &e.CategoryName,
 		); err != nil {
 			return nil, err
@@ -113,7 +116,7 @@ func scanCallLog(row pgx.Row) (*models.CallLog, error) {
 	var startedAt time.Time
 	if err := row.Scan(
 		&c.ID, &c.BookingID, &c.ConsultationID, &c.CallerUserID, &c.CalleeUserID,
-		&c.Status, &startedAt, &c.AnsweredAt, &c.EndedAt, &c.DurationSeconds, &c.CreatedAt,
+		&c.Status, &startedAt, &c.AnsweredAt, &c.EndedAt, &c.DurationSeconds, &c.CreatedAt, &c.CallType,
 	); err != nil {
 		return nil, err
 	}
