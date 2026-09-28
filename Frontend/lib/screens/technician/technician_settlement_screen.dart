@@ -526,7 +526,7 @@ class _PaymentTileState extends State<_PaymentTile> {
               children: [
                 Row(
                   children: [
-                    Text('₹${payment.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                    Text('₹${payment.amount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -537,7 +537,7 @@ class _PaymentTileState extends State<_PaymentTile> {
                 ),
                 const SizedBox(height: 3),
                 if (payment.technicianEarning != null)
-                  Text(AppLocalizations.of(context).techSettlementYourShare(payment.technicianEarning!.toStringAsFixed(0)),
+                  Text(AppLocalizations.of(context).techSettlementYourShare(payment.technicianEarning!.toStringAsFixed(2)),
                       style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                 const SizedBox(height: 3),
                 Text(
