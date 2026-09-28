@@ -38,7 +38,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   void initState() {
     super.initState();
     _load();
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _load(silent: true));
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _load(silent: true));
   }
 
   @override
@@ -93,6 +93,9 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
         _isSending = false;
       });
       _scrollToBottom();
+      // Support may have replied automatically — fetch right away instead
+      // of waiting for the next poll.
+      _load(silent: true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSending = false);
@@ -171,6 +174,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
         _isUploadingAttachment = false;
       });
       _scrollToBottom();
+      _load(silent: true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _isUploadingAttachment = false);
@@ -232,7 +236,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Text(
-            'Kuch bhi pucho ya complain karo — HomeFix support team seedha yahan reply karegi.',
+            'Ask a question or raise a complaint — our support team will reply right here.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey[500]),
           ),
@@ -361,7 +365,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                 maxLines: 4,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
-                  hintText: 'Apna message likhein...',
+                  hintText: 'Type your message...',
                   filled: true,
                   fillColor: Colors.grey[100],
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
