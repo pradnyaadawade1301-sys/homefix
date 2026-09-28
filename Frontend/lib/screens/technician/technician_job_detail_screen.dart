@@ -449,14 +449,52 @@ class _CashReceivedButtonState extends State<_CashReceivedButton> {
     }
   }
 
+  /// Asks the technician for the OTP the customer sees on their phone.
+  Future<String?> _askOtp() async {
+    final ctrl = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Enter customer OTP'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('After taking the cash, ask the customer for the OTP shown on their app.', style: TextStyle(fontSize: 13)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              maxLength: 4,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 26, letterSpacing: 8, fontWeight: FontWeight.w700),
+              decoration: const InputDecoration(counterText: '', hintText: '••••'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), child: const Text('Confirm')),
+        ],
+      ),
+    );
+  }
+
   Future<void> _confirm() async {
     if (_confirming || _payment == null) return;
+    final otp = await _askOtp();
+    if (otp == null || otp.length != 4) {
+      if (otp != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter the 4-digit OTP')));
+      }
+      return;
+    }
     setState(() => _confirming = true);
     try {
-      await context.read<PaymentProvider>().confirmCash(_payment!.id);
+      await context.read<PaymentProvider>().confirmCash(_payment!.id, otp);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cash payment confirmed — commission debited from your wallet.')),
+        const SnackBar(content: Text('Cash payment confirmed — commission added to your dues (pay it from Settlement).')),
       );
       setState(() => _payment = null);
     } catch (e) {
@@ -494,7 +532,7 @@ class _CashReceivedButtonState extends State<_CashReceivedButton> {
           icon: _confirming
               ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.payments_outlined, size: 18),
-          label: Text(_confirming ? 'Confirming…' : 'Confirm ₹${payment.amount.toStringAsFixed(0)} cash received'),
+          label: Text(_confirming ? 'Confirming…' : 'Cash received ₹${payment.amount.toStringAsFixed(0)} — enter OTP'),
           style: OutlinedButton.styleFrom(foregroundColor: TechTheme.primary, side: const BorderSide(color: TechTheme.primary)),
         ),
       ),

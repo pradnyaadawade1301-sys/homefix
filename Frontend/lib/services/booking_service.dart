@@ -152,6 +152,20 @@ class BookingService {
     }
   }
 
+  /// Chat history from this customer+technician pair's earlier bookings
+  /// together — GET /bookings/:id/messages/previous. Not this booking's own
+  /// thread (see [getMessages]); empty when this is their first booking
+  /// together or no technician is assigned yet.
+  Future<List<BookingMessage>> getPreviousMessages(String bookingId) async {
+    try {
+      final response = await _httpClient.get('${ApiConfig.bookingDetail}/$bookingId/messages/previous');
+      final list = ApiEnvelope.unwrap(response) as List? ?? [];
+      return list.map((e) => BookingMessage.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
   /// Sends a chat message — POST /bookings/:id/messages.
   Future<BookingMessage> sendMessage(String bookingId, String content) async {
     try {

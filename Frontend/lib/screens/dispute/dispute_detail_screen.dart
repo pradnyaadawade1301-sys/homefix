@@ -6,6 +6,7 @@ import '../../core/theme.dart';
 import '../../models/dispute_model.dart';
 import '../../services/dispute_service.dart';
 import '../../services/service_locator.dart' show UploadService;
+import 'dispute_chat_screen.dart';
 
 /// Dispute detail + evidence trail. GET /disputes/:id for the data, POST
 /// /disputes/:id/evidence to attach photos/notes. Resolution (refund/reject)
@@ -119,7 +120,18 @@ class _DisputeDetailScreenState extends State<DisputeDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Dispute Details')),
+      appBar: AppBar(
+        title: const Text('Dispute Details'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.chat_bubble_outline),
+            tooltip: 'Chat with Support',
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => DisputeChatScreen(disputeId: widget.disputeId),
+            )),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: FutureBuilder<DisputeDetail>(

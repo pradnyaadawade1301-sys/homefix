@@ -19,6 +19,7 @@ type CallLog struct {
 	CallerUserID    string     `json:"caller_user_id"`
 	CalleeUserID    string     `json:"callee_user_id"`
 	Status          string     `json:"status"`
+	CallType        string     `json:"call_type"` // "audio" | "video"
 	StartedAt       time.Time  `json:"started_at"`
 	AnsweredAt      *time.Time `json:"answered_at,omitempty"`
 	EndedAt         *time.Time `json:"ended_at,omitempty"`
@@ -31,8 +32,8 @@ type CallLog struct {
 // user's point of view — whether this was an outgoing or incoming call.
 type CallLogEntry struct {
 	CallLog
-	PeerName       string `json:"peer_name"`
-	PeerRole       string `json:"peer_role"` // "technician" or "customer"
-	CategoryName   string `json:"category_name,omitempty"`
-	IsOutgoing     bool   `json:"is_outgoing"` // true if the viewing user placed the call
+	PeerName     string `json:"peer_name"`
+	PeerRole     string `json:"peer_role"` // "technician" or "customer"
+	CategoryName string `json:"category_name,omitempty"`
+	IsOutgoing   bool   `json:"is_outgoing"` // true if the viewing user placed the call
 }

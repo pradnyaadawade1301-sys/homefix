@@ -472,6 +472,34 @@ func (r *BookingRepository) ListMessages(ctx context.Context, bookingID string) 
 	return out, rows.Err()
 }
 
+// ListPreviousMessages returns every chat message this customer and
+// technician exchanged on their OTHER bookings together (i.e. every booking
+// except currentBookingID), oldest first — chat is normally booking-scoped
+// (see ListMessages), so this is what backs the "Previous conversation"
+// section shown when the same pair is reconnected on a new booking.
+func (r *BookingRepository) ListPreviousMessages(ctx context.Context, customerID, technicianID, currentBookingID string) ([]models.BookingMessage, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT bm.id, bm.booking_id, bm.sender_id, bm.sender_role, bm.content, bm.created_at, bm.read_at
+		FROM booking_messages bm
+		JOIN bookings b ON b.id = bm.booking_id
+		WHERE b.customer_id = $1 AND b.technician_id = $2 AND b.id != $3
+		ORDER BY bm.created_at ASC`, customerID, technicianID, currentBookingID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []models.BookingMessage
+	for rows.Next() {
+		var m models.BookingMessage
+		if err := rows.Scan(&m.ID, &m.BookingID, &m.SenderID, &m.SenderRole, &m.Content, &m.CreatedAt, &m.ReadAt); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
 // MarkMessagesRead marks every unread message in this booking's chat that
 // wasn't sent by readerID (i.e. the other side's messages) as read. Called
 // whenever a user opens that chat thread — see BookingService.ListMessages.

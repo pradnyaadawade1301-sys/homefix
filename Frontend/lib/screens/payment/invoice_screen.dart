@@ -126,7 +126,27 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   }
 
   Future<pw.Document> _buildPdf(InvoiceDetail inv) async {
-    final doc = pw.Document();
+    // The PDF package's built-in font (Helvetica) has no Devanagari glyphs, so
+    // Hindi/Marathi text (e.g. from voice-typed issue descriptions) came out
+    // as empty boxes. Noto Sans covers Latin + ₹, with Noto Sans Devanagari as
+    // the fallback for Hindi/Marathi. Fonts are fetched once and cached; if the
+    // download fails (offline) we fall back to the default font instead of
+    // failing the whole download.
+    pw.ThemeData? theme;
+    try {
+      final base = await PdfGoogleFonts.notoSansRegular();
+      final bold = await PdfGoogleFonts.notoSansBold();
+      final deva = await PdfGoogleFonts.notoSansDevanagariRegular();
+      final devaBold = await PdfGoogleFonts.notoSansDevanagariBold();
+      theme = pw.ThemeData.withFont(
+        base: base,
+        bold: bold,
+        fontFallback: [deva, devaBold],
+      );
+    } catch (_) {
+      theme = null;
+    }
+    final doc = pw.Document(theme: theme);
     final dateFmt = DateFormat('d MMM yyyy, h:mm a');
     const teal = PdfColor.fromInt(0xFF0F766E);
 
@@ -185,7 +205,6 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                         pw.Text('Billed to', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600, fontWeight: pw.FontWeight.bold)),
                         pw.SizedBox(height: 3),
                         pw.Text(inv.customerName, style: const pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-                        if (inv.customerPhone.isNotEmpty) pw.Text(inv.customerPhone, style: const pw.TextStyle(fontSize: 10)),
                         if (inv.addressFormatted.isNotEmpty)
                           pw.Padding(
                             padding: const pw.EdgeInsets.only(top: 3),
@@ -202,7 +221,6 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                           pw.Text('Service by', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600, fontWeight: pw.FontWeight.bold)),
                           pw.SizedBox(height: 3),
                           pw.Text(inv.technicianName, style: const pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-                          if (inv.technicianPhone.isNotEmpty) pw.Text(inv.technicianPhone, style: const pw.TextStyle(fontSize: 10)),
                         ],
                       ),
                     ),
@@ -409,10 +427,10 @@ class _InvoiceBody extends StatelessWidget {
                 Text(invoice.problemDescription, style: TextStyle(fontSize: 13, color: Colors.grey[700])),
               ],
               const Divider(height: 24),
-              _personRow(Icons.person_outline_rounded, 'Billed to', invoice.customerName, invoice.customerPhone),
+              _personRow(Icons.person_outline_rounded, 'Billed to', invoice.customerName, ''),
               if (invoice.technicianName.isNotEmpty) ...[
                 const SizedBox(height: 10),
-                _personRow(Icons.build_outlined, 'Service by', invoice.technicianName, invoice.technicianPhone),
+                _personRow(Icons.build_outlined, 'Service by', invoice.technicianName, ''),
               ],
               if (invoice.addressFormatted.isNotEmpty) ...[
                 const SizedBox(height: 10),

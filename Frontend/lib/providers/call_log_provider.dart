@@ -18,6 +18,16 @@ class CallLogProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
+  /// This booking's calls only, oldest first — used by the booking chat to
+  /// show "Voice call"/"Video call" rows inline. Doesn't touch the shared
+  /// list/loading state, so it's safe to call from a polling timer.
+  Future<List<CallLogEntry>> callsForBooking(String bookingId) async {
+    final all = await _service.getHistory();
+    final list = all.where((c) => c.bookingId == bookingId).toList();
+    list.sort((a, b) => a.startedAt.compareTo(b.startedAt));
+    return list;
+  }
+
   Future<void> loadHistory() async {
     _isLoading = true;
     _error = null;

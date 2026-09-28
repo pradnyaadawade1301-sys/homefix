@@ -392,6 +392,22 @@ func (h *BookingHandler) ListMessages(c *gin.Context) {
 	utils.Success(c, http.StatusOK, msgs)
 }
 
+// ListPreviousMessages — GET /bookings/:id/messages/previous — chat history
+// from this customer+technician pair's earlier bookings together (not this
+// booking's own thread, see ListMessages).
+func (h *BookingHandler) ListPreviousMessages(c *gin.Context) {
+	bookingID := c.Param("id")
+	userID := c.GetString("user_id")
+	userRole := c.GetString("role")
+
+	msgs, err := h.bookingService.ListPreviousMessages(c.Request.Context(), bookingID, userID, userRole)
+	if err != nil {
+		utils.Error(c, http.StatusForbidden, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, msgs)
+}
+
 // --- OTP verification ---
 
 type bookingOTPVerifyBody struct {

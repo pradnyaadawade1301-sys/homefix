@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
@@ -73,7 +74,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final alreadyPaid = await provider.checkExistingPayment(widget.bookingId);
     if (!mounted) return;
     if (alreadyPaid) {
-      setState(() => _stage = provider.confirmedPayment?.isPendingCash == true ? _Stage.pendingCash : _Stage.success);
+      final pending = provider.confirmedPayment?.isPendingCash == true;
+      setState(() => _stage = pending ? _Stage.pendingCash : _Stage.success);
+      if (pending) _startCashOtpFlow();
       return;
     }
     provider.reset();
@@ -85,8 +88,57 @@ class _PaymentScreenState extends State<PaymentScreen> {
     if (mounted) setState(() {});
   }
 
+  // Cash-on-delivery OTP shown to the customer while the payment is pending.
+  String? _cashOtp;
+  String? _cashOtpError;
+  bool _refreshingOtp = false;
+  Timer? _cashPollTimer;
+
+  /// Loads the OTP and starts polling so the screen flips to "Payment
+  /// Successful" by itself the moment the technician enters the OTP.
+  Future<void> _startCashOtpFlow() async {
+    final id = context.read<PaymentProvider>().confirmedPayment?.id;
+    if (id == null || id.isEmpty) return;
+    await _loadCashOtp(id, refresh: false);
+    _cashPollTimer?.cancel();
+    _cashPollTimer = Timer.periodic(const Duration(seconds: 4), (_) => _pollCashPaid());
+  }
+
+  Future<void> _loadCashOtp(String id, {required bool refresh}) async {
+    final provider = context.read<PaymentProvider>();
+    if (mounted) setState(() { _refreshingOtp = true; _cashOtpError = null; });
+    try {
+      final otp = refresh ? await provider.refreshCashOtp(id) : await provider.getCashOtp(id);
+      if (mounted) setState(() => _cashOtp = otp);
+    } catch (e) {
+      if (mounted) setState(() => _cashOtpError = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _refreshingOtp = false);
+    }
+  }
+
+  Future<void> _pollCashPaid() async {
+    if (!mounted || _stage != _Stage.pendingCash) return;
+    final provider = context.read<PaymentProvider>();
+    final stillPending = await provider.checkExistingPayment(widget.bookingId);
+    if (!mounted || !stillPending) return;
+    if (provider.confirmedPayment?.isPendingCash == true) return;
+    _cashPollTimer?.cancel();
+    setState(() => _stage = _Stage.success);
+    final paymentId = provider.confirmedPayment?.id;
+    if (paymentId != null && paymentId.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => InvoiceScreen(paymentId: paymentId)),
+        );
+      });
+    }
+  }
+
   @override
   void dispose() {
+    _cashPollTimer?.cancel();
     _razorpay.clear();
     super.dispose();
   }
@@ -131,8 +183,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   /// Cash on Delivery counterpart to _startPayment — no Checkout sheet, just
   /// records the payment as pending cash. The backend refuses this up front
-  /// if the assigned technician's wallet can't currently cover the platform
-  /// commission (see RazorpayService.CreateCodOrder) — that error surfaces
+  /// if the assigned technician's unpaid commission dues have hit the limit
+  /// (platform commission dues) (see RazorpayService.CreateCodOrder) — that error surfaces
   /// here as a snackbar rather than blocking the screen entirely, so the
   /// customer can fall back to paying online.
   Future<void> _startCodPayment() async {
@@ -144,6 +196,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     setState(() => _startingCod = false);
     if (ok) {
       setState(() => _stage = _Stage.pendingCash);
+      _startCashOtpFlow();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(provider.error ?? 'Could not start cash payment')),
@@ -395,12 +448,49 @@ class _PaymentScreenState extends State<PaymentScreen> {
           style: TextStyle(fontSize: 13.5, color: Colors.grey[600]),
         ),
         const SizedBox(height: 6),
+        const SizedBox(height: 22),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF8E1),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.orange.shade200),
+          ),
+          child: Column(
+            children: [
+              const Text('Your cash OTP', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              if (_cashOtp != null && _cashOtp!.isNotEmpty)
+                Text(
+                  _cashOtp!.split('').join('  '),
+                  style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: 4),
+                )
+              else if (_cashOtpError != null)
+                Text(_cashOtpError!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red, fontSize: 12.5))
+              else
+                const SizedBox(height: 28, width: 28, child: CircularProgressIndicator(strokeWidth: 2.5)),
+              const SizedBox(height: 8),
+              Text(
+                'Give the cash first, then tell this OTP to the technician. Never share it before paying.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+              ),
+              TextButton.icon(
+                onPressed: _refreshingOtp || payment == null ? null : () => _loadCashOtp(payment.id, refresh: true),
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('New OTP'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
         Text(
-          'The invoice will be ready once they confirm receiving the cash.',
+          'This screen updates by itself once the technician confirms the cash.',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 12, color: Colors.grey[500]),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 24),
         SizedBox(
           width: double.infinity,
           height: 50,

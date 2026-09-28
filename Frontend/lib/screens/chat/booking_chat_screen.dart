@@ -7,6 +7,8 @@ import '../../core/booking_call_launcher.dart';
 import '../../core/theme.dart';
 import '../../core/technician_theme.dart';
 import '../../models/booking_model.dart';
+import '../../models/call_log_model.dart';
+import '../../providers/call_log_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/booking_service.dart';
 import '../../services/service_locator.dart' show UploadService;
@@ -42,6 +44,9 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
   final _scrollController = ScrollController();
   final _imagePicker = ImagePicker();
   List<BookingMessage> _messages = [];
+  // Audio/video calls on this booking — shown inline in the thread (like
+  // WhatsApp's "Missed voice call" rows), merged with messages by time.
+  List<CallLogEntry> _calls = [];
   bool _isLoading = true;
   bool _isSending = false;
   bool _isUploadingImage = false;
@@ -52,15 +57,40 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
   // can start a call); fetched separately since this screen is only ever
   // given a bookingId + peerName by its callers, not the full Booking.
   bool _callable = false;
+  // Messages from this same customer+technician pair's *other* bookings —
+  // chat is normally booking-scoped, so this is what lets a returning
+  // customer/technician see they've talked before. Shown collapsed by
+  // default above the current booking's thread; empty when this is their
+  // first booking together.
+  List<BookingMessage> _previousMessages = [];
+  bool _isLoadingPrevious = true;
+  bool _previousExpanded = false;
 
   @override
   void initState() {
     super.initState();
     _load();
     _loadCallability();
+    _loadPreviousMessages();
     // Simple polling so new messages from the other side show up without a
     // websocket layer — cheap for a booking-scoped 1:1 thread like this.
     _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _load(silent: true));
+  }
+
+  Future<void> _loadPreviousMessages() async {
+    try {
+      final messages = await context.read<BookingService>().getPreviousMessages(widget.bookingId);
+      if (!mounted) return;
+      setState(() {
+        _previousMessages = messages;
+        _isLoadingPrevious = false;
+      });
+    } catch (_) {
+      // Best-effort — the current booking's thread still loads fine without
+      // this; just skip showing the "previous conversation" section.
+      if (!mounted) return;
+      setState(() => _isLoadingPrevious = false);
+    }
   }
 
   @override
@@ -85,8 +115,14 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
     if (!silent) setState(() => _isLoading = true);
     try {
       final messages = await context.read<BookingService>().getMessages(widget.bookingId);
+      // Best-effort: a failure loading call history must never hide the chat.
+      List<CallLogEntry> calls = _calls;
+      try {
+        calls = await context.read<CallLogProvider>().callsForBooking(widget.bookingId);
+      } catch (_) {}
       if (!mounted) return;
       setState(() {
+        _calls = calls;
         _messages = messages;
         _isLoading = false;
         _error = null;
@@ -198,6 +234,16 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
     }
   }
 
+  // Shown when the customer taps the audio/video call icon before a
+  // technician is assigned to this booking (or the booking is no longer
+  // in a callable state) — previously the buttons just looked disabled
+  // with no explanation.
+  void _showNotAvailable() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Technician is not available right now. Please try again later.')),
+    );
+  }
+
   void _openImage(String url) {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => Scaffold(
@@ -219,16 +265,16 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
           IconButton(
             icon: const Icon(Icons.call_outlined),
             tooltip: 'Audio call',
-            onPressed: _callable
-                ? () => startBookingAudioCall(context, bookingId: widget.bookingId, peerDisplayName: widget.peerName)
-                : null,
+            onPressed: () => _callable
+                ? startBookingAudioCall(context, bookingId: widget.bookingId, peerDisplayName: widget.peerName)
+                : _showNotAvailable(),
           ),
           IconButton(
             icon: const Icon(Icons.videocam_outlined),
             tooltip: 'Video call',
-            onPressed: _callable
-                ? () => startBookingVideoCall(context, bookingId: widget.bookingId, peerDisplayName: widget.peerName)
-                : null,
+            onPressed: () => _callable
+                ? startBookingVideoCall(context, bookingId: widget.bookingId, peerDisplayName: widget.peerName)
+                : _showNotAvailable(),
           ),
         ],
       ),
@@ -258,7 +304,8 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
         ),
       );
     }
-    if (_messages.isEmpty) {
+    final showPrevious = !_isLoadingPrevious && _previousMessages.isNotEmpty;
+    if (_messages.isEmpty && _calls.isEmpty && !showPrevious) {
       return Center(
         child: Text(
           l10n.chatEmptyState,
@@ -266,79 +313,231 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
         ),
       );
     }
+    if (_messages.isEmpty && _calls.isEmpty) {
+      // No messages on this booking yet, but they've chatted on an earlier
+      // one together — lead with that instead of the empty state.
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _previousConversationSection(myId),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 24),
+              child: Text(l10n.chatEmptyState, style: TextStyle(color: Colors.grey[500])),
+            ),
+          ),
+        ],
+      );
+    }
+    // Messages and calls interleaved oldest -> newest.
+    final timeline = <({DateTime at, BookingMessage? msg, CallLogEntry? call})>[
+      for (final m in _messages) (at: m.createdAt, msg: m, call: null),
+      for (final c in _calls) (at: c.startedAt, msg: null, call: c),
+    ]..sort((a, b) => a.at.compareTo(b.at));
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(16),
-      itemCount: _messages.length,
+      itemCount: (showPrevious ? 1 : 0) + timeline.length,
       itemBuilder: (context, i) {
-        final msg = _messages[i];
-        final isMine = msg.senderId == myId;
-        final isImage = msg.content.startsWith(_imageMessagePrefix);
-        final imageUrl = isImage ? msg.content.substring(_imageMessagePrefix.length) : null;
-        return Align(
-          alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: isImage
-                ? const EdgeInsets.all(6)
-                : const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
-            decoration: BoxDecoration(
-              color: isMine
-                  ? (context.watch<AuthProvider>().currentUser?.isTechnician == true ? TechTheme.primary : AppTheme.primaryColor)
-                  : Colors.grey[200],
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(14),
-                topRight: const Radius.circular(14),
-                bottomLeft: Radius.circular(isMine ? 14 : 2),
-                bottomRight: Radius.circular(isMine ? 2 : 14),
+        if (showPrevious) {
+          if (i == 0) return _previousConversationSection(myId);
+          i -= 1;
+        }
+        final item = timeline[i];
+        if (item.call != null) return _callRow(item.call!);
+        return _messageBubble(item.msg!, myId);
+      },
+    );
+  }
+
+  // Collapsible header + (when expanded) the messages themselves from this
+  // pair's earlier bookings, rendered above the current booking's thread.
+  Widget _previousConversationSection(String? myId) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => setState(() => _previousExpanded = !_previousExpanded),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(Icons.history, size: 18, color: Colors.grey[700]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Previous conversation (${_previousMessages.length})',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey[800]),
+                    ),
+                  ),
+                  Icon(
+                    _previousExpanded ? Icons.expand_less : Icons.expand_more,
+                    color: Colors.grey[700],
+                  ),
+                ],
               ),
             ),
-            child: Column(
+          ),
+          if (_previousExpanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: Column(
+                children: _previousMessages.map((m) => _messageBubble(m, myId)).toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // WhatsApp-style call entry: a centered pill with an arrow-in-icon, the
+  // call type, and either "Missed", "No answer" or the duration.
+  Widget _callRow(CallLogEntry c) {
+    final missedIncoming = c.isMissed && !c.isOutgoing;
+    final kind = c.isVideo ? 'video call' : 'voice call';
+    String title;
+    String subtitle;
+    switch (c.status) {
+      case CallLogStatus.missed:
+        title = c.isOutgoing ? (c.isVideo ? 'Video call' : 'Voice call') : 'Missed $kind';
+        subtitle = c.isOutgoing ? 'No answer' : 'Tap call button to call back';
+        break;
+      case CallLogStatus.rejected:
+        title = c.isVideo ? 'Video call' : 'Voice call';
+        subtitle = 'Declined';
+        break;
+      case CallLogStatus.ringing:
+        title = c.isVideo ? 'Video call' : 'Voice call';
+        subtitle = c.isOutgoing ? 'Calling…' : 'Ringing…';
+        break;
+      case CallLogStatus.received:
+        title = c.isVideo ? 'Video call' : 'Voice call';
+        subtitle = _formatDuration(c.durationSeconds);
+        break;
+    }
+    final color = missedIncoming ? Colors.red[700]! : Colors.grey[800]!;
+    final arrow = missedIncoming
+        ? Icons.call_missed
+        : (c.isOutgoing ? Icons.call_made : Icons.call_received);
+    return Align(
+      alignment: Alignment.center,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: missedIncoming ? Colors.red.shade100 : Colors.grey.shade300),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(c.isVideo ? Icons.videocam_rounded : Icons.call_rounded, size: 20, color: color),
+            const SizedBox(width: 10),
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (isImage)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: GestureDetector(
-                      onTap: () => _openImage(imageUrl),
-                      child: SizedBox(
-                        width: 200,
-                        height: 200,
-                        child: Image.network(
-                          imageUrl!,
-                          fit: BoxFit.cover,
-                          loadingBuilder: (context, child, progress) {
-                            if (progress == null) return child;
-                            return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-                          },
-                          errorBuilder: (_, __, ___) => Container(
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  Text(
-                    msg.content,
-                    style: TextStyle(color: isMine ? Colors.white : Colors.black87, fontSize: 14),
-                  ),
-                const SizedBox(height: 4),
-                Text(
-                  _formatTime(msg.createdAt),
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    color: isMine ? Colors.white70 : Colors.grey[600],
-                  ),
+                Text(title, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: color)),
+                const SizedBox(height: 2),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(arrow, size: 13, color: missedIncoming ? Colors.red[700] : Colors.green[700]),
+                    const SizedBox(width: 4),
+                    Text('$subtitle · ${_formatTime(c.startedAt)}',
+                        style: TextStyle(fontSize: 11.5, color: Colors.grey[600])),
+                  ],
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDuration(int? seconds) {
+    final s = seconds ?? 0;
+    if (s <= 0) return 'Answered';
+    final m = s ~/ 60;
+    final r = s % 60;
+    return m > 0 ? '${m}m ${r.toString().padLeft(2, '0')}s' : '${r}s';
+  }
+
+  Widget _messageBubble(BookingMessage msg, String? myId) {
+    final isMine = msg.senderId == myId;
+    final isImage = msg.content.startsWith(_imageMessagePrefix);
+    final imageUrl = isImage ? msg.content.substring(_imageMessagePrefix.length) : null;
+    return Align(
+      alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: isImage
+            ? const EdgeInsets.all(6)
+            : const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+        decoration: BoxDecoration(
+          color: isMine
+              ? (context.watch<AuthProvider>().currentUser?.isTechnician == true ? TechTheme.primary : AppTheme.primaryColor)
+              : Colors.grey[200],
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(14),
+            topRight: const Radius.circular(14),
+            bottomLeft: Radius.circular(isMine ? 14 : 2),
+            bottomRight: Radius.circular(isMine ? 2 : 14),
           ),
-        );
-      },
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isImage)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: GestureDetector(
+                  onTap: () => _openImage(imageUrl),
+                  child: SizedBox(
+                    width: 200,
+                    height: 200,
+                    child: Image.network(
+                      imageUrl!,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                      },
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            else
+              Text(
+                msg.content,
+                style: TextStyle(color: isMine ? Colors.white : Colors.black87, fontSize: 14),
+              ),
+            const SizedBox(height: 4),
+            Text(
+              _formatTime(msg.createdAt),
+              style: TextStyle(
+                fontSize: 10.5,
+                color: isMine ? Colors.white70 : Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

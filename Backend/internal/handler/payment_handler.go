@@ -113,7 +113,14 @@ func (h *PaymentHandler) CreateCodOrder(c *gin.Context) {
 // RazorpayService.ConfirmCashPayment.
 func (h *PaymentHandler) ConfirmCash(c *gin.Context) {
 	userID := c.GetString("user_id")
-	payment, err := h.razorpay.ConfirmCashPayment(c.Request.Context(), c.Param("id"), userID)
+	var body struct {
+		OTP string `json:"otp" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, "enter the OTP shown on the customer's phone")
+		return
+	}
+	payment, err := h.razorpay.ConfirmCashPayment(c.Request.Context(), c.Param("id"), userID, body.OTP)
 	if err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return

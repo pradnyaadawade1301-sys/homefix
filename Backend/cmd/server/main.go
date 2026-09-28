@@ -57,6 +57,9 @@ func main() {
 	aiRepo := repository.NewAIRepository(pool)
 	notifRepo := repository.NewNotificationRepository(pool)
 	disputeRepo := repository.NewDisputeRepository(pool)
+	disputeMsgRepo := repository.NewDisputeMessageRepository(pool)
+	supportMsgRepo := repository.NewSupportMessageRepository(pool)
+	dueRepo := repository.NewDueRepository(pool)
 	inventoryRepo := repository.NewInventoryRepository(pool)
 	cmsRepo := repository.NewCmsRepository(pool)
 	auditRepo := repository.NewAuditRepository(pool)
@@ -88,6 +91,11 @@ func main() {
 		paymentRepo, bookingRepo, techRepo, walletRepo, fcmService,
 	)
 
+	// COD commission dues ledger. Without this, razorpayService.dueService
+	// stays nil and cash jobs never record a due (Pending dues stays 0).
+	dueService := service.NewDueService(dueRepo, cfg.RazorpayKeyID, cfg.RazorpayKeySecret, cfg.CodDueLimit, cfg.CodDueMaxDays)
+	razorpayService.SetDueService(dueService)
+
 	// ---- Domain services ----
 	authService := service.NewAuthService(userRepo, mailService, cfg.JWTAccessSecret, cfg.JWTRefreshSecret, cfg.JWTAccessTTLMin, cfg.JWTRefreshTTLHrs, cfg.GoogleClientID)
 	userService := service.NewUserService(userRepo)
@@ -96,7 +104,8 @@ func main() {
 	consultService := service.NewConsultationService(consultRepo, techRepo, bookingService, reviewRepo, aiRepo, fcmService)
 	walletService := service.NewWalletService(walletRepo)
 	reviewService := service.NewReviewService(reviewRepo, bookingRepo)
-	disputeService := service.NewDisputeService(disputeRepo, bookingRepo, consultRepo, techRepo, razorpayService, paymentRepo)
+	disputeService := service.NewDisputeService(disputeRepo, disputeMsgRepo, bookingRepo, consultRepo, techRepo, razorpayService, paymentRepo)
+	supportService := service.NewSupportService(supportMsgRepo)
 	inventoryService := service.NewInventoryService(inventoryRepo)
 	cmsService := service.NewCmsService(cmsRepo)
 	analyticsService := service.NewAnalyticsService(analyticsRepo)
@@ -123,6 +132,8 @@ func main() {
 		Consultation: handler.NewConsultationHandler(consultService, cfg.StunURLs, cfg.TurnURL, cfg.TurnSecret, cfg.TurnTTLSecond),
 		WebRTC:       handler.NewWebRTCHandler(cfg.StunURLs, cfg.TurnURL, cfg.TurnSecret, cfg.TurnTTLSecond),
 		Dispute:      handler.NewDisputeHandler(disputeService),
+		Due:          handler.NewDueHandler(dueService),
+		Support:      handler.NewSupportHandler(supportService),
 		Cms:          handler.NewCmsHandler(cmsService),
 		Finance:      financeHandler,
 		AdminAPI:     adminAPIHandler,
@@ -242,6 +253,78 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 		 SELECT id, category_id FROM technicians
 		 ON CONFLICT DO NOTHING;`); err != nil {
 		log.Printf("startup migration: failed to ensure technician_categories table exists: %v", err)
+	}
+
+	// 035–039 — same "Render never applies migrations/ files" issue as above.
+	// 035/036 dispute chat, 037 support chat, 038 COD commission dues ledger
+	// (without it GET /technician/dues fails and Pending dues shows 0),
+	// 039 cash-OTP columns. All idempotent.
+	if _, err := pool.Exec(ctx,
+		`CREATE TABLE IF NOT EXISTS dispute_messages (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			dispute_id UUID NOT NULL REFERENCES disputes(id) ON DELETE CASCADE,
+			sender_id UUID NULL REFERENCES users(id) ON DELETE SET NULL,
+			sender_role VARCHAR(16) NOT NULL CHECK (sender_role IN ('user', 'admin')),
+			message TEXT NULL DEFAULT '',
+			attachment_url TEXT NULL,
+			attachment_type VARCHAR(16) NULL CHECK (attachment_type IN ('image', 'video')),
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		 );
+		 CREATE INDEX IF NOT EXISTS idx_dispute_messages_dispute_id ON dispute_messages(dispute_id, created_at);
+		 ALTER TABLE dispute_messages ADD COLUMN IF NOT EXISTS attachment_url TEXT NULL;
+		 ALTER TABLE dispute_messages ADD COLUMN IF NOT EXISTS attachment_type VARCHAR(16) NULL;
+		 ALTER TABLE dispute_messages ALTER COLUMN message DROP NOT NULL;
+		 ALTER TABLE dispute_messages ALTER COLUMN message SET DEFAULT '';`); err != nil {
+		log.Printf("startup migration: failed to ensure dispute_messages table exists: %v", err)
+	}
+
+	if _, err := pool.Exec(ctx,
+		`CREATE TABLE IF NOT EXISTS support_messages (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			sender_role VARCHAR(16) NOT NULL CHECK (sender_role IN ('user', 'admin')),
+			message TEXT NULL,
+			attachment_url TEXT NULL,
+			attachment_type VARCHAR(16) NULL CHECK (attachment_type IN ('image', 'video')),
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			CONSTRAINT support_messages_has_content
+				CHECK ((message IS NOT NULL AND length(trim(message)) > 0) OR attachment_url IS NOT NULL)
+		 );
+		 CREATE INDEX IF NOT EXISTS idx_support_messages_user_id ON support_messages(user_id, created_at);`); err != nil {
+		log.Printf("startup migration: failed to ensure support_messages table exists: %v", err)
+	}
+
+	if _, err := pool.Exec(ctx,
+		`CREATE TABLE IF NOT EXISTS technician_dues (
+			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+			technician_user_id UUID NOT NULL REFERENCES users(id),
+			payment_id UUID NOT NULL UNIQUE REFERENCES payments(id),
+			booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
+			amount NUMERIC(12,2) NOT NULL,
+			status VARCHAR(10) NOT NULL DEFAULT 'pending',
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			paid_at TIMESTAMPTZ
+		 );
+		 CREATE INDEX IF NOT EXISTS idx_technician_dues_user_status ON technician_dues(technician_user_id, status);
+		 CREATE TABLE IF NOT EXISTS due_settlements (
+			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+			technician_user_id UUID NOT NULL REFERENCES users(id),
+			amount NUMERIC(12,2) NOT NULL,
+			due_ids UUID[] NOT NULL,
+			razorpay_order_id TEXT NOT NULL UNIQUE,
+			razorpay_payment_id TEXT,
+			status VARCHAR(10) NOT NULL DEFAULT 'created',
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			paid_at TIMESTAMPTZ
+		 );`); err != nil {
+		log.Printf("startup migration: failed to ensure technician_dues tables exist: %v", err)
+	}
+
+	if _, err := pool.Exec(ctx,
+		`ALTER TABLE payments ADD COLUMN IF NOT EXISTS cash_otp VARCHAR(4);
+		 ALTER TABLE payments ADD COLUMN IF NOT EXISTS cash_otp_attempts INT NOT NULL DEFAULT 0;
+		 ALTER TABLE payments ADD COLUMN IF NOT EXISTS cash_otp_verified_at TIMESTAMPTZ;`); err != nil {
+		log.Printf("startup migration: failed to ensure cash_otp columns exist: %v", err)
 	}
 
 	log.Println("startup migrations: done")

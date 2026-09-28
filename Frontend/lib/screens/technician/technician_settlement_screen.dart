@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../core/theme.dart';
 import '../../core/technician_theme.dart';
 import '../../models/booking_model.dart';
 import '../../models/payment_model.dart';
-import '../../models/wallet_model.dart';
+import '../../models/due_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/payment_provider.dart';
 import '../../l10n/app_localizations.dart';
@@ -44,7 +45,7 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
 
   Future<void> _load() async {
     final provider = context.read<PaymentProvider>();
-    await Future.wait([provider.loadHistory(), provider.fetchWallet()]);
+    await Future.wait([provider.loadHistory(), provider.fetchDues()]);
   }
 
   @override
@@ -79,7 +80,7 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: _WalletCard(wallet: paymentProvider.wallet, isLoading: paymentProvider.isLoadingWallet),
+                  child: _DuesCard(dues: paymentProvider.dues, isLoading: paymentProvider.isLoadingDues),
                 ),
               ),
               SliverToBoxAdapter(
@@ -202,70 +203,155 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
   }
 }
 
-/// Shows the technician's own wallet balance — this is what
-/// RazorpayService.CreateCodOrder checks against the platform commission
-/// before letting a Cash-on-Delivery job go through, so a ₹0 balance here
-/// is the reason COD keeps silently failing (see the low-balance guard).
-/// Wallet is only ever credited by completing an online-paid job or an
-/// admin top-up (AdminAPIHandler.CreditTechnicianWallet) — there's no
-/// self-serve top-up, so a low balance is flagged with a hint to contact
-/// support rather than a button that can't do anything yet.
-class _WalletCard extends StatelessWidget {
-  final Wallet? wallet;
+/// COD commission dues. When the technician confirms cash received, the
+/// platform's commission becomes a pending due (DueService). Once dues cross
+/// the limit (or any due is too old) Cash-on-Delivery jobs are blocked until
+/// the technician pays them here via Razorpay (UPI / cards / netbanking).
+class _DuesCard extends StatefulWidget {
+  final DueSummary? dues;
   final bool isLoading;
-  const _WalletCard({required this.wallet, required this.isLoading});
+  const _DuesCard({required this.dues, required this.isLoading});
+
+  @override
+  State<_DuesCard> createState() => _DuesCardState();
+}
+
+class _DuesCardState extends State<_DuesCard> {
+  late final Razorpay _razorpay;
+  String? _orderId;
+
+  @override
+  void initState() {
+    super.initState();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _onSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _onError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, (_) {});
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    super.dispose();
+  }
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _payDues() async {
+    final provider = context.read<PaymentProvider>();
+    final order = await provider.createDueOrder();
+    if (!mounted) return;
+    if (order == null) {
+      _snack(provider.error ?? 'Could not start payment');
+      return;
+    }
+    _orderId = order.razorpayOrderId;
+    try {
+      _razorpay.open({
+        'key': order.razorpayKeyId,
+        'amount': order.amountPaise,
+        'currency': order.currency,
+        'order_id': order.razorpayOrderId,
+        'name': 'OneFix Live',
+        'description': 'Commission dues',
+        'timeout': 300,
+      });
+    } catch (e) {
+      _snack('Could not open payment sheet: $e');
+    }
+  }
+
+  Future<void> _onSuccess(PaymentSuccessResponse r) async {
+    final provider = context.read<PaymentProvider>();
+    final ok = await provider.verifyDuePayment(
+      orderId: r.orderId ?? _orderId ?? '',
+      paymentId: r.paymentId ?? '',
+      signature: r.signature ?? '',
+    );
+    _snack(ok ? 'Dues paid — Cash-on-Delivery jobs are on again.' : (provider.error ?? 'Could not verify payment'));
+  }
+
+  void _onError(PaymentFailureResponse r) => _snack(r.message ?? 'Payment cancelled');
 
   @override
   Widget build(BuildContext context) {
-    final balance = wallet?.balance ?? 0;
-    final isLow = wallet != null && balance <= 0;
+    final dues = widget.dues;
+    final total = dues?.pendingTotal ?? 0;
+    final limit = dues?.limit ?? 0;
+    final blocked = dues?.codBlocked ?? false;
+    final paying = context.watch<PaymentProvider>().isPayingDues;
+    final warn = blocked || (limit > 0 && total >= limit * 0.8);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isLow ? AppTheme.errorColor.withValues(alpha: 0.3) : Colors.grey[200]!),
+        border: Border.all(color: warn ? AppTheme.errorColor.withValues(alpha: 0.3) : Colors.grey[200]!),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: TechTheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.account_balance_wallet_outlined, color: TechTheme.primary, size: 20),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: TechTheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.receipt_long_outlined, color: TechTheme.primary, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Pending dues (cash jobs)', style: TextStyle(fontSize: 12.5, color: Colors.black54)),
+                    const SizedBox(height: 2),
+                    widget.isLoading && dues == null
+                        ? const SizedBox(
+                            width: 14, height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: TechTheme.primary),
+                          )
+                        : Text(
+                            limit > 0
+                                ? '₹${total.toStringAsFixed(0)} / ₹${limit.toStringAsFixed(0)}'
+                                : '₹${total.toStringAsFixed(0)}',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: warn ? AppTheme.errorColor : Colors.black87,
+                            ),
+                          ),
+                  ],
+                ),
+              ),
+              if (total > 0)
+                ElevatedButton(
+                  onPressed: paying ? null : _payDues,
+                  child: paying
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Pay Dues'),
+                ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Wallet balance', style: TextStyle(fontSize: 12.5, color: Colors.black54)),
-                const SizedBox(height: 2),
-                isLoading && wallet == null
-                    ? const SizedBox(
-                        width: 14, height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: TechTheme.primary),
-                      )
-                    : Text(
-                        '₹${balance.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          color: isLow ? AppTheme.errorColor : Colors.black87,
-                        ),
-                      ),
-                if (isLow) ...[
-                  const SizedBox(height: 2),
-                  const Text(
-                    'Low balance — Cash-on-Delivery jobs need enough here to cover the commission. Contact support to top up.',
-                    style: TextStyle(fontSize: 11, color: AppTheme.errorColor),
-                  ),
-                ],
-              ],
+          if (blocked) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'Cash-on-Delivery jobs are paused — pay your dues to receive them again. Online jobs are not affected.',
+              style: TextStyle(fontSize: 11.5, color: AppTheme.errorColor),
             ),
-          ),
+          ] else if (total > 0) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Commission on cash jobs. Clear it before it reaches ₹${limit.toStringAsFixed(0)}'
+              '${(dues?.maxDays ?? 0) > 0 ? ' or ${dues!.maxDays} days' : ''} to keep getting cash jobs.',
+              style: const TextStyle(fontSize: 11.5, color: Colors.black54),
+            ),
+          ],
         ],
       ),
     );
@@ -440,7 +526,7 @@ class _PaymentTileState extends State<_PaymentTile> {
               children: [
                 Row(
                   children: [
-                    Text('₹${payment.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                    Text('₹${payment.amount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -451,7 +537,7 @@ class _PaymentTileState extends State<_PaymentTile> {
                 ),
                 const SizedBox(height: 3),
                 if (payment.technicianEarning != null)
-                  Text(AppLocalizations.of(context).techSettlementYourShare(payment.technicianEarning!.toStringAsFixed(0)),
+                  Text(AppLocalizations.of(context).techSettlementYourShare(payment.technicianEarning!.toStringAsFixed(2)),
                       style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                 const SizedBox(height: 3),
                 Text(

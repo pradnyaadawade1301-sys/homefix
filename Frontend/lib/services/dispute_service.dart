@@ -74,4 +74,42 @@ class DisputeService {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
   }
+
+  /// GET /disputes/:id/messages — the live-chat thread with support.
+  /// Poll this while the chat screen is open.
+  Future<List<DisputeMessage>> listMessages(String disputeId) async {
+    try {
+      final response = await _httpClient.get('/disputes/$disputeId/messages');
+      final list = ApiEnvelope.unwrap(response) as List? ?? [];
+      return list.map((e) => DisputeMessage.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// POST /disputes/:id/messages. To send a photo/video, upload the file
+  /// first via UploadService.uploadFile, then pass the returned URL here as
+  /// [attachmentUrl] with [attachmentType] "image" or "video". [message] can
+  /// be left empty for an attachment-only message.
+  Future<DisputeMessage> sendMessage({
+    required String disputeId,
+    String message = '',
+    String? attachmentUrl,
+    String? attachmentType,
+  }) async {
+    try {
+      final response = await _httpClient.post(
+        '/disputes/$disputeId/messages',
+        data: {
+          'message': message,
+          if (attachmentUrl != null) 'attachment_url': attachmentUrl,
+          if (attachmentType != null) 'attachment_type': attachmentType,
+        },
+      );
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return DisputeMessage.fromJson(data);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
 }

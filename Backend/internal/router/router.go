@@ -17,6 +17,7 @@ type Handlers struct {
 	Technician   *handler.TechnicianHandler
 	Booking      *handler.BookingHandler
 	Payment      *handler.PaymentHandler
+	Due          *handler.DueHandler
 	Wallet       *handler.WalletHandler
 	Review       *handler.ReviewHandler
 	AI           *handler.AIHandler
@@ -27,6 +28,7 @@ type Handlers struct {
 	Consultation *handler.ConsultationHandler
 	WebRTC       *handler.WebRTCHandler
 	Dispute      *handler.DisputeHandler
+	Support      *handler.SupportHandler
 	Cms          *handler.CmsHandler
 	Finance      *handler.FinanceHandler
 	AdminAPI     *handler.AdminAPIHandler
@@ -46,6 +48,10 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 	// Serves files saved by UploadHandler (technician government ID / profile photo,
 	// review images, etc.) — swap for a real S3/CDN URL when AWS storage is configured.
 	r.Static("/uploads", uploadDir)
+
+	// Support staff inbox for Live Chat (sign in with an admin account; the page
+	// itself only calls the role-protected /api/v1/admin/support/* endpoints).
+	r.GET("/support-inbox", handler.SupportInboxPage)
 
 	api := r.Group("/api/v1")
 
@@ -134,6 +140,7 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.POST("/bookings/:id/cancel", h.Booking.Cancel)
 		authed.POST("/bookings/:id/messages", h.Booking.SendMessage)
 		authed.GET("/bookings/:id/messages", h.Booking.ListMessages)
+		authed.GET("/bookings/:id/messages/previous", h.Booking.ListPreviousMessages)
 
 		// OTP verification before the technician can start work on-site.
 		// GetOTP is polled by the customer's app to show the on-screen code;
@@ -196,7 +203,14 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.POST("/payments/:id/refund", middleware.RequireRole("admin"), h.Payment.Refund)
 		authed.POST("/payments/cod", h.Payment.CreateCodOrder)
 		authed.POST("/payments/:id/confirm-cash", h.Payment.ConfirmCash)
+		authed.GET("/payments/:id/cash-otp", h.Payment.GetCashOTP)
+		authed.POST("/payments/:id/cash-otp/refresh", h.Payment.RefreshCashOTP)
 		authed.GET("/bookings/:id/payment/cod", h.Payment.GetPendingCodByBooking)
+
+		// Technician COD commission dues (replaces wallet-balance gating)
+		authed.GET("/technician/dues", middleware.RequireRole("technician"), h.Due.Summary)
+		authed.POST("/technician/dues/pay", middleware.RequireRole("technician"), h.Due.Pay)
+		authed.POST("/technician/dues/verify", middleware.RequireRole("technician"), h.Due.Verify)
 
 		authed.GET("/wallet", h.Wallet.Balance)
 		authed.GET("/wallet/transactions", h.Wallet.History)
@@ -210,6 +224,13 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.GET("/disputes/me", h.Dispute.ListMine)
 		authed.GET("/disputes/:id", h.Dispute.Get)
 		authed.POST("/disputes/:id/evidence", h.Dispute.AddEvidence)
+		authed.POST("/disputes/:id/messages", h.Dispute.SendMessage)
+		authed.GET("/disputes/:id/messages", h.Dispute.ListMessages)
+
+		// General "Contact Support" live chat (Profile screen) — not tied
+		// to any specific booking/consultation, unlike disputes above.
+		authed.POST("/support/messages", h.Support.SendMessage)
+		authed.GET("/support/messages", h.Support.ListMessages)
 
 		authed.POST("/ai/sessions", h.AI.StartSession)
 		authed.POST("/ai/sessions/:id/messages", h.AI.SendMessage)
@@ -231,12 +252,17 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 			adminAPI.GET("/bookings", h.AdminAPI.Bookings)
 			adminAPI.GET("/bookings/:id/photos", h.AdminAPI.BookingPhotos)
 			adminAPI.GET("/technicians", h.AdminAPI.Technicians)
-		adminAPI.GET("/technicians/:id/wallet", h.AdminAPI.TechnicianWallet)
-		adminAPI.POST("/technicians/:id/wallet/credit", h.AdminAPI.CreditTechnicianWallet)
+			adminAPI.GET("/technicians/:id/wallet", h.AdminAPI.TechnicianWallet)
+			adminAPI.POST("/technicians/:id/wallet/credit", h.AdminAPI.CreditTechnicianWallet)
 			adminAPI.GET("/disputes", h.AdminAPI.Disputes)
 			adminAPI.GET("/disputes/:id/evidence", h.AdminAPI.DisputeDetail)
 			adminAPI.PATCH("/disputes/:id/review", h.AdminAPI.ReviewDispute)
 			adminAPI.PATCH("/disputes/:id/resolve", h.AdminAPI.ResolveDispute)
+			adminAPI.GET("/disputes/:id/messages", h.AdminAPI.DisputeMessages)
+			adminAPI.POST("/disputes/:id/messages", h.AdminAPI.ReplyToDispute)
+			adminAPI.GET("/support/chats", h.AdminAPI.SupportChats)
+			adminAPI.GET("/support/chats/:user_id/messages", h.AdminAPI.SupportMessages)
+			adminAPI.POST("/support/chats/:user_id/messages", h.AdminAPI.ReplyToSupport)
 		}
 
 		// ---- New React Finance Panel (JSON API) ----

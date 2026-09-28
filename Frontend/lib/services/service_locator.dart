@@ -8,6 +8,7 @@ import '../models/user_model.dart';
 import '../models/ai_model.dart';
 import '../models/payment_model.dart';
 import '../models/wallet_model.dart';
+import '../models/due_model.dart';
 
 class CategoryService {
   final HttpClient _httpClient;
@@ -139,12 +140,35 @@ class PaymentService {
 
   /// Technician side: confirms cash was physically received for a pending
   /// COD payment — marks it paid and debits the platform commission from
-  /// their wallet. See RazorpayService.ConfirmCashPayment.
-  Future<Payment> confirmCash(String paymentId) async {
+  /// their dues. See RazorpayService.ConfirmCashPayment.
+  Future<Payment> confirmCash(String paymentId, String otp) async {
     try {
-      final response = await _httpClient.post(ApiConfig.paymentConfirmCash(paymentId));
+      final response = await _httpClient.post(ApiConfig.paymentConfirmCash(paymentId), data: {'otp': otp});
       final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
       return Payment.fromJson(data);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Customer side: the 4-digit code the customer reads out to the technician
+  /// after handing over cash. Only the payment's own customer can fetch it.
+  Future<String> getCashOtp(String paymentId) async {
+    try {
+      final response = await _httpClient.get(ApiConfig.paymentCashOtp(paymentId));
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return (data['otp'] as String?) ?? '';
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Customer side: issues a new cash OTP (also clears the wrong-attempt lock).
+  Future<String> refreshCashOtp(String paymentId) async {
+    try {
+      final response = await _httpClient.post(ApiConfig.paymentCashOtpRefresh(paymentId));
+      final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
+      return (data['otp'] as String?) ?? '';
     } catch (e) {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
@@ -161,6 +185,47 @@ class PaymentService {
       final response = await _httpClient.get(ApiConfig.walletBalance);
       final data = ApiEnvelope.unwrap(response) as Map<String, dynamic>;
       return Wallet.fromJson(data);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Technician's COD commission dues — see GET /technician/dues. Cash jobs
+  /// add the platform commission here; COD is blocked once it crosses the
+  /// limit until the technician pays it (see DueService).
+  Future<DueSummary> getDues() async {
+    try {
+      final response = await _httpClient.get(ApiConfig.technicianDues);
+      return DueSummary.fromJson(ApiEnvelope.unwrap(response) as Map<String, dynamic>);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Creates a Razorpay order for all pending dues (POST /technician/dues/pay).
+  Future<DueOrder> createDueOrder() async {
+    try {
+      final response = await _httpClient.post(ApiConfig.technicianDuesPay);
+      return DueOrder.fromJson(ApiEnvelope.unwrap(response) as Map<String, dynamic>);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// Sends Razorpay Checkout's response back so the server can verify the
+  /// signature and clear the dues (POST /technician/dues/verify).
+  Future<DueSummary> verifyDuePayment({
+    required String orderId,
+    required String paymentId,
+    required String signature,
+  }) async {
+    try {
+      final response = await _httpClient.post(ApiConfig.technicianDuesVerify, data: {
+        'razorpay_order_id': orderId,
+        'razorpay_payment_id': paymentId,
+        'razorpay_signature': signature,
+      });
+      return DueSummary.fromJson(ApiEnvelope.unwrap(response) as Map<String, dynamic>);
     } catch (e) {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
