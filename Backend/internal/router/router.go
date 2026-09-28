@@ -27,6 +27,7 @@ type Handlers struct {
 	Consultation *handler.ConsultationHandler
 	WebRTC       *handler.WebRTCHandler
 	Dispute      *handler.DisputeHandler
+	Support      *handler.SupportHandler
 	Cms          *handler.CmsHandler
 	Finance      *handler.FinanceHandler
 	AdminAPI     *handler.AdminAPIHandler
@@ -214,6 +215,11 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.POST("/disputes/:id/messages", h.Dispute.SendMessage)
 		authed.GET("/disputes/:id/messages", h.Dispute.ListMessages)
 
+		// General "Contact Support" live chat (Profile screen) — not tied
+		// to any specific booking/consultation, unlike disputes above.
+		authed.POST("/support/messages", h.Support.SendMessage)
+		authed.GET("/support/messages", h.Support.ListMessages)
+
 		authed.POST("/ai/sessions", h.AI.StartSession)
 		authed.POST("/ai/sessions/:id/messages", h.AI.SendMessage)
 		authed.GET("/ai/sessions/:id/messages", h.AI.History)
@@ -242,6 +248,9 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 			adminAPI.PATCH("/disputes/:id/resolve", h.AdminAPI.ResolveDispute)
 			adminAPI.GET("/disputes/:id/messages", h.AdminAPI.DisputeMessages)
 			adminAPI.POST("/disputes/:id/messages", h.AdminAPI.ReplyToDispute)
+			adminAPI.GET("/support/chats", h.AdminAPI.SupportChats)
+			adminAPI.GET("/support/chats/:user_id/messages", h.AdminAPI.SupportMessages)
+			adminAPI.POST("/support/chats/:user_id/messages", h.AdminAPI.ReplyToSupport)
 		}
 
 		// ---- New React Finance Panel (JSON API) ----

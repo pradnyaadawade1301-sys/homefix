@@ -58,6 +58,7 @@ func main() {
 	notifRepo := repository.NewNotificationRepository(pool)
 	disputeRepo := repository.NewDisputeRepository(pool)
 	disputeMsgRepo := repository.NewDisputeMessageRepository(pool)
+	supportMsgRepo := repository.NewSupportMessageRepository(pool)
 	inventoryRepo := repository.NewInventoryRepository(pool)
 	cmsRepo := repository.NewCmsRepository(pool)
 	auditRepo := repository.NewAuditRepository(pool)
@@ -98,6 +99,7 @@ func main() {
 	walletService := service.NewWalletService(walletRepo)
 	reviewService := service.NewReviewService(reviewRepo, bookingRepo)
 	disputeService := service.NewDisputeService(disputeRepo, disputeMsgRepo, bookingRepo, consultRepo, techRepo, razorpayService, paymentRepo)
+	supportService := service.NewSupportService(supportMsgRepo)
 	inventoryService := service.NewInventoryService(inventoryRepo)
 	cmsService := service.NewCmsService(cmsRepo)
 	analyticsService := service.NewAnalyticsService(analyticsRepo)
@@ -105,7 +107,7 @@ func main() {
 
 	// ---- Handlers ----
 	financeHandler := handler.NewFinanceHandler(paymentRepo, walletRepo, upiService)
-	adminAPIHandler := handler.NewAdminAPIHandler(userRepo, bookingRepo, techRepo, paymentRepo, disputeService, walletService)
+	adminAPIHandler := handler.NewAdminAPIHandler(userRepo, bookingRepo, techRepo, paymentRepo, disputeService, walletService, supportService)
 
 	handlers := &router.Handlers{
 		Auth:         handler.NewAuthHandler(authService, cfg.Env),
@@ -124,6 +126,7 @@ func main() {
 		Consultation: handler.NewConsultationHandler(consultService, cfg.StunURLs, cfg.TurnURL, cfg.TurnSecret, cfg.TurnTTLSecond),
 		WebRTC:       handler.NewWebRTCHandler(cfg.StunURLs, cfg.TurnURL, cfg.TurnSecret, cfg.TurnTTLSecond),
 		Dispute:      handler.NewDisputeHandler(disputeService),
+		Support:      handler.NewSupportHandler(supportService),
 		Cms:          handler.NewCmsHandler(cmsService),
 		Finance:      financeHandler,
 		AdminAPI:     adminAPIHandler,
@@ -287,6 +290,32 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 		`ALTER TABLE dispute_messages ADD CONSTRAINT dispute_messages_has_content
 			CHECK ((message IS NOT NULL AND length(trim(message)) > 0) OR attachment_url IS NOT NULL);`); err != nil {
 		log.Printf("startup migration: dispute_messages_has_content: %v", err)
+	}
+
+	// 037_support_messages — same "Render never applies migrations/ files"
+	// issue as above. General "Contact Support" live chat reachable from
+	// the Profile screen (Call us / Email us / Live Chat), not tied to any
+	// specific booking/consultation the way dispute_messages is. Safe
+	// no-op once it exists.
+	if _, err := pool.Exec(ctx,
+		`CREATE TABLE IF NOT EXISTS support_messages (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			sender_role VARCHAR(16) NOT NULL CHECK (sender_role IN ('user', 'admin')),
+			message TEXT NULL,
+			attachment_url TEXT NULL,
+			attachment_type VARCHAR(16) NULL CHECK (attachment_type IN ('image', 'video')),
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		 );
+		 CREATE INDEX IF NOT EXISTS idx_support_messages_user_id ON support_messages(user_id, created_at);`); err != nil {
+		log.Printf("startup migration: failed to ensure support_messages table exists: %v", err)
+	}
+	if _, err := pool.Exec(ctx,
+		`ALTER TABLE support_messages ADD CONSTRAINT support_messages_has_content
+			CHECK ((message IS NOT NULL AND length(trim(message)) > 0) OR attachment_url IS NOT NULL);`); err != nil {
+		// No "ADD CONSTRAINT IF NOT EXISTS" in Postgres — harmless
+		// "already exists" error on every boot after the first.
+		log.Printf("startup migration: support_messages_has_content: %v", err)
 	}
 
 	log.Println("startup migrations: done")

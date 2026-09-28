@@ -24,6 +24,7 @@ type AdminAPIHandler struct {
 	paymentRepo    *repository.PaymentRepository
 	disputeService *service.DisputeService
 	walletService  *service.WalletService
+	supportService *service.SupportService
 }
 
 func NewAdminAPIHandler(
@@ -33,6 +34,7 @@ func NewAdminAPIHandler(
 	paymentRepo *repository.PaymentRepository,
 	disputeService *service.DisputeService,
 	walletService *service.WalletService,
+	supportService *service.SupportService,
 ) *AdminAPIHandler {
 	return &AdminAPIHandler{
 		userRepo:       userRepo,
@@ -41,6 +43,7 @@ func NewAdminAPIHandler(
 		paymentRepo:    paymentRepo,
 		disputeService: disputeService,
 		walletService:  walletService,
+		supportService: supportService,
 	}
 }
 
@@ -343,4 +346,50 @@ func (h *AdminAPIHandler) CreditTechnicianWallet(c *gin.Context) {
 		return
 	}
 	utils.Success(c, http.StatusOK, wallet)
+}
+
+// SupportChats — GET /admin/support/chats
+// One row per user who has ever messaged the general "Contact Support" live
+// chat (Profile screen), most recently active first — the admin panel's
+// support inbox.
+func (h *AdminAPIHandler) SupportChats(c *gin.Context) {
+	chats, err := h.supportService.AdminListChats(c.Request.Context())
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, chats)
+}
+
+// SupportMessages — GET /admin/support/chats/:user_id/messages
+func (h *AdminAPIHandler) SupportMessages(c *gin.Context) {
+	messages, err := h.supportService.AdminListMessages(c.Request.Context(), c.Param("user_id"))
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, messages)
+}
+
+// ReplyToSupport — POST /admin/support/chats/:user_id/messages
+// Support sends a chat reply; the user's app sees it next time it polls
+// GET /support/messages.
+type replySupportBody struct {
+	Message        string `json:"message"`
+	AttachmentURL  string `json:"attachment_url"`
+	AttachmentType string `json:"attachment_type"` // "image" | "video"
+}
+
+func (h *AdminAPIHandler) ReplyToSupport(c *gin.Context) {
+	var body replySupportBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	m, err := h.supportService.AdminReply(c.Request.Context(), c.Param("user_id"), body.Message, body.AttachmentURL, body.AttachmentType)
+	if err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusCreated, m)
 }
