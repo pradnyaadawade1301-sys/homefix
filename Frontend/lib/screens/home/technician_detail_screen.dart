@@ -48,6 +48,8 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
     }
     return showModalBottomSheet<(String, String)>(
       context: context,
+      isScrollControlled: true,
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (sheetContext) {
@@ -71,13 +73,22 @@ class _TechnicianDetailScreenState extends State<TechnicianDetailScreen> with Si
                 Text('${t.name} offers ${t.categoryNames.length} services',
                     style: TextStyle(fontSize: 12.5, color: Colors.grey[600])),
                 const SizedBox(height: 12),
-                for (var i = 0; i < t.categoryIds.length; i++)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.build_outlined, color: _accent),
-                    title: Text(t.categoryNames[i], style: const TextStyle(fontWeight: FontWeight.w600)),
-                    onTap: () => Navigator.of(sheetContext).pop((t.categoryIds[i], t.categoryNames[i])),
+                // Scrollable: a technician can offer 15+ services, which
+                // overflowed the sheet when they were laid out in a plain Column.
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (var i = 0; i < t.categoryIds.length; i++)
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.build_outlined, color: _accent),
+                          title: Text(t.categoryNames[i], style: const TextStyle(fontWeight: FontWeight.w600)),
+                          onTap: () => Navigator.of(sheetContext).pop((t.categoryIds[i], t.categoryNames[i])),
+                        ),
+                    ],
                   ),
+                ),
               ],
             ),
           ),
