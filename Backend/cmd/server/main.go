@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"context"
@@ -57,6 +57,8 @@ func main() {
 	aiRepo := repository.NewAIRepository(pool)
 	notifRepo := repository.NewNotificationRepository(pool)
 	disputeRepo := repository.NewDisputeRepository(pool)
+	disputeMsgRepo := repository.NewDisputeMessageRepository(pool)
+	supportRepo := repository.NewSupportMessageRepository(pool)
 	inventoryRepo := repository.NewInventoryRepository(pool)
 	cmsRepo := repository.NewCmsRepository(pool)
 	auditRepo := repository.NewAuditRepository(pool)
@@ -96,7 +98,8 @@ func main() {
 	consultService := service.NewConsultationService(consultRepo, techRepo, bookingService, reviewRepo, aiRepo, fcmService)
 	walletService := service.NewWalletService(walletRepo)
 	reviewService := service.NewReviewService(reviewRepo, bookingRepo)
-	disputeService := service.NewDisputeService(disputeRepo, bookingRepo, consultRepo, techRepo, razorpayService, paymentRepo)
+	disputeService := service.NewDisputeService(disputeRepo, disputeMsgRepo, bookingRepo, consultRepo, techRepo, razorpayService, paymentRepo)
+	supportService := service.NewSupportService(supportRepo)
 	inventoryService := service.NewInventoryService(inventoryRepo)
 	cmsService := service.NewCmsService(cmsRepo)
 	analyticsService := service.NewAnalyticsService(analyticsRepo)
@@ -104,7 +107,7 @@ func main() {
 
 	// ---- Handlers ----
 	financeHandler := handler.NewFinanceHandler(paymentRepo, walletRepo, upiService)
-	adminAPIHandler := handler.NewAdminAPIHandler(userRepo, bookingRepo, techRepo, paymentRepo, disputeService, walletService)
+	adminAPIHandler := handler.NewAdminAPIHandler(userRepo, bookingRepo, techRepo, paymentRepo, disputeService, walletService, supportService)
 
 	handlers := &router.Handlers{
 		Auth:         handler.NewAuthHandler(authService, cfg.Env),
@@ -123,6 +126,7 @@ func main() {
 		Consultation: handler.NewConsultationHandler(consultService, cfg.StunURLs, cfg.TurnURL, cfg.TurnSecret, cfg.TurnTTLSecond),
 		WebRTC:       handler.NewWebRTCHandler(cfg.StunURLs, cfg.TurnURL, cfg.TurnSecret, cfg.TurnTTLSecond),
 		Dispute:      handler.NewDisputeHandler(disputeService),
+		Support:      handler.NewSupportHandler(supportService),
 		Cms:          handler.NewCmsHandler(cmsService),
 		Finance:      financeHandler,
 		AdminAPI:     adminAPIHandler,
