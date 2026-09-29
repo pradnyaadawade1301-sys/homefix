@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"context"
@@ -113,7 +113,8 @@ func main() {
 
 	// ---- Handlers ----
 	financeHandler := handler.NewFinanceHandler(paymentRepo, walletRepo, upiService)
-	adminAPIHandler := handler.NewAdminAPIHandler(userRepo, bookingRepo, techRepo, paymentRepo, disputeService, walletService, supportService)
+	adminAPIHandler := handler.NewAdminAPIHandler(userRepo, bookingRepo, techRepo, paymentRepo, disputeService, walletService)
+
 	handlers := &router.Handlers{
 		Auth:         handler.NewAuthHandler(authService, cfg.Env),
 		User:         handler.NewUserHandler(userService),
@@ -233,6 +234,16 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 		log.Printf("startup migration: failed to ensure call_logs table exists: %v", err)
 	}
 
+	// 041_call_log_type — same "Render never applies migrations/ files" issue
+	// as above. CallLogRepository.Create/ListForUser both reference
+	// call_logs.call_type; without this column every call-log INSERT and
+	// GET /calls/history fails, so no (video) call history shows up.
+	// Safe no-op once the column already exists.
+	if _, err := pool.Exec(ctx,
+		`ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS call_type VARCHAR(8) NOT NULL DEFAULT 'audio';`); err != nil {
+		log.Printf("startup migration: failed to ensure call_logs.call_type column exists: %v", err)
+	}
+
 	// 034_technician_categories — same "Render never applies migrations/
 	// files" issue as above. Lets a technician serve more than one category
 	// (e.g. Plumbing + Painting); technicians.category_id stays as their
@@ -326,12 +337,5 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 		log.Printf("startup migration: failed to ensure cash_otp columns exist: %v", err)
 	}
 
-	// call_logs.call_type - audio vs video, so the booking chat can show
-    // "Missed video call" / "Voice call". Safe no-op once the column exists.
-    if _, err := pool.Exec(ctx,
-        `ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS call_type VARCHAR(8) NOT NULL DEFAULT 'audio';`); err != nil {
-        log.Printf("startup migration: failed to ensure call_logs.call_type column exists: %v", err)
-    }
-
-    log.Println("startup migrations: done")
+	log.Println("startup migrations: done")
 }
