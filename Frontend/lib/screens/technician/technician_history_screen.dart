@@ -4,6 +4,8 @@ import '../../core/booking_call_launcher.dart';
 import '../../core/theme.dart';
 import '../../core/technician_theme.dart';
 import '../../models/booking_model.dart';
+import '../../models/call_log_model.dart';
+import '../../models/consultation_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/consultation_provider.dart';
 import '../../providers/call_log_provider.dart';
@@ -67,9 +69,9 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
           child: _tab == 0
               ? _chatsList(bookings)
               : _tab == 1
-                  ? _videoCallList(consultationProvider)
+                  ? _videoCallList(consultationProvider, callLogProvider)
                   : _tab == 2
-                      ? _callList(callLogProvider)
+                      ? _callList(callLogProvider, video: false)
                       : _warrantyList(bookings),
         ),
       ],
@@ -211,20 +213,23 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
   /// Real audio-call history — every call this technician placed or
   /// received (see GET /calls/history, CallLogProvider), most recent first,
   /// with who it was with, when, and whether it was picked up.
-  Widget _callList(CallLogProvider provider) {
+  Widget _callList(CallLogProvider provider, {bool video = false}) {
     if (provider.isLoading && provider.calls.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
-    final calls = provider.calls;
+    final calls = provider.calls.where((c) => c.isVideo == video).toList();
     if (calls.isEmpty) {
-      return const Center(child: Text('No calls yet'));
+      return Center(child: Text(video ? 'No video calls yet' : 'No calls yet'));
     }
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: calls.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, i) {
-        final call = calls[i];
+      itemBuilder: (context, i) => _callLogRow(context, calls[i]),
+    );
+  }
+
+  Widget _callLogRow(BuildContext context, CallLogEntry call) {
         final peerName = call.peerName.isNotEmpty ? call.peerName : 'Customer';
         final missed = call.isMissed;
 
@@ -240,13 +245,17 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
 
         String subtitle;
         if (missed) {
-          subtitle = call.isOutgoing ? 'Not answered' : 'Missed call';
+          subtitle = call.isOutgoing
+              ? 'Not answered'
+              : (call.isVideo ? 'Missed video call' : 'Missed call');
         } else if (call.durationSeconds != null) {
           final mins = call.durationSeconds! ~/ 60;
           final secs = call.durationSeconds! % 60;
           subtitle = mins > 0 ? '${mins}m ${secs}s' : '${secs}s';
         } else {
-          subtitle = call.isOutgoing ? 'Outgoing call' : 'Incoming call';
+          subtitle = call.isOutgoing
+              ? (call.isVideo ? 'Outgoing video call' : 'Outgoing call')
+              : (call.isVideo ? 'Incoming video call' : 'Incoming call');
         }
 
         final dt = call.startedAt;
@@ -262,7 +271,11 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
 
         void call_() {
           if (call.bookingId != null) {
-            startBookingAudioCall(context, bookingId: call.bookingId!, peerDisplayName: peerName);
+            if (call.isVideo) {
+              startBookingVideoCall(context, bookingId: call.bookingId!, peerDisplayName: peerName);
+            } else {
+              startBookingAudioCall(context, bookingId: call.bookingId!, peerDisplayName: peerName);
+            }
           }
         }
 
@@ -311,8 +324,9 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
                     Text(dateLabel, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                     const SizedBox(height: 6),
                     IconButton(
-                      icon: const Icon(Icons.call_outlined, color: TechTheme.primary, size: 20),
-                      tooltip: 'Call',
+                      icon: Icon(call.isVideo ? Icons.videocam_outlined : Icons.call_outlined,
+                          color: TechTheme.primary, size: 20),
+                      tooltip: call.isVideo ? 'Video call' : 'Call',
                       onPressed: call.bookingId != null ? call_ : null,
                     ),
                   ],
@@ -321,23 +335,35 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
             ),
           ),
         );
-      },
-    );
   }
 
-  Widget _videoCallList(ConsultationProvider provider) {
-    if (provider.isLoadingHistory && provider.history.isEmpty) {
+  Widget _videoCallList(ConsultationProvider provider, CallLogProvider callLogProvider) {
+    final loading = (provider.isLoadingHistory && provider.history.isEmpty) ||
+        (callLogProvider.isLoading && callLogProvider.calls.isEmpty);
+    // Two sources of "video calls": live video consultations, and video calls
+    // placed from a booking's chat (stored in call_logs with call_type='video').
+    final items = <({DateTime at, Widget Function(BuildContext) build})>[
+      for (final c in provider.history)
+        (at: c.scheduledAt ?? c.createdAt, build: (ctx) => _consultationRow(c)),
+      for (final l in callLogProvider.calls.where((c) => c.isVideo))
+        (at: l.startedAt, build: (ctx) => _callLogRow(ctx, l)),
+    ]..sort((x, y) => y.at.compareTo(x.at));
+
+    if (loading && items.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (provider.history.isEmpty) {
+    if (items.isEmpty) {
       return const Center(child: Text('No video calls yet'));
     }
     return ListView.separated(
       padding: const EdgeInsets.all(16),
-      itemCount: provider.history.length,
+      itemCount: items.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, i) {
-        final c = provider.history[i];
+      itemBuilder: (context, i) => items[i].build(context),
+    );
+  }
+
+  Widget _consultationRow(Consultation c) {
         final customerName = c.customerName?.isNotEmpty == true ? c.customerName! : 'Customer';
         return Container(
           padding: const EdgeInsets.all(14),
@@ -391,8 +417,6 @@ class _TechnicianHistoryScreenState extends State<TechnicianHistoryScreen> {
             ],
           ),
         );
-      },
-    );
   }
 
   /// Jobs this technician offered a warranty on — most recent first. Reuses
