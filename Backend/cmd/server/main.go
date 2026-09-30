@@ -137,6 +137,7 @@ func main() {
 		Dispute:      handler.NewDisputeHandler(disputeService),
 		Support:      handler.NewSupportHandler(supportService),
 		Cms:          handler.NewCmsHandler(cmsService),
+		Due:          handler.NewDueHandler(dueService),
 		Finance:      financeHandler,
 		AdminAPI:     adminAPIHandler,
 	}
