@@ -374,6 +374,22 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 		log.Printf("startup migration: failed to ensure technician_dues tables exist: %v", err)
 	}
 
+	// Backfill: jo cash payments dues ledger live hone se PEHLE confirm hue,
+	// unka due row nahi bana (Pending dues 0 dikhta tha, Pay Dues button nahi
+	// aata tha). payments.platform_commission se missing due bana do.
+	// Idempotent hai (UNIQUE payment_id), har boot par chalna safe hai.
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO technician_dues (technician_user_id, payment_id, booking_id, amount, created_at)
+		 SELECT t.user_id, p.id, p.booking_id, p.platform_commission, p.updated_at
+		 FROM payments p
+		 JOIN bookings b ON b.id = p.booking_id
+		 JOIN technicians t ON t.id = b.technician_id
+		 WHERE p.method = 'cash' AND p.status = 'paid'
+		   AND COALESCE(p.platform_commission, 0) > 0
+		 ON CONFLICT (payment_id) DO NOTHING;`); err != nil {
+		log.Printf("startup migration: failed to backfill cash dues: %v", err)
+	}
+
 	// 039_cash_otp — same "Render never applies migrations/ files" issue as
 	// above. Cash-on-delivery OTP columns on payments.
 	if _, err := pool.Exec(ctx,
