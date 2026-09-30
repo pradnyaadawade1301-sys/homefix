@@ -86,9 +86,10 @@ type DueOrder struct {
 	Currency    string  `json:"currency"`
 }
 
-// CreateSettlementOrder opens a Razorpay order for ALL currently pending dues.
-func (s *DueService) CreateSettlementOrder(ctx context.Context, techUserID string) (*DueOrder, error) {
-	ids, total, err := s.repo.PendingIDsAndTotal(ctx, techUserID)
+// CreateSettlementOrder opens a Razorpay order for ALL pending dues, or only
+// for dueID when given (the per-payment "Pay commission" button).
+func (s *DueService) CreateSettlementOrder(ctx context.Context, techUserID, dueID string) (*DueOrder, error) {
+	ids, total, err := s.repo.PendingIDsAndTotal(ctx, techUserID, dueID)
 	if err != nil {
 		return nil, err
 	}

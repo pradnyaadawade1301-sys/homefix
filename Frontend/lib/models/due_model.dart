@@ -1,6 +1,7 @@
 /// Matches backend `models.DueSummary` (GET /technician/dues).
 class DueItem {
   final String id;
+  final String paymentId;
   final String? bookingId;
   final double amount;
   final String status; // "pending" | "paid"
@@ -9,6 +10,7 @@ class DueItem {
 
   DueItem({
     required this.id,
+    this.paymentId = '',
     this.bookingId,
     required this.amount,
     required this.status,
@@ -20,6 +22,7 @@ class DueItem {
 
   factory DueItem.fromJson(Map<String, dynamic> json) => DueItem(
         id: (json['id'] as String?) ?? '',
+        paymentId: (json['payment_id'] as String?) ?? '',
         bookingId: json['booking_id'] as String?,
         amount: (json['amount'] as num?)?.toDouble() ?? 0,
         status: (json['status'] as String?) ?? 'pending',

@@ -23,9 +23,14 @@ func (h *DueHandler) Summary(c *gin.Context) {
 	utils.Success(c, http.StatusOK, s)
 }
 
-// Pay — POST /technician/dues/pay : creates the Razorpay order for all pending dues.
+// Pay — POST /technician/dues/pay : creates the Razorpay order for all pending
+// dues, or for a single due when the optional body {"due_id": "..."} is sent.
 func (h *DueHandler) Pay(c *gin.Context) {
-	o, err := h.dues.CreateSettlementOrder(c.Request.Context(), c.GetString("user_id"))
+	var b struct {
+		DueID string `json:"due_id"`
+	}
+	_ = c.ShouldBindJSON(&b) // body is optional
+	o, err := h.dues.CreateSettlementOrder(c.Request.Context(), c.GetString("user_id"), b.DueID)
 	if err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return

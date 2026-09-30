@@ -202,10 +202,14 @@ class PaymentService {
     }
   }
 
-  /// Creates a Razorpay order for all pending dues (POST /technician/dues/pay).
-  Future<DueOrder> createDueOrder() async {
+  /// Creates a Razorpay order for all pending dues, or just [dueId] when given
+  /// (POST /technician/dues/pay).
+  Future<DueOrder> createDueOrder({String? dueId}) async {
     try {
-      final response = await _httpClient.post(ApiConfig.technicianDuesPay);
+      final response = await _httpClient.post(
+        ApiConfig.technicianDuesPay,
+        data: dueId == null ? null : {'due_id': dueId},
+      );
       return DueOrder.fromJson(ApiEnvelope.unwrap(response) as Map<String, dynamic>);
     } catch (e) {
       throw Exception(ApiEnvelope.errorMessage(e));

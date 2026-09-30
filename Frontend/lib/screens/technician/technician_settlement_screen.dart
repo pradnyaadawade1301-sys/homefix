@@ -37,9 +37,75 @@ class TechnicianSettlementScreen extends StatefulWidget {
 class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen> {
   int _tab = 0; // 0 = Visit History, 1 = Payment History
 
+  // One Razorpay instance for the whole screen, shared by the top "Pay Dues"
+  // card and every payment row's "Pay commission" button (the plugin routes
+  // native callbacks to a single listener, so per-row instances would clash).
+  late final Razorpay _razorpay;
+  String? _orderId;
+  String? _payingDueId; // which row's button is busy (null = top card / none)
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  /// Pays all pending dues (dueId == null) or a single payment's commission.
+  Future<void> _payDues({String? dueId}) async {
+    final provider = context.read<PaymentProvider>();
+    setState(() => _payingDueId = dueId);
+    final order = await provider.createDueOrder(dueId: dueId);
+    if (!mounted) return;
+    if (order == null) {
+      setState(() => _payingDueId = null);
+      _snack(provider.error ?? 'Could not start payment');
+      return;
+    }
+    _orderId = order.razorpayOrderId;
+    try {
+      _razorpay.open({
+        'key': order.razorpayKeyId,
+        'amount': order.amountPaise,
+        'currency': order.currency,
+        'order_id': order.razorpayOrderId,
+        'name': 'OneFix Live',
+        'description': 'Commission dues',
+        'timeout': 300,
+      });
+    } catch (e) {
+      setState(() => _payingDueId = null);
+      _snack('Could not open payment sheet: $e');
+    }
+  }
+
+  Future<void> _onPaySuccess(PaymentSuccessResponse r) async {
+    final provider = context.read<PaymentProvider>();
+    final ok = await provider.verifyDuePayment(
+      orderId: r.orderId ?? _orderId ?? '',
+      paymentId: r.paymentId ?? '',
+      signature: r.signature ?? '',
+    );
+    if (mounted) setState(() => _payingDueId = null);
+    _snack(ok ? 'Commission paid successfully.' : (provider.error ?? 'Could not verify payment'));
+  }
+
+  void _onPayError(PaymentFailureResponse r) {
+    if (mounted) setState(() => _payingDueId = null);
+    _snack(r.message ?? 'Payment cancelled');
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaySuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _onPayError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, (_) {});
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
@@ -108,7 +174,12 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: _DuesCard(dues: paymentProvider.dues, isLoading: paymentProvider.isLoadingDues),
+                  child: _DuesCard(
+                    dues: paymentProvider.dues,
+                    isLoading: paymentProvider.isLoadingDues,
+                    paying: paymentProvider.isPayingDues,
+                    onPay: () => _payDues(),
+                  ),
                 ),
               ),
               SliverToBoxAdapter(
@@ -138,7 +209,7 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
               if (_tab == 0)
                 _buildVisitSliver(completedJobs, l10n)
               else
-                _buildPaymentSliver(payments, isLoadingPayments, l10n),
+                _buildPaymentSliver(payments, isLoadingPayments, l10n, paymentProvider.dues),
               const SliverToBoxAdapter(child: SizedBox(height: 24)),
             ],
           );
@@ -195,7 +266,7 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
     );
   }
 
-  Widget _buildPaymentSliver(List<Payment> payments, bool isLoading, AppLocalizations l10n) {
+  Widget _buildPaymentSliver(List<Payment> payments, bool isLoading, AppLocalizations l10n, DueSummary? dues) {
     if (isLoading) {
       return const SliverToBoxAdapter(
         child: Padding(
@@ -212,7 +283,25 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
       sliver: SliverList.separated(
         itemCount: payments.length,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
-        itemBuilder: (context, i) => _PaymentTile(payment: payments[i]),
+        itemBuilder: (context, i) {
+          final p = payments[i];
+          DueItem? due;
+          if (dues != null) {
+            for (final d in dues.dues) {
+              if (d.isPending && d.paymentId == p.id) {
+                due = d;
+                break;
+              }
+            }
+          }
+          return _PaymentTile(
+            payment: p,
+            pendingDue: due,
+            paying: _payingDueId != null && _payingDueId == due?.id,
+            anyPaying: _payingDueId != null,
+            onPayCommission: due == null ? null : () => _payDues(dueId: due!.id),
+          );
+        },
       ),
     );
   }
@@ -235,82 +324,18 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
 /// platform's commission becomes a pending due (DueService). Once dues cross
 /// the limit (or any due is too old) Cash-on-Delivery jobs are blocked until
 /// the technician pays them here via Razorpay (UPI / cards / netbanking).
-class _DuesCard extends StatefulWidget {
+class _DuesCard extends StatelessWidget {
   final DueSummary? dues;
   final bool isLoading;
-  const _DuesCard({required this.dues, required this.isLoading});
-
-  @override
-  State<_DuesCard> createState() => _DuesCardState();
-}
-
-class _DuesCardState extends State<_DuesCard> {
-  late final Razorpay _razorpay;
-  String? _orderId;
-
-  @override
-  void initState() {
-    super.initState();
-    _razorpay = Razorpay();
-    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _onSuccess);
-    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _onError);
-    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, (_) {});
-  }
-
-  @override
-  void dispose() {
-    _razorpay.clear();
-    super.dispose();
-  }
-
-  void _snack(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  }
-
-  Future<void> _payDues() async {
-    final provider = context.read<PaymentProvider>();
-    final order = await provider.createDueOrder();
-    if (!mounted) return;
-    if (order == null) {
-      _snack(provider.error ?? 'Could not start payment');
-      return;
-    }
-    _orderId = order.razorpayOrderId;
-    try {
-      _razorpay.open({
-        'key': order.razorpayKeyId,
-        'amount': order.amountPaise,
-        'currency': order.currency,
-        'order_id': order.razorpayOrderId,
-        'name': 'OneFix Live',
-        'description': 'Commission dues',
-        'timeout': 300,
-      });
-    } catch (e) {
-      _snack('Could not open payment sheet: $e');
-    }
-  }
-
-  Future<void> _onSuccess(PaymentSuccessResponse r) async {
-    final provider = context.read<PaymentProvider>();
-    final ok = await provider.verifyDuePayment(
-      orderId: r.orderId ?? _orderId ?? '',
-      paymentId: r.paymentId ?? '',
-      signature: r.signature ?? '',
-    );
-    _snack(ok ? 'Dues paid — Cash-on-Delivery jobs are on again.' : (provider.error ?? 'Could not verify payment'));
-  }
-
-  void _onError(PaymentFailureResponse r) => _snack(r.message ?? 'Payment cancelled');
+  final bool paying;
+  final VoidCallback onPay;
+  const _DuesCard({required this.dues, required this.isLoading, required this.paying, required this.onPay});
 
   @override
   Widget build(BuildContext context) {
-    final dues = widget.dues;
     final total = dues?.pendingTotal ?? 0;
     final limit = dues?.limit ?? 0;
     final blocked = dues?.codBlocked ?? false;
-    final paying = context.watch<PaymentProvider>().isPayingDues;
     final warn = blocked || (limit > 0 && total >= limit * 0.8);
     return Container(
       padding: const EdgeInsets.all(16),
@@ -339,7 +364,7 @@ class _DuesCardState extends State<_DuesCard> {
                   children: [
                     const Text('Pending dues (cash jobs)', style: TextStyle(fontSize: 12.5, color: Colors.black54)),
                     const SizedBox(height: 2),
-                    widget.isLoading && dues == null
+                    isLoading && dues == null
                         ? const SizedBox(
                             width: 14, height: 14,
                             child: CircularProgressIndicator(strokeWidth: 2, color: TechTheme.primary),
@@ -359,7 +384,7 @@ class _DuesCardState extends State<_DuesCard> {
               ),
               if (total > 0)
                 ElevatedButton(
-                  onPressed: paying ? null : _payDues,
+                  onPressed: paying ? null : onPay,
                   child: paying
                       ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Text('Pay Dues'),
@@ -501,7 +526,17 @@ class _VisitTile extends StatelessWidget {
 
 class _PaymentTile extends StatefulWidget {
   final Payment payment;
-  const _PaymentTile({required this.payment});
+  final DueItem? pendingDue; // unpaid commission for this (cash) payment
+  final bool paying;
+  final bool anyPaying;
+  final VoidCallback? onPayCommission;
+  const _PaymentTile({
+    required this.payment,
+    this.pendingDue,
+    this.paying = false,
+    this.anyPaying = false,
+    this.onPayCommission,
+  });
 
   @override
   State<_PaymentTile> createState() => _PaymentTileState();
@@ -579,6 +614,25 @@ class _PaymentTileState extends State<_PaymentTile> {
           ),
         ],
           ),
+          if (widget.pendingDue != null && widget.onPayCommission != null) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: widget.anyPaying ? null : widget.onPayCommission,
+                icon: widget.paying
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.payments_outlined, size: 18),
+                label: Text('Pay commission ₹${widget.pendingDue!.amount.toStringAsFixed(2)}'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: TechTheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
       ),

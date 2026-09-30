@@ -55,12 +55,12 @@ class PaymentProvider extends ChangeNotifier {
 
   /// Step 1 of paying dues: asks the backend for a Razorpay order. Returns
   /// null (and sets [error]) on failure.
-  Future<DueOrder?> createDueOrder() async {
+  Future<DueOrder?> createDueOrder({String? dueId}) async {
     _isPayingDues = true;
     _error = null;
     notifyListeners();
     try {
-      return await _paymentService.createDueOrder();
+      return await _paymentService.createDueOrder(dueId: dueId);
     } catch (e) {
       _error = e.toString().replaceFirst('Exception: ', '');
       return null;

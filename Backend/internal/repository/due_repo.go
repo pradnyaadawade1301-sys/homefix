@@ -58,8 +58,11 @@ func (r *DueRepository) List(ctx context.Context, userID string, limit int) ([]m
 }
 
 // PendingIDsAndTotal snapshots the pending dues a settlement order will cover.
-func (r *DueRepository) PendingIDsAndTotal(ctx context.Context, userID string) ([]string, float64, error) {
-	rows, err := r.db.Query(ctx, `SELECT id::text, amount FROM technician_dues WHERE technician_user_id=$1 AND status='pending'`, userID)
+// dueID == "" -> all pending dues; otherwise only that one due (pay-per-payment).
+func (r *DueRepository) PendingIDsAndTotal(ctx context.Context, userID, dueID string) ([]string, float64, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id::text, amount FROM technician_dues
+		WHERE technician_user_id=$1 AND status='pending' AND ($2 = '' OR id::text = $2)`, userID, dueID)
 	if err != nil {
 		return nil, 0, err
 	}
