@@ -350,7 +350,7 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 	// issue as above. COD commission dues ledger + Razorpay settlements.
 	if _, err := pool.Exec(ctx,
 		`CREATE TABLE IF NOT EXISTS technician_dues (
-			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 			technician_user_id UUID NOT NULL REFERENCES users(id),
 			payment_id UUID NOT NULL UNIQUE REFERENCES payments(id),
 			booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
@@ -361,7 +361,7 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 		);
 		CREATE INDEX IF NOT EXISTS idx_technician_dues_user_status ON technician_dues(technician_user_id, status);
 		CREATE TABLE IF NOT EXISTS due_settlements (
-			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 			technician_user_id UUID NOT NULL REFERENCES users(id),
 			amount NUMERIC(12,2) NOT NULL,
 			due_ids UUID[] NOT NULL,
