@@ -25,7 +25,6 @@ class _JobBriefCardState extends State<JobBriefCard> {
   // Collapsed by default only for sections that tend to be long; Guided
   // Q&A and the priority header always show.
   bool _attachmentsExpanded = false;
-  bool _notesExpanded = true;
   bool _prepExpanded = false;
 
   // Simple category -> suggested tools/parts mapping. Falls back to a
@@ -56,7 +55,6 @@ class _JobBriefCardState extends State<JobBriefCard> {
     final booking = widget.booking;
     final brief = booking.jobBrief;
     final isUrgent = brief?.isEmergency == true;
-    final hasNotes = (brief?.aiDiagnosis?.isNotEmpty ?? false) || (brief?.consultationNotes?.isNotEmpty ?? false);
     final attachmentCount = booking.images.length + (brief?.hasVideo == true ? 1 : 0);
 
     return Container(
@@ -190,27 +188,6 @@ class _JobBriefCardState extends State<JobBriefCard> {
                         ),
                       ),
                   ],
-                ),
-              ),
-            ],
-          ],
-          if (hasNotes) ...[
-            const SizedBox(height: 14),
-            _collapsibleHeader(
-              icon: Icons.psychology_outlined,
-              label: 'AI / Expert notes',
-              expanded: _notesExpanded,
-              onTap: () => setState(() => _notesExpanded = !_notesExpanded),
-            ),
-            if (_notesExpanded) ...[
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(10)),
-                child: Text(
-                  brief?.consultationNotes?.isNotEmpty == true ? brief!.consultationNotes! : brief!.aiDiagnosis!,
-                  style: TextStyle(fontSize: 12.5, color: Colors.grey[800]),
                 ),
               ),
             ],

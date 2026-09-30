@@ -53,13 +53,16 @@ func main() {
 	callLogRepo := repository.NewCallLogRepository(pool)
 	paymentRepo := repository.NewPaymentRepository(pool)
 	walletRepo := repository.NewWalletRepository(pool)
+
+	dueRepo := repository.NewDueRepository(pool)
+	cashOtpRepo := repository.NewCashOtpRepository(pool)
+
 	reviewRepo := repository.NewReviewRepository(pool)
 	aiRepo := repository.NewAIRepository(pool)
 	notifRepo := repository.NewNotificationRepository(pool)
 	disputeRepo := repository.NewDisputeRepository(pool)
 	disputeMsgRepo := repository.NewDisputeMessageRepository(pool)
-	supportMsgRepo := repository.NewSupportMessageRepository(pool)
-	dueRepo := repository.NewDueRepository(pool)
+	supportRepo := repository.NewSupportMessageRepository(pool)
 	inventoryRepo := repository.NewInventoryRepository(pool)
 	cmsRepo := repository.NewCmsRepository(pool)
 	auditRepo := repository.NewAuditRepository(pool)
@@ -91,10 +94,10 @@ func main() {
 		paymentRepo, bookingRepo, techRepo, walletRepo, fcmService,
 	)
 
-	// COD commission dues ledger. Without this, razorpayService.dueService
-	// stays nil and cash jobs never record a due (Pending dues stays 0).
+	// COD commission dues ledger — replaces the wallet-balance gate for cash jobs.
 	dueService := service.NewDueService(dueRepo, cfg.RazorpayKeyID, cfg.RazorpayKeySecret, cfg.CodDueLimit, cfg.CodDueMaxDays)
 	razorpayService.SetDueService(dueService)
+	razorpayService.SetCashOtpRepo(cashOtpRepo)
 
 	// ---- Domain services ----
 	authService := service.NewAuthService(userRepo, mailService, cfg.JWTAccessSecret, cfg.JWTRefreshSecret, cfg.JWTAccessTTLMin, cfg.JWTRefreshTTLHrs, cfg.GoogleClientID)
@@ -105,7 +108,7 @@ func main() {
 	walletService := service.NewWalletService(walletRepo)
 	reviewService := service.NewReviewService(reviewRepo, bookingRepo)
 	disputeService := service.NewDisputeService(disputeRepo, disputeMsgRepo, bookingRepo, consultRepo, techRepo, razorpayService, paymentRepo)
-	supportService := service.NewSupportService(supportMsgRepo)
+	supportService := service.NewSupportService(supportRepo)
 	inventoryService := service.NewInventoryService(inventoryRepo)
 	cmsService := service.NewCmsService(cmsRepo)
 	analyticsService := service.NewAnalyticsService(analyticsRepo)
@@ -132,7 +135,6 @@ func main() {
 		Consultation: handler.NewConsultationHandler(consultService, cfg.StunURLs, cfg.TurnURL, cfg.TurnSecret, cfg.TurnTTLSecond),
 		WebRTC:       handler.NewWebRTCHandler(cfg.StunURLs, cfg.TurnURL, cfg.TurnSecret, cfg.TurnTTLSecond),
 		Dispute:      handler.NewDisputeHandler(disputeService),
-		Due:          handler.NewDueHandler(dueService),
 		Support:      handler.NewSupportHandler(supportService),
 		Cms:          handler.NewCmsHandler(cmsService),
 		Finance:      financeHandler,
@@ -178,6 +180,25 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 		 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS otp_verified_at TIMESTAMP NULL;
 		 ALTER TABLE consultations ADD COLUMN IF NOT EXISTS decline_reason TEXT;`); err != nil {
 		log.Printf("startup migration: failed to ensure otp columns exist: %v", err)
+	}
+
+	// 012_email_verification / 011_user_photo / 018_google_auth — same "Render
+	// never applies migrations/ files" issue as above. Without these, any query
+	// that selects users (login, Google sign-in) fails with:
+	//   column "email_otp_code" does not exist (SQLSTATE 42703)
+	// Safe no-op once the columns exist.
+	if _, err := pool.Exec(ctx,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_otp_code VARCHAR(10);
+		 ALTER TABLE users ADD COLUMN IF NOT EXISTS email_otp_expires_at TIMESTAMPTZ NULL;
+		 ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT false;
+		 ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN NOT NULL DEFAULT false;
+		 ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT NULL;
+		 ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255) NULL;
+		 ALTER TABLE users ADD COLUMN IF NOT EXISTS fcm_token TEXT NULL;
+		 ALTER TABLE users ALTER COLUMN phone DROP NOT NULL;
+		 ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+		 CREATE UNIQUE INDEX IF NOT EXISTS users_google_id_key ON users (google_id) WHERE google_id IS NOT NULL;`); err != nil {
+		log.Printf("startup migration: failed to ensure users auth columns exist: %v", err)
 	}
 
 	// 030_seed_more_categories_2 — only ever ran via `make migrate` against
@@ -255,29 +276,55 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 		log.Printf("startup migration: failed to ensure technician_categories table exists: %v", err)
 	}
 
-	// 035–039 — same "Render never applies migrations/ files" issue as above.
-	// 035/036 dispute chat, 037 support chat, 038 COD commission dues ledger
-	// (without it GET /technician/dues fails and Pending dues shows 0),
-	// 039 cash-OTP columns. All idempotent.
+	// 035_dispute_messages — same "Render never applies migrations/ files"
+	// issue as above. Live-chat thread attached to a dispute (complaint),
+	// so the customer/technician and admin/support can go back and forth
+	// instead of only a one-shot reason + resolution. Safe no-op once it
+	// exists.
 	if _, err := pool.Exec(ctx,
 		`CREATE TABLE IF NOT EXISTS dispute_messages (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 			dispute_id UUID NOT NULL REFERENCES disputes(id) ON DELETE CASCADE,
 			sender_id UUID NULL REFERENCES users(id) ON DELETE SET NULL,
 			sender_role VARCHAR(16) NOT NULL CHECK (sender_role IN ('user', 'admin')),
-			message TEXT NULL DEFAULT '',
-			attachment_url TEXT NULL,
-			attachment_type VARCHAR(16) NULL CHECK (attachment_type IN ('image', 'video')),
+			message TEXT NOT NULL,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		 );
-		 CREATE INDEX IF NOT EXISTS idx_dispute_messages_dispute_id ON dispute_messages(dispute_id, created_at);
-		 ALTER TABLE dispute_messages ADD COLUMN IF NOT EXISTS attachment_url TEXT NULL;
-		 ALTER TABLE dispute_messages ADD COLUMN IF NOT EXISTS attachment_type VARCHAR(16) NULL;
-		 ALTER TABLE dispute_messages ALTER COLUMN message DROP NOT NULL;
-		 ALTER TABLE dispute_messages ALTER COLUMN message SET DEFAULT '';`); err != nil {
+		 CREATE INDEX IF NOT EXISTS idx_dispute_messages_dispute_id ON dispute_messages(dispute_id, created_at);`); err != nil {
 		log.Printf("startup migration: failed to ensure dispute_messages table exists: %v", err)
 	}
 
+	// 036_dispute_message_attachments — same "Render never applies
+	// migrations/ files" issue as above. Lets a dispute chat message carry
+	// a photo/video attachment instead of (or alongside) text, and relaxes
+	// message to nullable so an attachment-only message doesn't need a
+	// caption. Safe no-op once the columns/constraints already exist.
+	if _, err := pool.Exec(ctx,
+		`ALTER TABLE dispute_messages ADD COLUMN IF NOT EXISTS attachment_url TEXT NULL;
+		 ALTER TABLE dispute_messages ADD COLUMN IF NOT EXISTS attachment_type VARCHAR(16) NULL;
+		 ALTER TABLE dispute_messages ALTER COLUMN message DROP NOT NULL;
+		 ALTER TABLE dispute_messages ALTER COLUMN message SET DEFAULT '';`); err != nil {
+		log.Printf("startup migration: failed to ensure dispute_messages attachment columns exist: %v", err)
+	}
+	if _, err := pool.Exec(ctx,
+		`ALTER TABLE dispute_messages ADD CONSTRAINT dispute_messages_attachment_type_check
+			CHECK (attachment_type IN ('image', 'video'));`); err != nil {
+		// Postgres has no "ADD CONSTRAINT IF NOT EXISTS" — this fails (harmlessly,
+		// already logged not fatal) with a "constraint already exists" error on
+		// every boot after the first, which is expected and fine to ignore.
+		log.Printf("startup migration: dispute_messages_attachment_type_check: %v", err)
+	}
+	if _, err := pool.Exec(ctx,
+		`ALTER TABLE dispute_messages ADD CONSTRAINT dispute_messages_has_content
+			CHECK ((message IS NOT NULL AND length(trim(message)) > 0) OR attachment_url IS NOT NULL);`); err != nil {
+		log.Printf("startup migration: dispute_messages_has_content: %v", err)
+	}
+
+	// 037_support_messages — same "Render never applies migrations/ files"
+	// issue as above. General "Contact Support" live chat reachable from
+	// the Profile screen (Call us / Email us / Live Chat), not tied to any
+	// specific booking/consultation the way dispute_messages is. Safe
+	// no-op once it exists.
 	if _, err := pool.Exec(ctx,
 		`CREATE TABLE IF NOT EXISTS support_messages (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -286,17 +333,24 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 			message TEXT NULL,
 			attachment_url TEXT NULL,
 			attachment_type VARCHAR(16) NULL CHECK (attachment_type IN ('image', 'video')),
-			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-			CONSTRAINT support_messages_has_content
-				CHECK ((message IS NOT NULL AND length(trim(message)) > 0) OR attachment_url IS NOT NULL)
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		 );
 		 CREATE INDEX IF NOT EXISTS idx_support_messages_user_id ON support_messages(user_id, created_at);`); err != nil {
 		log.Printf("startup migration: failed to ensure support_messages table exists: %v", err)
 	}
+	if _, err := pool.Exec(ctx,
+		`ALTER TABLE support_messages ADD CONSTRAINT support_messages_has_content
+			CHECK ((message IS NOT NULL AND length(trim(message)) > 0) OR attachment_url IS NOT NULL);`); err != nil {
+		// No "ADD CONSTRAINT IF NOT EXISTS" in Postgres — harmless
+		// "already exists" error on every boot after the first.
+		log.Printf("startup migration: support_messages_has_content: %v", err)
+	}
 
+	// 038_technician_dues — same "Render never applies migrations/ files"
+	// issue as above. COD commission dues ledger + Razorpay settlements.
 	if _, err := pool.Exec(ctx,
 		`CREATE TABLE IF NOT EXISTS technician_dues (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 			technician_user_id UUID NOT NULL REFERENCES users(id),
 			payment_id UUID NOT NULL UNIQUE REFERENCES payments(id),
 			booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
@@ -304,10 +358,10 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 			status VARCHAR(10) NOT NULL DEFAULT 'pending',
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			paid_at TIMESTAMPTZ
-		 );
-		 CREATE INDEX IF NOT EXISTS idx_technician_dues_user_status ON technician_dues(technician_user_id, status);
-		 CREATE TABLE IF NOT EXISTS due_settlements (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		);
+		CREATE INDEX IF NOT EXISTS idx_technician_dues_user_status ON technician_dues(technician_user_id, status);
+		CREATE TABLE IF NOT EXISTS due_settlements (
+			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 			technician_user_id UUID NOT NULL REFERENCES users(id),
 			amount NUMERIC(12,2) NOT NULL,
 			due_ids UUID[] NOT NULL,
@@ -316,31 +370,26 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 			status VARCHAR(10) NOT NULL DEFAULT 'created',
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			paid_at TIMESTAMPTZ
-		 );`); err != nil {
+		);`); err != nil {
 		log.Printf("startup migration: failed to ensure technician_dues tables exist: %v", err)
 	}
 
-	// Backfill: cash payments the technician already confirmed BEFORE the dues
-	// ledger was live have no due row (Pending dues showed 0 and no "Pay
-	// commission" button). Create the missing due from payments.platform_commission.
-	// Idempotent thanks to UNIQUE(payment_id).
-	if _, err := pool.Exec(ctx,
-		`INSERT INTO technician_dues (technician_user_id, payment_id, booking_id, amount, created_at)
-		 SELECT t.user_id, p.id, p.booking_id, p.platform_commission, p.updated_at
-		 FROM payments p
-		 JOIN bookings b ON b.id = p.booking_id
-		 JOIN technicians t ON t.id = b.technician_id
-		 WHERE p.method = 'cash' AND p.status = 'paid'
-		   AND COALESCE(p.platform_commission, 0) > 0
-		 ON CONFLICT (payment_id) DO NOTHING;`); err != nil {
-		log.Printf("startup migration: failed to backfill cash dues: %v", err)
-	}
-
+	// 039_cash_otp — same "Render never applies migrations/ files" issue as
+	// above. Cash-on-delivery OTP columns on payments.
 	if _, err := pool.Exec(ctx,
 		`ALTER TABLE payments ADD COLUMN IF NOT EXISTS cash_otp VARCHAR(4);
-		 ALTER TABLE payments ADD COLUMN IF NOT EXISTS cash_otp_attempts INT NOT NULL DEFAULT 0;
-		 ALTER TABLE payments ADD COLUMN IF NOT EXISTS cash_otp_verified_at TIMESTAMPTZ;`); err != nil {
-		log.Printf("startup migration: failed to ensure cash_otp columns exist: %v", err)
+		ALTER TABLE payments ADD COLUMN IF NOT EXISTS cash_otp_attempts INT NOT NULL DEFAULT 0;
+		ALTER TABLE payments ADD COLUMN IF NOT EXISTS cash_otp_verified_at TIMESTAMPTZ;`); err != nil {
+		log.Printf("startup migration: failed to ensure payments.cash_otp columns exist: %v", err)
+	}
+
+	// 040_email_otp_columns — email OTP login/verification uses these two
+	// users columns but no earlier migration ever created them, so a fresh
+	// database failed with "email_otp_code does not exist". Idempotent.
+	if _, err := pool.Exec(ctx,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_otp_code VARCHAR(6);
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS email_otp_expires_at TIMESTAMPTZ;`); err != nil {
+		log.Printf("startup migration: failed to ensure users.email_otp columns exist: %v", err)
 	}
 
 	log.Println("startup migrations: done")
