@@ -25,6 +25,16 @@ const paymentColumns = `id, booking_id, user_id, transaction_ref, upi_txn_id, in
 	       platform_commission, technician_earning, payment_type, visit_fee_credit,
 	       platform_fee_amount, visit_charge_amount, refunded_at, created_at, updated_at`
 
+// Same columns, "p." prefixed for use in queries that JOIN payments against
+// other tables (see ListAllWithDetails) where an unqualified column would be
+// ambiguous.
+const paymentColumnsPrefixed = `p.id, p.booking_id, p.user_id, p.transaction_ref, p.upi_txn_id, p.invoice_number,
+	       p.amount, p.base_amount, p.gst_amount, p.gst_percent, p.cgst_amount, p.sgst_amount, p.currency, p.method, p.status, p.upi_status, p.upi_response_code, p.upi_approval_ref,
+	       p.verified, p.is_repeat_customer, p.repeat_discount_percent, p.repeat_discount_amount,
+	       p.razorpay_order_id, p.razorpay_payment_id, p.razorpay_signature,
+	       p.platform_commission, p.technician_earning, p.payment_type, p.visit_fee_credit,
+	       p.platform_fee_amount, p.visit_charge_amount, p.refunded_at, p.created_at, p.updated_at`
+
 func scanPayment(row pgx.Row) (*models.Payment, error) {
 	var p models.Payment
 	err := row.Scan(&p.ID, &p.BookingID, &p.UserID, &p.TransactionRef, &p.UpiTxnID, &p.InvoiceNumber,
@@ -221,6 +231,59 @@ func (r *PaymentRepository) ListAll(ctx context.Context, status string) ([]model
 			return nil, err
 		}
 		out = append(out, *p)
+	}
+	return out, rows.Err()
+}
+
+// ListAllWithDetails is ListAll plus the human-readable names the Finance
+// Panel needs (customer name/phone, technician name, service category) —
+// joined in SQL rather than N+1 fetched, since this is a read-only reporting
+// surface. service_code doubles as a readable booking reference.
+func (r *PaymentRepository) ListAllWithDetails(ctx context.Context, status string) ([]models.PaymentWithDetails, error) {
+	query := `
+		SELECT ` + paymentColumnsPrefixed + `,
+		       cust.name, cust.phone,
+		       tech_user.name, tech_user.phone,
+		       cat.name,
+		       b.service_code, b.status
+		FROM payments p
+		JOIN bookings b ON b.id = p.booking_id
+		JOIN users cust ON cust.id = p.user_id
+		JOIN categories cat ON cat.id = b.category_id
+		LEFT JOIN technicians tech ON tech.id = b.technician_id
+		LEFT JOIN users tech_user ON tech_user.id = tech.user_id
+	`
+	args := []interface{}{}
+	if status != "" {
+		query += ` WHERE p.status = $1`
+		args = append(args, status)
+	}
+	query += ` ORDER BY p.created_at DESC LIMIT 200`
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []models.PaymentWithDetails
+	for rows.Next() {
+		var d models.PaymentWithDetails
+		err := rows.Scan(&d.ID, &d.BookingID, &d.UserID, &d.TransactionRef, &d.UpiTxnID, &d.InvoiceNumber,
+			&d.Amount, &d.BaseAmount, &d.GstAmount, &d.GstPercent, &d.CgstAmount, &d.SgstAmount, &d.Currency, &d.Method, &d.Status, &d.UpiStatus, &d.UpiResponseCode, &d.UpiApprovalRef,
+			&d.Verified, &d.IsRepeatCustomer, &d.RepeatDiscountPercent, &d.RepeatDiscountAmount,
+			&d.RazorpayOrderID, &d.RazorpayPaymentID, &d.RazorpaySignature,
+			&d.PlatformCommission, &d.TechnicianEarning, &d.PaymentType, &d.VisitFeeCredit,
+			&d.PlatformFeeAmount, &d.VisitChargeAmount, &d.RefundedAt, &d.CreatedAt, &d.UpdatedAt,
+			&d.CustomerName, &d.CustomerPhone,
+			&d.TechnicianName, &d.TechnicianPhone,
+			&d.ServiceName,
+			&d.BookingCode, &d.BookingStatus,
+		)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, d)
 	}
 	return out, rows.Err()
 }

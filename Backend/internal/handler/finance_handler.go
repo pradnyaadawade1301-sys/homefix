@@ -29,13 +29,13 @@ func NewFinanceHandler(paymentRepo *repository.PaymentRepository, walletRepo *re
 // so the default view is "money actually received", not every attempted order.
 func (h *FinanceHandler) Collections(c *gin.Context) {
 	status := c.DefaultQuery("status", "paid")
-	payments, err := h.paymentRepo.ListAll(c.Request.Context(), status)
+	payments, err := h.paymentRepo.ListAllWithDetails(c.Request.Context(), status)
 	if err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	var totalCollected, totalCommission, totalTechnicianEarning float64
+	var totalCollected, totalCommission, totalTechnicianEarning, totalGST, totalPlatformFee float64
 	for _, p := range payments {
 		totalCollected += p.Amount
 		if p.PlatformCommission != nil {
@@ -44,6 +44,12 @@ func (h *FinanceHandler) Collections(c *gin.Context) {
 		if p.TechnicianEarning != nil {
 			totalTechnicianEarning += *p.TechnicianEarning
 		}
+		if p.GstAmount != nil {
+			totalGST += *p.GstAmount
+		}
+		if p.PlatformFeeAmount != nil {
+			totalPlatformFee += *p.PlatformFeeAmount
+		}
 	}
 
 	utils.Success(c, http.StatusOK, gin.H{
@@ -51,6 +57,8 @@ func (h *FinanceHandler) Collections(c *gin.Context) {
 		"summary": gin.H{
 			"total_collected":           totalCollected,
 			"total_platform_commission": totalCommission,
+			"total_platform_fee":        totalPlatformFee,
+			"total_gst_collected":       totalGST,
 			"total_technician_earning":  totalTechnicianEarning,
 			"count":                     len(payments),
 		},
@@ -62,7 +70,7 @@ func (h *FinanceHandler) Collections(c *gin.Context) {
 // gst_amount/gst_percent columns UpiService already populates on CreateOrder
 // (see UpiService.CreateOrder) — no separate ledger needed.
 func (h *FinanceHandler) GSTReport(c *gin.Context) {
-	payments, err := h.paymentRepo.ListAll(c.Request.Context(), "paid")
+	payments, err := h.paymentRepo.ListAllWithDetails(c.Request.Context(), "paid")
 	if err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
 		return
@@ -85,7 +93,11 @@ func (h *FinanceHandler) GSTReport(c *gin.Context) {
 			"payment_id":     p.ID,
 			"booking_id":     p.BookingID,
 			"invoice_number": p.InvoiceNumber,
+			"customer_name":  p.CustomerName,
+			"service_name":   p.ServiceName,
 			"base_amount":    base,
+			"cgst_amount":    p.CgstAmount,
+			"sgst_amount":    p.SgstAmount,
 			"gst_amount":     gst,
 			"gst_percent":    p.GstPercent,
 			"total_amount":   p.Amount,
@@ -106,7 +118,7 @@ func (h *FinanceHandler) GSTReport(c *gin.Context) {
 // Refunds — GET /finance/refunds
 // Every refunded payment, for reconciliation.
 func (h *FinanceHandler) Refunds(c *gin.Context) {
-	payments, err := h.paymentRepo.ListAll(c.Request.Context(), "refunded")
+	payments, err := h.paymentRepo.ListAllWithDetails(c.Request.Context(), "refunded")
 	if err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
 		return
