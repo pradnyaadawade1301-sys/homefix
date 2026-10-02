@@ -148,11 +148,16 @@ type InvoiceDetail struct {
 // written back, so it's a separate struct rather than extending Payment.
 type PaymentWithDetails struct {
 	Payment
-	CustomerName    string  `json:"customer_name"`
-	CustomerPhone   string  `json:"customer_phone"`
-	TechnicianName  *string `json:"technician_name,omitempty"`
-	TechnicianPhone *string `json:"technician_phone,omitempty"`
-	ServiceName     string  `json:"service_name"`
-	BookingCode     string  `json:"booking_code,omitempty"`
-	BookingStatus   string  `json:"booking_status"`
+	// All strings here — never pointers — because the SQL (ListAllWithDetails)
+	// COALESCEs every one of these to '' at the query level. That keeps NULL
+	// handling in one place (the SQL) instead of scattered across Go structs,
+	// and avoids "cannot scan NULL into *string" crashes for rows with a
+	// missing phone/name or no technician assigned yet (LEFT JOIN).
+	CustomerName    string `json:"customer_name"`
+	CustomerPhone   string `json:"customer_phone"`
+	TechnicianName  string `json:"technician_name,omitempty"`
+	TechnicianPhone string `json:"technician_phone,omitempty"`
+	ServiceName     string `json:"service_name"`
+	BookingCode     string `json:"booking_code,omitempty"`
+	BookingStatus   string `json:"booking_status"`
 }

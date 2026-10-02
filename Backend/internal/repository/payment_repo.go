@@ -242,10 +242,10 @@ func (r *PaymentRepository) ListAll(ctx context.Context, status string) ([]model
 func (r *PaymentRepository) ListAllWithDetails(ctx context.Context, status string) ([]models.PaymentWithDetails, error) {
 	query := `
 		SELECT ` + paymentColumnsPrefixed + `,
-		       cust.name, cust.phone,
-		       tech_user.name, tech_user.phone,
-		       cat.name,
-		       b.service_code, b.status
+		       COALESCE(cust.name, ''), COALESCE(cust.phone, ''),
+		       COALESCE(tech_user.name, ''), COALESCE(tech_user.phone, ''),
+		       COALESCE(cat.name, ''),
+		       COALESCE(b.service_code, ''), COALESCE(b.status, '')
 		FROM payments p
 		JOIN bookings b ON b.id = p.booking_id
 		JOIN users cust ON cust.id = p.user_id
@@ -278,7 +278,7 @@ func (r *PaymentRepository) ListAllWithDetails(ctx context.Context, status strin
 			&d.CustomerName, &d.CustomerPhone,
 			&d.TechnicianName, &d.TechnicianPhone,
 			&d.ServiceName,
-			&d.BookingCode, &d.BookingStatus,
+			&d.BookingCode, &d.BookingStatus, // all COALESCE'd to '' in SQL above — never NULL
 		)
 		if err != nil {
 			return nil, err
