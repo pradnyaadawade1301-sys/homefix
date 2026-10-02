@@ -135,6 +135,7 @@ func main() {
 		Consultation: handler.NewConsultationHandler(consultService, cfg.StunURLs, cfg.TurnURL, cfg.TurnSecret, cfg.TurnTTLSecond),
 		WebRTC:       handler.NewWebRTCHandler(cfg.StunURLs, cfg.TurnURL, cfg.TurnSecret, cfg.TurnTTLSecond),
 		Dispute:      handler.NewDisputeHandler(disputeService),
+		Due:          handler.NewDueHandler(dueService),
 		Support:      handler.NewSupportHandler(supportService),
 		Cms:          handler.NewCmsHandler(cmsService),
 		Finance:      financeHandler,
