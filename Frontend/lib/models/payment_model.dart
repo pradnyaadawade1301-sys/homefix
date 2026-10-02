@@ -51,6 +51,9 @@ class Payment {
   final double? technicianEarning;
   final double? platformFeeAmount;
   final double? visitChargeAmount;
+  // 4-digit cash-handover OTP — only ever sent by the backend to the paying
+  // customer, and only while a Cash on Delivery payment is still pending.
+  final String? cashOtp;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -78,6 +81,7 @@ class Payment {
     this.technicianEarning,
     this.platformFeeAmount,
     this.visitChargeAmount,
+    this.cashOtp,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -117,6 +121,7 @@ class Payment {
       technicianEarning: (json['technician_earning'] as num?)?.toDouble(),
       platformFeeAmount: (json['platform_fee_amount'] as num?)?.toDouble(),
       visitChargeAmount: (json['visit_charge_amount'] as num?)?.toDouble(),
+      cashOtp: json['cash_otp'] as String?,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : DateTime.now(),
       updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'] as String) : DateTime.now(),
     );
