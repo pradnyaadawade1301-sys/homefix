@@ -137,7 +137,6 @@ func main() {
 		Dispute:      handler.NewDisputeHandler(disputeService),
 		Support:      handler.NewSupportHandler(supportService),
 		Cms:          handler.NewCmsHandler(cmsService),
-		Due:          handler.NewDueHandler(dueService),
 		Finance:      financeHandler,
 		AdminAPI:     adminAPIHandler,
 	}
@@ -351,7 +350,7 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 	// issue as above. COD commission dues ledger + Razorpay settlements.
 	if _, err := pool.Exec(ctx,
 		`CREATE TABLE IF NOT EXISTS technician_dues (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 			technician_user_id UUID NOT NULL REFERENCES users(id),
 			payment_id UUID NOT NULL UNIQUE REFERENCES payments(id),
 			booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
@@ -362,7 +361,7 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 		);
 		CREATE INDEX IF NOT EXISTS idx_technician_dues_user_status ON technician_dues(technician_user_id, status);
 		CREATE TABLE IF NOT EXISTS due_settlements (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 			technician_user_id UUID NOT NULL REFERENCES users(id),
 			amount NUMERIC(12,2) NOT NULL,
 			due_ids UUID[] NOT NULL,
@@ -373,22 +372,6 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 			paid_at TIMESTAMPTZ
 		);`); err != nil {
 		log.Printf("startup migration: failed to ensure technician_dues tables exist: %v", err)
-	}
-
-	// Backfill: jo cash payments dues ledger live hone se PEHLE confirm hue,
-	// unka due row nahi bana (Pending dues 0 dikhta tha, Pay Dues button nahi
-	// aata tha). payments.platform_commission se missing due bana do.
-	// Idempotent hai (UNIQUE payment_id), har boot par chalna safe hai.
-	if _, err := pool.Exec(ctx,
-		`INSERT INTO technician_dues (technician_user_id, payment_id, booking_id, amount, created_at)
-		 SELECT t.user_id, p.id, p.booking_id, p.platform_commission, p.updated_at
-		 FROM payments p
-		 JOIN bookings b ON b.id = p.booking_id
-		 JOIN technicians t ON t.id = b.technician_id
-		 WHERE p.method = 'cash' AND p.status = 'paid'
-		   AND COALESCE(p.platform_commission, 0) > 0
-		 ON CONFLICT (payment_id) DO NOTHING;`); err != nil {
-		log.Printf("startup migration: failed to backfill cash dues: %v", err)
 	}
 
 	// 039_cash_otp — same "Render never applies migrations/ files" issue as
@@ -407,6 +390,28 @@ func runStartupMigrations(pool *pgxpool.Pool) {
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_otp_code VARCHAR(6);
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS email_otp_expires_at TIMESTAMPTZ;`); err != nil {
 		log.Printf("startup migration: failed to ensure users.email_otp columns exist: %v", err)
+	}
+
+	// 014_seed_finance — same "Render never applies migrations/ files" issue
+	// as above. Seeds (or repairs) the single 'finance' role user that the
+	// React Finance Panel logs in as. Uses a real bcrypt hash for the
+	// password "Finance@123" (change it after first login). ON CONFLICT
+	// repairs the row even if an earlier deploy inserted it with the old
+	// placeholder, unusable password_hash.
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO users (name, email, phone, role, password_hash, phone_verified, email_verified, is_active)
+		 VALUES (
+			'Finance Admin',
+			'finance@homefixlive.com',
+			'9999999998',
+			'finance',
+			'$2b$10$GVi7XKHLf4GrlVPeWXQEouFqQAyJnHkWfp7YgD7yR9KA6tcBtFl4S',
+			true,
+			true,
+			true
+		 )
+		 ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = 'finance';`); err != nil {
+		log.Printf("startup migration: failed to ensure finance user exists: %v", err)
 	}
 
 	log.Println("startup migrations: done")
