@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_ringtone_player/flutter_ringtone_player.dart' show FlutterRingtonePlayer;
 import 'package:provider/provider.dart';
 import '../../config/api_config.dart';
+import '../../core/consultation_ringtone_guard.dart';
 import '../../core/technician_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/consultation_provider.dart';
@@ -36,12 +36,15 @@ class _IncomingConsultationScreenState extends State<IncomingConsultationScreen>
   Timer? _pollTimer;
 
   void _syncRingtone(bool hasPending) {
+    // BUG #16 FIX: route through the shared ConsultationRingtoneGuard so this
+    // never starts a second overlapping ringtone on top of the one the FCM
+    // foreground-message callback in app.dart may have already started.
     if (hasPending && !_ringing) {
       _ringing = true;
-      FlutterRingtonePlayer().playRingtone(looping: true, volume: 1.0, asAlarm: false);
+      ConsultationRingtoneGuard.start();
     } else if (!hasPending && _ringing) {
       _ringing = false;
-      FlutterRingtonePlayer().stop();
+      ConsultationRingtoneGuard.stop();
     }
   }
 
@@ -70,7 +73,8 @@ class _IncomingConsultationScreenState extends State<IncomingConsultationScreen>
   void dispose() {
     _pollTimer?.cancel();
     if (_ringing) {
-      FlutterRingtonePlayer().stop();
+      _ringing = false;
+      ConsultationRingtoneGuard.stop();
     }
     super.dispose();
   }
@@ -78,13 +82,20 @@ class _IncomingConsultationScreenState extends State<IncomingConsultationScreen>
   Future<void> _accept(String consultationId) async {
     setState(() => _joiningConsultationId = consultationId);
     _syncRingtone(false);
+    // Capture both providers BEFORE any await — reading them off `context`
+    // after an await risks using a BuildContext across an async gap if this
+    // widget gets disposed mid-flight (use_build_context_synchronously).
+    final provider = context.read<ConsultationProvider>();
+    final authProvider = context.read<AuthProvider>();
     try {
-      final provider = context.read<ConsultationProvider>();
       await provider.acceptRequest(consultationId);
+      if (!mounted) return;
       final withCallInfo = await provider.getCallInfo(consultationId);
+      if (!mounted) return;
       // Fresh, not cached-from-login token — see AuthProvider.getValidAccessToken.
-      final token = await context.read<AuthProvider>().getValidAccessToken();
-      final myId = context.read<AuthProvider>().currentUser?.id ?? '';
+      final token = await authProvider.getValidAccessToken();
+      if (!mounted) return;
+      final myId = authProvider.currentUser?.id ?? '';
 
       if (token == null || withCallInfo.roomId == null) {
         throw Exception('Could not join the call. Please try again.');
@@ -241,7 +252,7 @@ class _IncomingConsultationScreenState extends State<IncomingConsultationScreen>
                           ],
                         ),
                       ],
-                    ),
+                     ),
                   ),
                 );
               },
