@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+    "math"
 	"strings"
 	"time"
 
@@ -98,10 +99,10 @@ func (s *RazorpayService) CreateOrder(ctx context.Context, bookingID, userID str
 		return nil, err
 	}
 	effectiveBase, platformFee, visitCharge, gstAmount, totalAmount := charges.effectiveBase, charges.platformFee, charges.visitCharge, charges.gstAmount, charges.totalAmount
-	isRepeat, repeatDiscountPercent, repeatDiscountAmount := false, (*float64)(nil), (*float64)(nil)
+    isRepeat, repeatDiscountPercent, repeatDiscountAmount := charges.isRepeat, charges.repeatDiscountPercent, charges.repeatDiscountAmount
 	var visitFeeCredit *float64 // legacy field — unused now that visit fee is an explicit line
 
-	amountPaise := int64(totalAmount*100 + 0.5) // Razorpay wants amount in the smallest currency unit (paise)
+    amountPaise := int64(math.Round(totalAmount * 100)) // Razorpay wants amount in the smallest currency unit (paise)
 
 	orderData := map[string]interface{}{
 		"amount":   amountPaise,
@@ -162,6 +163,12 @@ type chargeBreakdown struct {
 	visitCharge   float64
 	gstAmount     float64
 	totalAmount   float64
+
+    // Repeat-customer discount (see prepareCharge). isRepeat is false and the
+    // two pointers are nil when no discount applied.
+    isRepeat              bool
+    repeatDiscountPercent *float64
+    repeatDiscountAmount  *float64
 }
 
 // prepareCharge validates baseAmountRupees against the booking's invoiced
@@ -211,18 +218,49 @@ func (s *RazorpayService) prepareCharge(ctx context.Context, bookingID string, b
 		}
 	}
 
-	// GST is charged on the whole taxable subtotal: service amount + platform
-	// fee + visit charge.
-	subtotal := baseAmountRupees + platformFee + visitCharge
+    // Repeat-customer discount: if this customer has already had a completed
+    // job with THIS technician, take repeatDiscountPct off the service amount
+    // (pre-GST, never off the platform/visit fees). Skipped for warranty
+    // claims, which are free re-fixes anyway.
+    effectiveBase := baseAmountRupees
+    var isRepeat bool
+    var repeatDiscountPercent, repeatDiscountAmount *float64
+    if !booking.IsWarrantyClaim && booking.TechnicianID != nil && s.repeatDiscountPct > 0 {
+        priorCount, pErr := s.bookingRepo.CountPriorBookings(ctx, booking.CustomerID, *booking.TechnicianID)
+        if pErr != nil {
+            return nil, chargeBreakdown{}, "", pErr
+        }
+        // If this booking is itself already completed it is counted in
+        // priorCount, but it's the job being paid for — not a prior one.
+        if booking.Status == models.BookingCompleted {
+            priorCount--
+        }
+        if priorCount > 0 {
+            isRepeat = true
+            pct := s.repeatDiscountPct
+            amt := baseAmountRupees * pct / 100
+            repeatDiscountPercent = &pct
+            repeatDiscountAmount = &amt
+            effectiveBase = baseAmountRupees - amt
+        }
+    }
+
+    // GST is charged on the whole taxable subtotal: service amount (after any
+    // repeat discount) + platform fee + visit charge.
+    subtotal := effectiveBase + platformFee + visitCharge
 	gstAmount := subtotal * s.gstPct / 100
 	totalAmount := subtotal + gstAmount
 
 	return booking, chargeBreakdown{
-		effectiveBase: baseAmountRupees,
+        effectiveBase: effectiveBase,
 		platformFee:   platformFee,
 		visitCharge:   visitCharge,
 		gstAmount:     gstAmount,
 		totalAmount:   totalAmount,
+
+        isRepeat:              isRepeat,
+        repeatDiscountPercent: repeatDiscountPercent,
+        repeatDiscountAmount:  repeatDiscountAmount,
 	}, ref, nil
 }
 
@@ -271,6 +309,9 @@ func (s *RazorpayService) CreateCodOrder(ctx context.Context, bookingID, userID 
 		PlatformFeeAmount: &charges.platformFee,
 		VisitChargeAmount: &charges.visitCharge,
 		Currency:          "INR",
+        IsRepeatCustomer:      charges.isRepeat,
+        RepeatDiscountPercent: charges.repeatDiscountPercent,
+        RepeatDiscountAmount:  charges.repeatDiscountAmount,
 		Method:            strPtr("cash"),
 		PaymentType:       models.PaymentTypeService,
 	}

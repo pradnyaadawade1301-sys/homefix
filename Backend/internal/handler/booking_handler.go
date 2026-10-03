@@ -141,6 +141,17 @@ func (h *BookingHandler) TechnicianBookings(c *gin.Context) {
 // RepeatCustomers powers the technician's "My Customers" screen.
 func (h *BookingHandler) RepeatCustomers(c *gin.Context) {
 	technicianID := c.Param("id")
+    if c.GetString("role") != "admin" {
+        owner, err := h.bookingService.TechnicianOwnedByUser(c.Request.Context(), technicianID, c.GetString("user_id"))
+        if err != nil {
+            utils.Error(c, http.StatusInternalServerError, err.Error())
+            return
+        }
+        if !owner {
+            utils.Error(c, http.StatusForbidden, "not authorized to view this technician's customers")
+            return
+        }
+    }
 	list, err := h.bookingService.RepeatCustomers(c.Request.Context(), technicianID)
 	if err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
@@ -191,6 +202,17 @@ func (h *BookingHandler) MyServiceHistoryWithTechnician(c *gin.Context) {
 func (h *BookingHandler) ServiceHistory(c *gin.Context) {
 	technicianID := c.Param("id")
 	customerID := c.Param("customerId")
+    if c.GetString("role") != "admin" {
+        owner, err := h.bookingService.TechnicianOwnedByUser(c.Request.Context(), technicianID, c.GetString("user_id"))
+        if err != nil {
+            utils.Error(c, http.StatusInternalServerError, err.Error())
+            return
+        }
+        if !owner {
+            utils.Error(c, http.StatusForbidden, "not authorized to view this technician's service history")
+            return
+        }
+    }
 	list, err := h.bookingService.ServiceHistory(c.Request.Context(), technicianID, customerID)
 	if err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())

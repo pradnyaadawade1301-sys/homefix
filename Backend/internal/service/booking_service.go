@@ -314,7 +314,7 @@ func (s *BookingService) UpdateStatus(ctx context.Context, bookingID, status, no
 			return err
 		}
 	}
-	if s.fcm != nil {
+    if s.fcm != nil && b.TechnicianID != nil {
 		techName := ""
 		if b.TechnicianID != nil {
 			if n, err := s.techRepo.GetNameByID(ctx, *b.TechnicianID); err == nil {
@@ -552,7 +552,11 @@ func (s *BookingService) RaiseWarrantyClaim(ctx context.Context, customerID, ori
 	}
 
 	if original.TechnicianID != nil {
-		if err := s.bookingRepo.AssignTechnician(ctx, created.ID, *original.TechnicianID); err == nil {
+        if err := s.bookingRepo.AssignTechnician(ctx, created.ID, *original.TechnicianID); err != nil {
+            // Don't swallow this: the claim stays in the open "requested" pool
+            // (still visible to technicians) but we must at least leave a trace.
+            log.Printf("warning: warranty claim %s created but auto-assign to technician %s failed: %v", created.ID, *original.TechnicianID, err)
+        } else {
 			created.TechnicianID = original.TechnicianID
 			created.Status = models.BookingAccepted
 			if s.fcm != nil {
@@ -805,13 +809,38 @@ func (s *BookingService) RespondToEstimate(ctx context.Context, bookingID, decis
 	default:
 		return errors.New("decision must be 'approve' or 'decline'")
 	}
+    // Only a PENDING estimate on a live booking can be responded to; otherwise
+    // a repeated/late call would overwrite the decision and duplicate history rows.
+    est, err := s.bookingRepo.GetEstimate(ctx, bookingID)
+    if err != nil {
+        return err
+    }
+    if est == nil {
+        return errors.New("no estimate found for this booking")
+    }
+    if est.Status != models.EstimatePending {
+        return fmt.Errorf("estimate has already been %s", est.Status)
+    }
+    b, err := s.bookingRepo.GetByID(ctx, bookingID)
+    if err != nil {
+        return err
+    }
+    if b == nil {
+        return errors.New("booking not found")
+    }
+    if b.Status == models.BookingCancelled || b.Status == models.BookingCompleted {
+        return fmt.Errorf("cannot respond to an estimate on a %s booking", b.Status)
+    }
 	if err := s.bookingRepo.SetEstimateStatus(ctx, bookingID, status); err != nil {
 		return err
 	}
 	if status == models.EstimateApproved {
 		return s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingInProgress, "Customer approved estimate")
 	}
-	return s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingCancelled, "Customer declined estimate")
+    // Declined: don't cancel the job. Send it back to inspecting so the
+    // technician can revise the estimate and resubmit (UpsertEstimate resets
+    // the estimate to pending).
+    return s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingInspecting, "Customer declined estimate")
 }
 
 func (s *BookingService) AddServicePhoto(ctx context.Context, bookingID, photoURL, photoType string) (*models.BookingServicePhoto, error) {
