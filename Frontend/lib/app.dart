@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart' show FlutterRingtonePlayer;
 import 'package:provider/provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'core/consultation_ringtone_guard.dart';
 import 'core/http_client.dart';
 import 'core/notification_navigation.dart';
 import 'core/theme.dart';
@@ -142,7 +143,7 @@ class _MyAppState extends State<MyApp> {
     // after accept/reject) — see incoming_consultation_screen.dart.
     app.fcmNotificationService.onIncomingConsultation = (payload) {
       debugPrint('[FCM] Incoming consultation request: $payload');
-      FlutterRingtonePlayer().playRingtone(looping: true, volume: 1.0, asAlarm: false);
+      ConsultationRingtoneGuard.start();
       app.navigatorKey.currentState?.pushNamed('/consultation-requests');
     };
 

@@ -179,6 +179,8 @@ class _TechnicianSettlementScreenState extends State<TechnicianSettlementScreen>
                     isLoading: paymentProvider.isLoadingDues,
                     paying: paymentProvider.isPayingDues,
                     onPay: () => _payDues(),
+                    error: paymentProvider.dues == null ? paymentProvider.error : null,
+                    onRetry: () => context.read<PaymentProvider>().fetchDues(),
                   ),
                 ),
               ),
@@ -329,7 +331,16 @@ class _DuesCard extends StatelessWidget {
   final bool isLoading;
   final bool paying;
   final VoidCallback onPay;
-  const _DuesCard({required this.dues, required this.isLoading, required this.paying, required this.onPay});
+  final String? error; // set when GET /technician/dues failed
+  final VoidCallback onRetry;
+  const _DuesCard({
+    required this.dues,
+    required this.isLoading,
+    required this.paying,
+    required this.onPay,
+    required this.error,
+    required this.onRetry,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -391,6 +402,14 @@ class _DuesCard extends StatelessWidget {
                 ),
             ],
           ),
+          if (dues == null && !isLoading) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Dues load nahi ho paye${error != null ? ': $error' : ''}',
+              style: const TextStyle(fontSize: 11.5, color: AppTheme.errorColor),
+            ),
+            TextButton(onPressed: onRetry, child: const Text('Retry')),
+          ],
           if (blocked) ...[
             const SizedBox(height: 8),
             const Text(

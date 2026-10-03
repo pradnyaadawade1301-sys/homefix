@@ -153,26 +153,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
   }
 
-  Future<void> _confirmDeleteAccount(BuildContext context) async {
-    final l10n = AppLocalizations.of(context);
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.profileDeleteDialogTitle),
-        content: Text(l10n.profileDeleteDialogContent),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.commonCancel)),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.profileDeleteConfirm, style: const TextStyle(color: AppTheme.errorColor)),
-          ),
-        ],
-      ),
-    );
-    if (confirm != true || !context.mounted) return;
-    _openPlaceholder(context, l10n.profileDeleteAccount, Icons.delete_outline_rounded);
-  }
-
   void _openPlaceholder(BuildContext context, String title, IconData icon) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => _PlaceholderScreen(title: title, icon: icon)),
@@ -270,7 +250,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ? _TechnicianProfileBody(
                     user: user,
                     onLogout: () => _confirmLogout(context),
-                    onDelete: () => _confirmDeleteAccount(context),
                     openPlaceholder: (t, i) => _openPlaceholder(context, t, i),
                     openChangePassword: () => _openChangePassword(context),
                     openScreen: (w) => _openScreen(context, w),
@@ -279,7 +258,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 : _CustomerProfileBody(
                     user: user,
                     onLogout: () => _confirmLogout(context),
-                    onDelete: () => _confirmDeleteAccount(context),
                     openPlaceholder: (t, i) => _openPlaceholder(context, t, i),
                     openChangePassword: () => _openChangePassword(context),
                     openScreen: (w) => _openScreen(context, w),
@@ -436,7 +414,6 @@ Future<void> _showProfilePhotoSheet(
 class _CustomerProfileBody extends StatefulWidget {
   final User user;
   final VoidCallback onLogout;
-  final VoidCallback onDelete;
   final _OpenPlaceholder openPlaceholder;
   final VoidCallback openChangePassword;
   final void Function(Widget) openScreen;
@@ -445,7 +422,6 @@ class _CustomerProfileBody extends StatefulWidget {
   const _CustomerProfileBody({
     required this.user,
     required this.onLogout,
-    required this.onDelete,
     required this.openPlaceholder,
     required this.openChangePassword,
     required this.openScreen,
@@ -583,11 +559,6 @@ class _CustomerProfileBodyState extends State<_CustomerProfileBody> {
             style: OutlinedButton.styleFrom(side: const BorderSide(color: AppTheme.errorColor)),
           ),
         ),
-        const SizedBox(height: 12),
-        TextButton(
-          onPressed: widget.onDelete,
-          child: Text(l10n.profileDeleteAccount, style: const TextStyle(color: Colors.grey)),
-        ),
       ],
     );
   }
@@ -600,7 +571,6 @@ class _CustomerProfileBodyState extends State<_CustomerProfileBody> {
 class _TechnicianProfileBody extends StatefulWidget {
   final User user;
   final VoidCallback onLogout;
-  final VoidCallback onDelete;
   final _OpenPlaceholder openPlaceholder;
   final VoidCallback openChangePassword;
   final void Function(Widget) openScreen;
@@ -609,7 +579,6 @@ class _TechnicianProfileBody extends StatefulWidget {
   const _TechnicianProfileBody({
     required this.user,
     required this.onLogout,
-    required this.onDelete,
     required this.openPlaceholder,
     required this.openChangePassword,
     required this.openScreen,
@@ -929,11 +898,6 @@ class _TechnicianProfileBodyState extends State<_TechnicianProfileBody> {
                 label: Text(l10n.profileLogout, style: const TextStyle(color: AppTheme.errorColor)),
                 style: OutlinedButton.styleFrom(side: const BorderSide(color: AppTheme.errorColor)),
               ),
-            ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: widget.onDelete,
-              child: Text(l10n.profileDeleteAccount, style: const TextStyle(color: Colors.grey)),
             ),
           ],
         );

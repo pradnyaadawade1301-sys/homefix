@@ -154,6 +154,16 @@ class _IncomingBookingCallScreenState extends State<IncomingBookingCallScreen> {
       };
       signaling.connect();
 
+      // BUG #25 FIX: track whether we actually got 'peer-joined' or just
+      // hit the timeout, instead of only checking signaling.isConnected
+      // afterwards — the socket can still be open (connected to the
+      // signaling server) even though the caller never joined the room, so
+      // that check alone couldn't tell "nobody to reject" apart from
+      // "someone's there, send the reject". On timeout there's provably no
+      // peer in the room yet, so we skip the send + flush delay entirely
+      // and disconnect right away instead of holding the socket open for
+      // the full 10s for no reason once the user has already tapped
+      // Decline and left the screen.
       await peerJoined.future.timeout(
         const Duration(seconds: 10),
         onTimeout: () {
@@ -161,8 +171,10 @@ class _IncomingBookingCallScreenState extends State<IncomingBookingCallScreen> {
           // failed) — nothing to notify, just clean up below.
         },
       );
-
-      if (signaling.isConnected) {
+      // peerJoined.isCompleted is only ever set true by the 'peer-joined'
+      // handler above, so (unlike signaling.isConnected) it correctly tells
+      // "timed out" apart from "peer actually joined".
+      if (peerJoined.isCompleted && signaling.isConnected) {
         signaling.send(SignalingMessage(type: 'call-reject', from: myId, to: ''));
         // Brief pause so the message is flushed to the socket before we
         // close it — closing immediately after send can drop it.

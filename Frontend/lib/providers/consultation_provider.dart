@@ -111,8 +111,6 @@ class ConsultationProvider extends ChangeNotifier {
 
   /// Customer: kick off a new consultation request. Backend starts matching
   /// a technician; resulting status is typically "searching".
-   /// Customer: kick off a new consultation request. Backend starts matching
-  /// a technician; resulting status is typically "searching".
   Future<Consultation> requestConsultation({
     required String categoryId,
     required String categoryName,
@@ -166,8 +164,13 @@ class ConsultationProvider extends ChangeNotifier {
   Future<void> cancelRequest(String consultationId) async {
     try {
       await _consultationService.cancel(consultationId);
-      if (_current?.id == consultationId) {
-        _current = _current!.copyWith(status: ConsultationStatus.cancelled);
+      // BUG #27 FIX: re-check with a local, non-null snapshot instead of the
+      // unsafe `!` on `_current` — avoids a null-check crash if `_current`
+      // was cleared (e.g. clearCurrent() from another screen) between the
+      // await above completing and this line running.
+      final current = _current;
+      if (current != null && current.id == consultationId) {
+        _current = current.copyWith(status: ConsultationStatus.cancelled);
       }
       _error = null;
       notifyListeners();
@@ -313,6 +316,17 @@ class ConsultationProvider extends ChangeNotifier {
   List<Consultation> get upcoming => _upcoming;
   bool get isLoadingUpcoming => _isLoadingUpcoming;
 
+  /// Sorts "upcoming" consultations soonest-slot-first. `scheduledAt` is
+  /// null for an instant ("Consult Now") request, so those fall back to
+  /// `createdAt` and are ordered among themselves oldest-created-first —
+  /// they're effectively already due, so they should surface near the top
+  /// rather than be pushed below every dated slot.
+  int _byScheduledAtAscending(Consultation a, Consultation b) {
+    final aTime = a.scheduledAt ?? a.createdAt;
+    final bTime = b.scheduledAt ?? b.createdAt;
+    return aTime.compareTo(bTime);
+  }
+
   /// Technician: refresh the upcoming (scheduled/confirmed) list and update
   /// listeners. Used by [UpcomingConsultationsScreen] via RefreshIndicator /
   /// Consumer.
@@ -321,7 +335,9 @@ class ConsultationProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _upcoming = await _consultationService.getUpcoming();
-      _upcoming.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      // BUG #18 FIX: an "upcoming" list should show the soonest appointment
+      // first (scheduledAt ascending), not the most recently created one.
+      _upcoming.sort(_byScheduledAtAscending);
       _error = null;
     } catch (e) {
       _error = e.toString();
@@ -338,7 +354,8 @@ class ConsultationProvider extends ChangeNotifier {
   Future<List<Consultation>> fetchUpcomingList() async {
     try {
       final list = await _consultationService.getUpcoming();
-      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      // BUG #18 FIX: same soonest-first ordering as loadUpcoming().
+      list.sort(_byScheduledAtAscending);
       _upcoming = list;
       _error = null;
       notifyListeners();

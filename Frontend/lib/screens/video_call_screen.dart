@@ -206,7 +206,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   bool _ended = false;
 
-  void _endCall({bool notifyPeer = true}) async {
+  // BUG #24 FIX: returns Future<void> (was a fire-and-forget `void async`)
+  // so callers that need to know when the hangup/API/navigation work has
+  // actually finished (e.g. dispose(), below) can await it instead of firing
+  // it and moving on blind.
+  Future<void> _endCall({bool notifyPeer = true}) async {
     // Guards against this firing twice — once from the user's own tap, and
     // again from the onConnectionState callback that fires when hangUp()
     // below closes the peer connection locally. Without this, the second
@@ -289,7 +293,22 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     widget.signaling.onMessage = null;
     _localRenderer.dispose();
     _remoteRenderer.dispose();
-    _webrtc.hangUp();
+    // BUG #24 FIX: only hang up here if _endCall() hasn't already done it —
+    // previously this unconditionally called hangUp() again even when the
+    // user had just tapped "End Call" (which already hung up and is likely
+    // still mid-flight on its own API call / navigation), redundantly
+    // closing an already-closed peer connection and risking "setState()
+    // called after dispose()" if _endCall's async work resumes against this
+    // now-disposed State. If the screen is being torn down WITHOUT having
+    // gone through _endCall (e.g. the OS/route pops it directly), we still
+    // need to hang up — but fire-and-forget with its own error guard, since
+    // there is no State left here to safely await against or show a result.
+    if (!_ended) {
+      _ended = true;
+      _webrtc.hangUp().catchError((_) {
+        // Best-effort: nothing left to notify, nothing left to navigate.
+      });
+    }
     // Without this, the client-side socket to /ws/call/:id stays open in the
     // background even after this screen is popped — the server never sees a
     // close frame, so it keeps treating the room as occupied for up to the

@@ -1,4 +1,23 @@
 class ApiConfig {
+  // BUG #22 FIX: small helper so "base + /:id + /suffix" URLs (e.g.
+  // technicianBookings, technicianRepeatCustomers, technicianReviews,
+  // technicianDetail, bookingDetail, bookingCancel, ...) are built
+  // consistently and can never produce a double slash or a stray trailing
+  // slash, no matter how the base constant above is written. Previously
+  // each call site hand-wrote '${ApiConfig.someBase}/$id/suffix', which is
+  // fragile if someBase itself ever ends with a slash or already contains
+  // a placeholder segment.
+  static String withId(String base, String id, [String? suffix]) {
+    final cleanBase = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+    final cleanId = id.startsWith('/') ? id.substring(1) : id;
+    var url = '$cleanBase/$cleanId';
+    if (suffix != null && suffix.isNotEmpty) {
+      final cleanSuffix = suffix.startsWith('/') ? suffix.substring(1) : suffix;
+      url = '$url/$cleanSuffix';
+    }
+    return url;
+  }
+
   // Google Places / Geocoding API key.
   // Get one from https://console.cloud.google.com/ :
   //   1. Create/select a project.

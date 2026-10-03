@@ -41,11 +41,16 @@ class BookingService {
   /// assigned technician's details (name/phone/rating) once one is assigned.
   Future<List<Booking>> getUserBookings({String? status}) async {
     try {
-      final response = await _httpClient.get(ApiConfig.bookingList);
+      // BUG #21 FIX: send the status filter as a query param so the backend
+      // (GET /bookings/me?status=...) does the filtering in SQL, instead of
+      // downloading every booking the user has ever made and filtering it
+      // locally on every call.
+      final response = await _httpClient.get(
+        ApiConfig.bookingList,
+        queryParameters: (status != null && status.isNotEmpty) ? {'status': status} : null,
+      );
       final list = ApiEnvelope.unwrap(response) as List? ?? [];
-      final bookings = list.map((e) => Booking.fromJson(e as Map<String, dynamic>)).toList();
-      if (status == null) return bookings;
-      return bookings.where((b) => b.status == status).toList();
+      return list.map((e) => Booking.fromJson(e as Map<String, dynamic>)).toList();
     } catch (e) {
       throw Exception(ApiEnvelope.errorMessage(e));
     }
@@ -57,7 +62,12 @@ class BookingService {
   /// not the user id.
   Future<List<Booking>> getTechnicianBookings(String technicianId) async {
     try {
-      final response = await _httpClient.get('${ApiConfig.technicianBookings}/$technicianId/bookings');
+      // BUG #22 FIX: build the URL with ApiConfig.withId instead of raw
+      // string interpolation so it can't silently double-slash or
+      // mis-concatenate if ApiConfig.technicianBookings is ever changed.
+      final response = await _httpClient.get(
+        ApiConfig.withId(ApiConfig.technicianBookings, technicianId, 'bookings'),
+      );
       final list = ApiEnvelope.unwrap(response) as List? ?? [];
       return list.map((e) => Booking.fromJson(e as Map<String, dynamic>)).toList();
     } catch (e) {
@@ -70,8 +80,10 @@ class BookingService {
   /// RECORD id (from TechnicianProfile.id / GET /technicians/me), not the user id.
   Future<List<RepeatCustomer>> getRepeatCustomers(String technicianId) async {
     try {
+      // BUG #22 FIX: same ApiConfig.withId helper as getTechnicianBookings.
       final response = await _httpClient.get(
-          '${ApiConfig.technicianRepeatCustomers}/$technicianId/repeat-customers');
+        ApiConfig.withId(ApiConfig.technicianRepeatCustomers, technicianId, 'repeat-customers'),
+      );
       final list = ApiEnvelope.unwrap(response) as List? ?? [];
       return list.map((e) => RepeatCustomer.fromJson(e as Map<String, dynamic>)).toList();
     } catch (e) {

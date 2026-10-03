@@ -42,6 +42,7 @@ class PaymentProvider extends ChangeNotifier {
   /// Technician's COD commission dues (replaces the wallet-balance gate).
   Future<void> fetchDues() async {
     _isLoadingDues = true;
+    _error = null;
     notifyListeners();
     try {
       _dues = await _paymentService.getDues();

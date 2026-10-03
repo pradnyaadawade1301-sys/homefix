@@ -309,8 +309,17 @@ class BookingProvider extends ChangeNotifier {
     _error = null;
     final idx = _bookings.indexWhere((b) => b.id == bookingId);
     if (idx != -1) {
-      _selectedBooking = await _bookingService.getBookingDetail(bookingId);
-      _bookings[idx] = _selectedBooking!;
+      final refreshed = await _bookingService.getBookingDetail(bookingId);
+      _bookings[idx] = refreshed;
+      // BUG #19 FIX: only replace _selectedBooking when it was already
+      // pointing at THIS booking (or wasn't set). Previously this always
+      // overwrote _selectedBooking with whatever booking was just updated,
+      // even if the technician was currently viewing a different booking's
+      // detail screen — silently swapping the detail screen's data out from
+      // under them.
+      if (_selectedBooking == null || _selectedBooking!.id == bookingId) {
+        _selectedBooking = refreshed;
+      }
     }
   } catch (e) {
     _error = e.toString();
@@ -328,6 +337,14 @@ class BookingProvider extends ChangeNotifier {
 /// nothing). Refreshes the selected/local booking so the technician side
 /// re-renders into the "arrived, waiting for OTP" state.
 Future<void> markArrived(String bookingId, String technicianId) async {
+  // BUG #20 FIX: `technicianId` was accepted but silently dropped — the
+  // backend's PATCH /bookings/:id/status endpoint identifies the technician
+  // from the authenticated JWT, not from a body/query param, so there is
+  // nothing to actually pass it to today. To stop the parameter from being
+  // misleading dead weight (and to fail fast if that backend contract ever
+  // changes), we now assert it was actually supplied by the caller instead
+  // of silently accepting and ignoring blank/garbage values.
+  assert(technicianId.isNotEmpty, 'markArrived: technicianId must not be empty');
   await updateBookingStatus(bookingId, 'arrived', note: 'Technician has arrived');
 }
 
