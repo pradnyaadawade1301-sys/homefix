@@ -1,11 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import '../core/technician_theme.dart';
+import '../providers/category_provider.dart';
 
 /// Lets the technician upload professional certificates. Reuses the same
-/// image-picker pattern as the KYC screen. UI-only for now; wire the
-/// upload to your TechnicianKycProvider.uploadFile once ready.
+/// image-picker pattern as the KYC screen. Each picked image
+/// is uploaded and the URL list saved via PATCH /technicians/me/settings.
 class CertificatesScreen extends StatefulWidget {
   const CertificatesScreen({Key? key}) : super(key: key);
 
@@ -15,17 +17,59 @@ class CertificatesScreen extends StatefulWidget {
 
 class _CertificatesScreenState extends State<CertificatesScreen> {
   final _picker = ImagePicker();
-  final List<File> _certificates = [];
+  final List<String> _certificates = []; // uploaded certificate URLs
+  bool _busy = false;
 
-  Future<void> _addCertificate() async {
-    final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
-    if (picked == null) return;
-    setState(() => _certificates.add(File(picked.path)));
-    // TODO: Upload via TechnicianKycProvider.uploadFile and save the URL.
+  @override
+  void initState() {
+    super.initState();
+    _load();
   }
 
-  void _remove(int index) {
-    setState(() => _certificates.removeAt(index));
+  Future<void> _load() async {
+    final s = await context.read<TechnicianKycProvider>().loadSettings();
+    if (!mounted) return;
+    final list = s['certificates'];
+    if (list is List) setState(() => _certificates..clear()..addAll(list.whereType<String>()));
+  }
+
+  void _toast(String msg) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+
+  Future<void> _addCertificate() async {
+    if (_busy) return;
+    final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (picked == null || !mounted) return;
+    setState(() => _busy = true);
+    final provider = context.read<TechnicianKycProvider>();
+    final url = await provider.uploadFile(File(picked.path));
+    if (!mounted) return;
+    if (url == null) {
+      setState(() => _busy = false);
+      _toast(provider.error ?? 'Could not upload certificate');
+      return;
+    }
+    final updated = [..._certificates, url];
+    final ok = await provider.saveSettings({'certificates': updated});
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (ok) _certificates.add(url);
+    });
+    _toast(ok ? 'Certificate saved' : (provider.error ?? 'Could not save certificate'));
+  }
+
+  Future<void> _remove(int index) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final provider = context.read<TechnicianKycProvider>();
+    final updated = [..._certificates]..removeAt(index);
+    final ok = await provider.saveSettings({'certificates': updated});
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (ok) _certificates.removeAt(index);
+    });
+    if (!ok) _toast(provider.error ?? 'Could not remove certificate');
   }
 
   @override
@@ -65,7 +109,8 @@ class _CertificatesScreenState extends State<CertificatesScreen> {
                           children: [
                             ClipRRect(
                               borderRadius: BorderRadius.circular(12),
-                              child: Image.file(_certificates[index], fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+                              child: Image.network(_certificates[index], fit: BoxFit.cover, width: double.infinity, height: double.infinity,
+                                  errorBuilder: (_, __, ___) => Container(color: Colors.grey[300], child: const Icon(Icons.broken_image_outlined))),
                             ),
                             Positioned(
                               top: 4,
@@ -89,10 +134,10 @@ class _CertificatesScreenState extends State<CertificatesScreen> {
               width: double.infinity,
               height: 50,
               child: OutlinedButton.icon(
-                onPressed: _addCertificate,
+                onPressed: _busy ? null : _addCertificate,
                 style: OutlinedButton.styleFrom(foregroundColor: TechTheme.primary, side: const BorderSide(color: TechTheme.primary)),
                 icon: const Icon(Icons.add_rounded),
-                label: const Text('Add Certificate'),
+                label: Text(_busy ? 'Please wait…' : 'Add Certificate'),
               ),
             ),
           ],

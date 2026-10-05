@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../core/technician_theme.dart';
+import '../providers/category_provider.dart';
 
-/// Technician bank/UPI details for settlement payouts. UI-only for now;
-/// wire the save action to your settlement/payouts API once ready.
+/// Technician bank/UPI details for settlement payouts. Saved via
+/// PATCH /technicians/me/settings.
 class BankDetailsScreen extends StatefulWidget {
   const BankDetailsScreen({Key? key}) : super(key: key);
 
@@ -19,6 +21,24 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
   bool _isSaving = false;
 
   @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final s = await context.read<TechnicianKycProvider>().loadSettings();
+    if (!mounted) return;
+    String? str(String k) => s[k] is String ? s[k] as String : null;
+    setState(() {
+      _accountHolderController.text = str('bank_account_holder') ?? _accountHolderController.text;
+      _accountNumberController.text = str('bank_account_number') ?? _accountNumberController.text;
+      _ifscController.text = str('bank_ifsc') ?? _ifscController.text;
+      _upiController.text = str('upi_id') ?? _upiController.text;
+    });
+  }
+
+  @override
   void dispose() {
     _accountHolderController.dispose();
     _accountNumberController.dispose();
@@ -30,12 +50,17 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSaving = true);
-    // TODO: PATCH technician settlement details to your backend.
-    await Future.delayed(const Duration(milliseconds: 600));
+    final provider = context.read<TechnicianKycProvider>();
+    final ok = await provider.saveSettings({
+      'bank_account_holder': _accountHolderController.text.trim(),
+      'bank_account_number': _accountNumberController.text.trim(),
+      'bank_ifsc': _ifscController.text.trim().toUpperCase(),
+      'upi_id': _upiController.text.trim(),
+    });
     if (!mounted) return;
     setState(() => _isSaving = false);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Payout details saved')),
+      SnackBar(content: Text(ok ? 'Payout details saved' : (provider.error ?? 'Could not save payout details'))),
     );
   }
 

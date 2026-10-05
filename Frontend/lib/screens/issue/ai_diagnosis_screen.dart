@@ -33,9 +33,8 @@ class AIDiagnosisScreen extends StatefulWidget {
 /// The two ways a customer can proceed once the AI has given its first
 /// read on the problem: Get Instant AI Guidance / Book Technician Directly.
 /// "Talk to an Expert" (live video) has been removed from this screen
-/// entirely per product request — [talkToExpert] is kept in the enum only
-/// so old/serialized state doesn't break, but nothing sets it anymore.
-enum _NextStepChoice { aiGuidance, talkToExpert, bookDirect }
+/// entirely per product request.
+enum _NextStepChoice { aiGuidance, bookDirect }
 
 class _AIDiagnosisScreenState extends State<AIDiagnosisScreen> {
   final _messageController = TextEditingController();

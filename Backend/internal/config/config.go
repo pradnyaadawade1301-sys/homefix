@@ -137,6 +137,21 @@ func getOr(key, def string) string {
 	return def
 }
 
+// checkJWTSecrets refuses to start with placeholder JWT secrets, or with short
+// ones in production — a guessable secret lets anyone forge admin tokens.
+func checkJWTSecrets() {
+	prod := strings.EqualFold(os.Getenv("ENV"), "production")
+	for _, k := range []string{"JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET"} {
+		v := os.Getenv(k)
+		if strings.HasPrefix(strings.ToLower(v), "change-me") {
+			panic(fmt.Sprintf("config: %s is still the placeholder value — set a real random secret", k))
+		}
+		if prod && len(v) < 32 {
+			panic(fmt.Sprintf("config: %s must be at least 32 characters in production", k))
+		}
+	}
+}
+
 func Load() *Config {
 	_ = godotenv.Load() // ok if .env missing in container (env vars injected instead)
 
@@ -184,6 +199,8 @@ func Load() *Config {
 	if err != nil {
 		visitFeeAmount = 100
 	}
+
+	checkJWTSecrets()
 
 	return &Config{
 		Port:  getOr("PORT", "8080"),

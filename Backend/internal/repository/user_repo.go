@@ -168,7 +168,7 @@ func (r *UserRepository) VerifyOTPAndActivate(ctx context.Context, userID string
 }
 
 func (r *UserRepository) UpdateProfile(ctx context.Context, userID, name string, email *string) error {
-	_, err := r.db.Exec(ctx, `UPDATE users SET name = $1, email = $2, updated_at = now() WHERE id = $3`,
+	_, err := r.db.Exec(ctx, `UPDATE users SET name = $1, email = COALESCE(NULLIF($2::text, ''), email), updated_at = now() WHERE id = $3`,
 		name, email, userID)
 	return err
 }

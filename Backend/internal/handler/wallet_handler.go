@@ -40,6 +40,9 @@ func (h *WalletHandler) History(c *gin.Context) {
 type walletAdjustBody struct {
 	Amount float64 `json:"amount" binding:"required"`
 	Reason string  `json:"reason"`
+	// UserID is optional: when set (admin credit), that user's wallet is credited
+	// instead of the caller's own.
+	UserID string `json:"user_id"`
 }
 
 func (h *WalletHandler) Credit(c *gin.Context) {
@@ -48,6 +51,9 @@ func (h *WalletHandler) Credit(c *gin.Context) {
 	if err := c.ShouldBindJSON(&body); err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
+	}
+	if body.UserID != "" {
+		userID = body.UserID
 	}
 	w, err := h.walletService.Credit(c.Request.Context(), userID, body.Amount, body.Reason, nil)
 	if err != nil {

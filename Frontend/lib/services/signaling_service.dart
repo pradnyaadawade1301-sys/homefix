@@ -1,5 +1,11 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+
+// Debug-only logging: nothing is printed in release builds.
+void _log(String message) {
+  if (kDebugMode) debugPrint(message);
+}
 
 class SignalingMessage {
   final String type;
@@ -54,7 +60,7 @@ class SignalingService {
   set onMessage(OnMessage? listener) {
     _onMessage = listener;
     if (listener != null && _messageQueue.isNotEmpty) {
-      print('SignalingService: Flushing ${_messageQueue.length} queued messages to listener.');
+      _log('SignalingService: Flushing ${_messageQueue.length} queued messages to listener.');
       for (final msg in List.from(_messageQueue)) {
         listener(msg);
       }
@@ -75,47 +81,47 @@ class SignalingService {
     final uri = isDirectUrl
         ? Uri.parse(serverUrl)
         : Uri.parse('$serverUrl?userId=$userId&role=$role');
-    print('SignalingService: Connecting to $uri');
+    _log('SignalingService: Connecting to $uri');
     _channel = WebSocketChannel.connect(uri);
 
     _channel!.stream.listen(
       (raw) {
-        print('SignalingService: Received raw message: $raw');
+        _log('SignalingService: Received raw message: $raw');
         try {
           final decoded = jsonDecode(raw as String) as Map<String, dynamic>;
           final msg = SignalingMessage.fromJson(decoded);
           if (_onMessage != null) {
             _onMessage!.call(msg);
           } else {
-            print('SignalingService: No listener registered. Queueing message of type: ${msg.type}');
+            _log('SignalingService: No listener registered. Queueing message of type: ${msg.type}');
             _messageQueue.add(msg);
           }
         } catch (e) {
-          print('SignalingService: Error parsing message: $e');
+          _log('SignalingService: Error parsing message: $e');
         }
       },
       onDone: () {
-        print('SignalingService: Connection closed.');
+        _log('SignalingService: Connection closed.');
         _channel = null;
       },
       onError: (e) {
-        print('SignalingService: Error: $e');
+        _log('SignalingService: Error: $e');
       },
     );
   }
 
   void send(SignalingMessage message) {
     if (_channel == null) {
-      print('SignalingService: Cannot send message, not connected! Message type: ${message.type}');
+      _log('SignalingService: Cannot send message, not connected! Message type: ${message.type}');
       return;
     }
     final encoded = jsonEncode(message.toJson());
-    print('SignalingService: Sending message: $encoded');
+    _log('SignalingService: Sending message: $encoded');
     _channel?.sink.add(encoded);
   }
 
   void disconnect() {
-    print('SignalingService: Disconnecting.');
+    _log('SignalingService: Disconnecting.');
     _channel?.sink.close();
     _channel = null;
     _messageQueue.clear();

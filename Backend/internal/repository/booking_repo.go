@@ -673,8 +673,8 @@ func (r *BookingRepository) GetDetailByID(ctx context.Context, id string) (*mode
 	return d, nil
 }
 
-func (r *BookingRepository) ListByCustomerDetailed(ctx context.Context, customerID string) ([]models.BookingDetail, error) {
-	return r.listDetailedByColumn(ctx, "b.customer_id", customerID)
+func (r *BookingRepository) ListByCustomerDetailed(ctx context.Context, customerID string, status string) ([]models.BookingDetail, error) {
+	return r.listDetailedByColumn(ctx, "b.customer_id", customerID, status)
 }
 
 // ListAllDetailed powers the admin panel's Booking Management screen. status == ""
@@ -706,7 +706,7 @@ func (r *BookingRepository) ListAllDetailed(ctx context.Context, status string) 
 }
 
 func (r *BookingRepository) ListByTechnicianDetailed(ctx context.Context, technicianID string) ([]models.BookingDetail, error) {
-	return r.listDetailedByColumn(ctx, "b.technician_id", technicianID)
+	return r.listDetailedByColumn(ctx, "b.technician_id", technicianID, "")
 }
 
 // ListByCustomerAndTechnicianDetailed returns every booking between a specific
@@ -733,7 +733,7 @@ func (r *BookingRepository) ListByCustomerAndTechnicianDetailed(ctx context.Cont
 // Same SQL-injection-pattern concern as listByColumn above — col is always
 // hardcoded by callers today (ListByCustomerDetailed/ListByTechnicianDetailed
 // below), whitelisted here so it stays that way.
-func (r *BookingRepository) listDetailedByColumn(ctx context.Context, col, val string) ([]models.BookingDetail, error) {
+func (r *BookingRepository) listDetailedByColumn(ctx context.Context, col, val string, status string) ([]models.BookingDetail, error) {
 	var whereCol string
 	switch col {
 	case "b.customer_id":
@@ -743,7 +743,17 @@ func (r *BookingRepository) listDetailedByColumn(ctx context.Context, col, val s
 	default:
 		return nil, fmt.Errorf("listDetailedByColumn: unsupported column %q", col)
 	}
-	rows, err := r.db.Query(ctx, detailedSelect+" WHERE "+whereCol+" = $1 ORDER BY b.created_at DESC", val)
+	query := detailedSelect + " WHERE " + whereCol + " = $1"
+	args := []interface{}{val}
+	// BUG #21 FIX: filter by status in SQL instead of returning every
+	// booking and filtering client-side — avoids downloading the customer's
+	///technician's entire booking history just to show one status tab.
+	if status != "" {
+		query += " AND b.status = $2"
+		args = append(args, status)
+	}
+	query += " ORDER BY b.created_at DESC"
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

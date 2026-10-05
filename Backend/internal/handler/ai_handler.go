@@ -35,6 +35,25 @@ func (h *AIHandler) StartSession(c *gin.Context) {
 	utils.Success(c, http.StatusCreated, s)
 }
 
+// ownsSession writes the error response and returns false unless the session
+// exists and belongs to the authenticated user.
+func (h *AIHandler) ownsSession(c *gin.Context, sessionID string) bool {
+	exists, owned, err := h.groq.SessionOwnedBy(c.Request.Context(), sessionID, c.GetString("user_id"))
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return false
+	}
+	if !exists {
+		utils.Error(c, http.StatusNotFound, "session not found")
+		return false
+	}
+	if !owned {
+		utils.Error(c, http.StatusForbidden, "you do not have access to this session")
+		return false
+	}
+	return true
+}
+
 type sendMessageBody struct {
 	Message string `json:"message" binding:"required"`
 }
@@ -47,6 +66,9 @@ type sendMessageBody struct {
 // callers should fall back to displaying "reply" as plain text in that case.
 func (h *AIHandler) SendMessage(c *gin.Context) {
 	sessionID := c.Param("id")
+	if !h.ownsSession(c, sessionID) {
+		return
+	}
 	var body sendMessageBody
 	if err := c.ShouldBindJSON(&body); err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
@@ -63,6 +85,9 @@ func (h *AIHandler) SendMessage(c *gin.Context) {
 
 func (h *AIHandler) History(c *gin.Context) {
 	sessionID := c.Param("id")
+	if !h.ownsSession(c, sessionID) {
+		return
+	}
 	msgs, err := h.groq.History(c.Request.Context(), sessionID)
 	if err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())

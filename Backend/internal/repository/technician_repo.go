@@ -392,3 +392,22 @@ func (r *TechnicianRepository) GetCategoryIDs(ctx context.Context, technicianID 
 	}
 	return out, rows.Err()
 }
+
+// GetSettings returns the technician's self-managed settings blob (JSON object).
+func (r *TechnicianRepository) GetSettings(ctx context.Context, id string) ([]byte, error) {
+	var raw []byte
+	err := r.db.QueryRow(ctx, `SELECT COALESCE(settings, '{}'::jsonb) FROM technicians WHERE id = $1`, id).Scan(&raw)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return raw, nil
+}
+
+// MergeSettings shallow-merges patch (a JSON object) into the stored settings.
+func (r *TechnicianRepository) MergeSettings(ctx context.Context, id string, patch []byte) error {
+	_, err := r.db.Exec(ctx, `UPDATE technicians SET settings = COALESCE(settings, '{}'::jsonb) || $1::jsonb, updated_at = now() WHERE id = $2`, string(patch), id)
+	return err
+}

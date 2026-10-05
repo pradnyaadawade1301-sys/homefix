@@ -210,16 +210,30 @@ func (s *AuthService) SignupWithPassword(ctx context.Context, name, email, phone
 	if role != "customer" && role != "technician" {
 		role = "customer"
 	}
-	if phone == "" {
-		p, err := generatePlaceholderPhone()
+	generatedPhone := phone == ""
+	var exists bool
+	var err error
+	// A generated placeholder can (rarely) collide with an existing one — retry
+	// with a fresh placeholder instead of failing the signup.
+	for attempt := 0; attempt < 5; attempt++ {
+		if generatedPhone {
+			p, perr := generatePlaceholderPhone()
+			if perr != nil {
+				return nil, "", "", perr
+			}
+			phone = p
+		}
+		exists, err = s.userRepo.ExistsByEmailOrPhone(ctx, email, phone)
 		if err != nil {
 			return nil, "", "", err
 		}
-		phone = p
-	}
-	exists, err := s.userRepo.ExistsByEmailOrPhone(ctx, email, phone)
-	if err != nil {
-		return nil, "", "", err
+		if !exists || !generatedPhone {
+			break
+		}
+		// If the email itself already exists, retrying a new phone won't help.
+		if emailTaken, eErr := s.userRepo.ExistsByEmailOrPhone(ctx, email, ""); eErr == nil && emailTaken && email != "" {
+			break
+		}
 	}
 	if exists {
 		return nil, "", "", errors.New("an account with this email or phone already exists")

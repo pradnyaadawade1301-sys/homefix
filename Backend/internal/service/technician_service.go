@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 
 	"homefix-backend/internal/models"
 	"homefix-backend/internal/repository"
@@ -191,4 +193,68 @@ func (s *TechnicianService) ListPublic(ctx context.Context, categoryID string) (
 // GetPublicByID returns a single technician's public profile.
 func (s *TechnicianService) GetPublicByID(ctx context.Context, id string) (*models.TechnicianPublic, error) {
 	return s.techRepo.GetPublicByID(ctx, id)
+}
+
+// GetSettings returns the technician's saved settings as a JSON object.
+func (s *TechnicianService) GetSettings(ctx context.Context, technicianID string) (map[string]interface{}, error) {
+	raw, err := s.techRepo.GetSettings(ctx, technicianID)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]interface{}{}
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &out); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+var settingsAllowedKeys = map[string]bool{
+	"service_radius_km": true, "hourly_rate": true, "travel_fee": true, "emergency_fee": true,
+	"minimum_charge": true, "bank_account_holder": true, "bank_account_number": true,
+	"bank_ifsc": true, "upi_id": true, "certificates": true,
+}
+
+// UpdateSettings validates and merges a partial settings update.
+func (s *TechnicianService) UpdateSettings(ctx context.Context, technicianID string, patch map[string]interface{}) error {
+	for k, v := range patch {
+		if !settingsAllowedKeys[k] {
+			return fmt.Errorf("unknown setting %q", k)
+		}
+		switch k {
+		case "service_radius_km":
+			n, ok := v.(float64)
+			if !ok || n < 1 || n > 100 {
+				return errors.New("service_radius_km must be a number between 1 and 100")
+			}
+		case "hourly_rate", "travel_fee", "emergency_fee", "minimum_charge":
+			n, ok := v.(float64)
+			if !ok || n < 0 || n > 1000000 {
+				return fmt.Errorf("%s must be a non-negative number", k)
+			}
+		case "certificates":
+			arr, ok := v.([]interface{})
+			if !ok || len(arr) > 20 {
+				return errors.New("certificates must be a list of at most 20 URLs")
+			}
+			for _, it := range arr {
+				if _, ok := it.(string); !ok {
+					return errors.New("certificates must be a list of URLs")
+				}
+			}
+		default:
+			if _, ok := v.(string); !ok || len(v.(string)) > 100 {
+				return fmt.Errorf("%s must be a short text value", k)
+			}
+		}
+	}
+	if len(patch) == 0 {
+		return errors.New("nothing to update")
+	}
+	b, err := json.Marshal(patch)
+	if err != nil {
+		return err
+	}
+	return s.techRepo.MergeSettings(ctx, technicianID, b)
 }

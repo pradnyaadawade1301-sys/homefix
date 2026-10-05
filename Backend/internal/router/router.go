@@ -112,6 +112,8 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 
 		authed.POST("/technicians", h.Technician.Register)
 		authed.GET("/technicians/me", h.Technician.Me)
+		authed.GET("/technicians/me/settings", middleware.RequireRole("technician"), h.Technician.GetMySettings)
+		authed.PATCH("/technicians/me/settings", middleware.RequireRole("technician"), h.Technician.UpdateMySettings)
 		authed.PUT("/technicians/me/photo", middleware.RequireRole("technician"), h.Technician.UpdatePhoto)
 		// Add/remove categories a technician serves (e.g. Plumbing + Painting)
 		// from their profile — see TechnicianService.UpdateCategories.
@@ -120,6 +122,7 @@ func Setup(h *Handlers, accessSecret, uploadDir string, rdb *cache.Client) *gin.
 		authed.GET("/technicians/:id/reviews", h.Technician.Reviews)
 		authed.PATCH("/technicians/:id/availability", middleware.RequireRole("technician"), h.Technician.SetAvailability)
 		authed.PATCH("/technicians/:id/location", middleware.RequireRole("technician"), h.Technician.UpdateLocation)
+		authed.PATCH("/technicians/:id/working-hours", middleware.RequireRole("technician"), h.Technician.SetWorkingHours)
 		authed.PATCH("/technicians/:id/verify", middleware.RequireRole("admin"), h.Technician.Verify)
 		authed.PATCH("/technicians/:id/verified-badge", middleware.RequireRole("admin"), h.Technician.SetVerifiedBadge)
 		authed.GET("/technicians/:id/bookings", middleware.RequireRole("technician", "admin"), h.Booking.TechnicianBookings)

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -399,6 +400,7 @@ Future<void> _addAddress() async {
       // than a raw URL dumped into the visible problem description.
       String? newVideoUrl;
       if (_newVideos.isNotEmpty) {
+        if (!mounted) return;
         final uploadService = context.read<UploadService>();
         newVideoUrl = await uploadService.uploadFile(_newVideos.first);
       }
@@ -455,14 +457,17 @@ Future<void> _addAddress() async {
   /// so there's never any doubt about whether the booking actually went
   /// through.
   Future<void> _showBookingConfirmedSheet({String? assignedTechnicianName}) {
+    // Auto-dismiss timer that is cancelled if the user closes the sheet
+    // manually first — otherwise it would pop the screen underneath.
+    Timer? dismissTimer;
     return showModalBottomSheet<void>(
       context: context,
       isDismissible: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (sheetContext) {
-        Future.delayed(const Duration(milliseconds: 1600), () {
-          if (Navigator.of(sheetContext).canPop()) Navigator.of(sheetContext).pop();
+        dismissTimer ??= Timer(const Duration(milliseconds: 1600), () {
+          if (sheetContext.mounted && Navigator.of(sheetContext).canPop()) Navigator.of(sheetContext).pop();
         });
         return Padding(
           padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
@@ -489,7 +494,7 @@ Future<void> _addAddress() async {
           ),
         );
       },
-    );
+    ).whenComplete(() => dismissTimer?.cancel());
   }
 
   @override

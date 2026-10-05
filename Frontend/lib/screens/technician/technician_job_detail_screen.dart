@@ -483,6 +483,7 @@ class _CashReceivedButtonState extends State<_CashReceivedButton> {
   Future<void> _confirm() async {
     if (_confirming || _payment == null) return;
     final otp = await _askOtp();
+    if (!mounted) return;
     if (otp == null || otp.length != 4) {
       if (otp != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter the 4-digit OTP')));
@@ -491,6 +492,7 @@ class _CashReceivedButtonState extends State<_CashReceivedButton> {
     }
     setState(() => _confirming = true);
     try {
+      if (!mounted) return;
       await context.read<PaymentProvider>().confirmCash(_payment!.id, otp);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

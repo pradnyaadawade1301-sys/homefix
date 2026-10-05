@@ -78,7 +78,11 @@ func (d *Deps) handleInventoryList(c *gin.Context) {
 }
 
 func (d *Deps) handleCreateSparePart(c *gin.Context) {
-	unitPrice, _ := strconv.ParseFloat(c.PostForm("unit_price"), 64)
+	unitPrice, priceErr := strconv.ParseFloat(c.PostForm("unit_price"), 64)
+	if priceErr != nil || unitPrice <= 0 {
+		c.String(http.StatusBadRequest, "unit price must be a number greater than zero")
+		return
+	}
 	stockQty, _ := strconv.Atoi(c.PostForm("stock_quantity"))
 	reorderLevel, _ := strconv.Atoi(c.PostForm("reorder_level"))
 

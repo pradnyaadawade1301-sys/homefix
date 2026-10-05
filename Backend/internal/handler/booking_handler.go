@@ -103,7 +103,10 @@ func (h *BookingHandler) Get(c *gin.Context) {
 
 func (h *BookingHandler) MyBookings(c *gin.Context) {
 	userID := c.GetString("user_id")
-	list, err := h.bookingService.ListForCustomerDetailed(c.Request.Context(), userID)
+	// BUG #21 FIX: accept an optional ?status= filter so the frontend no
+	// longer has to download every booking and filter client-side.
+	status := c.Query("status")
+	list, err := h.bookingService.ListForCustomerDetailed(c.Request.Context(), userID, status)
 	if err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
 		return
@@ -141,17 +144,6 @@ func (h *BookingHandler) TechnicianBookings(c *gin.Context) {
 // RepeatCustomers powers the technician's "My Customers" screen.
 func (h *BookingHandler) RepeatCustomers(c *gin.Context) {
 	technicianID := c.Param("id")
-    if c.GetString("role") != "admin" {
-        owner, err := h.bookingService.TechnicianOwnedByUser(c.Request.Context(), technicianID, c.GetString("user_id"))
-        if err != nil {
-            utils.Error(c, http.StatusInternalServerError, err.Error())
-            return
-        }
-        if !owner {
-            utils.Error(c, http.StatusForbidden, "not authorized to view this technician's customers")
-            return
-        }
-    }
 	list, err := h.bookingService.RepeatCustomers(c.Request.Context(), technicianID)
 	if err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
@@ -202,17 +194,6 @@ func (h *BookingHandler) MyServiceHistoryWithTechnician(c *gin.Context) {
 func (h *BookingHandler) ServiceHistory(c *gin.Context) {
 	technicianID := c.Param("id")
 	customerID := c.Param("customerId")
-    if c.GetString("role") != "admin" {
-        owner, err := h.bookingService.TechnicianOwnedByUser(c.Request.Context(), technicianID, c.GetString("user_id"))
-        if err != nil {
-            utils.Error(c, http.StatusInternalServerError, err.Error())
-            return
-        }
-        if !owner {
-            utils.Error(c, http.StatusForbidden, "not authorized to view this technician's service history")
-            return
-        }
-    }
 	list, err := h.bookingService.ServiceHistory(c.Request.Context(), technicianID, customerID)
 	if err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
@@ -271,6 +252,10 @@ func (h *BookingHandler) UpdateStatus(c *gin.Context) {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
+	if err := h.bookingService.AuthorizeBookingActor(c.Request.Context(), c.GetString("user_id"), c.GetString("role"), bookingID, false); err != nil {
+		utils.Error(c, http.StatusForbidden, err.Error())
+		return
+	}
 	if err := h.bookingService.UpdateStatus(c.Request.Context(), bookingID, body.Status, body.Note); err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
@@ -293,6 +278,10 @@ func (h *BookingHandler) Arrived(c *gin.Context) {
 	// technician_id is accepted for parity with other technician-action
 	// endpoints (Accept, VerifyOTP) but UpdateStatus doesn't need it — the
 	// booking is looked up by bookingID alone.
+	if err := h.bookingService.AuthorizeBookingActor(c.Request.Context(), c.GetString("user_id"), c.GetString("role"), bookingID, false); err != nil {
+		utils.Error(c, http.StatusForbidden, err.Error())
+		return
+	}
 	_ = c.ShouldBindJSON(&body)
 	if err := h.bookingService.UpdateStatus(c.Request.Context(), bookingID, models.BookingArrived, "Technician has arrived"); err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
@@ -302,7 +291,7 @@ func (h *BookingHandler) Arrived(c *gin.Context) {
 }
 
 type completeBody struct {
-	FinalPrice float64 `json:"final_price" binding:"required"`
+	FinalPrice float64 `json:"final_price" binding:"required,gt=0"`
 	// Warranty is optional and off by default — the technician must
 	// explicitly opt in. WarrantyDays is only read/required when
 	// WarrantyEnabled is true; any positive number of days is accepted (see
@@ -319,6 +308,10 @@ func (h *BookingHandler) Complete(c *gin.Context) {
 	var body completeBody
 	if err := c.ShouldBindJSON(&body); err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.bookingService.AuthorizeBookingActor(c.Request.Context(), c.GetString("user_id"), c.GetString("role"), bookingID, false); err != nil {
+		utils.Error(c, http.StatusForbidden, err.Error())
 		return
 	}
 	if err := h.bookingService.Complete(c.Request.Context(), bookingID, body.FinalPrice, body.WarrantyEnabled, body.WarrantyDays, body.WarrantyDescription); err != nil {
@@ -357,6 +350,10 @@ func (h *BookingHandler) Cancel(c *gin.Context) {
 	bookingID := c.Param("id")
 	var body cancelBody
 	_ = c.ShouldBindJSON(&body)
+	if err := h.bookingService.AuthorizeBookingActor(c.Request.Context(), c.GetString("user_id"), c.GetString("role"), bookingID, true); err != nil {
+		utils.Error(c, http.StatusForbidden, err.Error())
+		return
+	}
 	if err := h.bookingService.Cancel(c.Request.Context(), bookingID, body.Reason); err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return

@@ -116,6 +116,7 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
     try {
       final messages = await context.read<BookingService>().getMessages(widget.bookingId);
       // Best-effort: a failure loading call history must never hide the chat.
+      if (!mounted) return;
       List<CallLogEntry> calls = _calls;
       try {
         calls = await context.read<CallLogProvider>().callsForBooking(widget.bookingId);
@@ -216,8 +217,11 @@ class _BookingChatScreenState extends State<BookingChatScreen> {
     if (picked == null || _isUploadingImage) return;
 
     setState(() => _isUploadingImage = true);
+    if (!mounted) return;
+    final uploadService = context.read<UploadService>();
     try {
-      final url = await context.read<UploadService>().uploadFile(File(picked.path));
+      final url = await uploadService.uploadFile(File(picked.path));
+      if (!mounted) return;
       final sent = await context.read<BookingService>().sendMessage(widget.bookingId, '$_imageMessagePrefix$url');
       if (!mounted) return;
       setState(() {

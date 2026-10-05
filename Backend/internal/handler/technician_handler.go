@@ -289,6 +289,49 @@ func (h *TechnicianHandler) SetWorkingHours(c *gin.Context) {
 	utils.Success(c, http.StatusOK, gin.H{"message": "working hours updated"})
 }
 
+// GetMySettings - GET /technicians/me/settings.
+func (h *TechnicianHandler) GetMySettings(c *gin.Context) {
+	self, err := h.techService.GetByUser(c.Request.Context(), c.GetString("user_id"))
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if self == nil {
+		utils.Error(c, http.StatusNotFound, "technician profile not found")
+		return
+	}
+	s, err := h.techService.GetSettings(c.Request.Context(), self.ID)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, s)
+}
+
+// UpdateMySettings - PATCH /technicians/me/settings. Partial update of the
+// technician's own radius / pricing / payout / certificate settings.
+func (h *TechnicianHandler) UpdateMySettings(c *gin.Context) {
+	self, err := h.techService.GetByUser(c.Request.Context(), c.GetString("user_id"))
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if self == nil {
+		utils.Error(c, http.StatusNotFound, "technician profile not found")
+		return
+	}
+	var body map[string]interface{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.techService.UpdateSettings(c.Request.Context(), self.ID, body); err != nil {
+		utils.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.Success(c, http.StatusOK, gin.H{"message": "settings updated"})
+}
+
 type locationBody struct {
 	Lat float64 `json:"lat" binding:"required"`
 	Lng float64 `json:"lng" binding:"required"`
@@ -296,6 +339,15 @@ type locationBody struct {
 
 func (h *TechnicianHandler) UpdateLocation(c *gin.Context) {
 	technicianID := c.Param("id")
+	self, err := h.techService.GetByUser(c.Request.Context(), c.GetString("user_id"))
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if self == nil || self.ID != technicianID {
+		utils.Error(c, http.StatusForbidden, "you can only update your own location")
+		return
+	}
 	var body locationBody
 	if err := c.ShouldBindJSON(&body); err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())

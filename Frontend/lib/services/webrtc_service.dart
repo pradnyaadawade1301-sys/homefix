@@ -142,10 +142,14 @@ class WebRTCService {
   }
 
   Future<void> handleRemoteIceCandidate(Map<String, dynamic> data) async {
+    final rawCandidate = data['candidate'];
+    if (rawCandidate is! String || rawCandidate.isEmpty) return; // end-of-candidates / malformed
+    final rawMid = data['sdpMid'];
+    final rawIndex = data['sdpMLineIndex'];
     final candidate = RTCIceCandidate(
-      data['candidate'] as String,
-      data['sdpMid'] as String?,
-      data['sdpMLineIndex'] as int?,
+      rawCandidate,
+      rawMid is String ? rawMid : null,
+      rawIndex is num ? rawIndex.toInt() : null, // JSON may decode ints as doubles
     );
     if (!_remoteDescriptionSet) {
       _pendingCandidates.add(candidate);
@@ -191,8 +195,13 @@ class WebRTCService {
       await track.stop();
     }
     await localStream?.dispose();
+    for (final track in remoteStream?.getTracks() ?? []) {
+      await track.stop();
+    }
+    await remoteStream?.dispose();
     await peerConnection?.close();
     localStream = null;
+    remoteStream = null;
     peerConnection = null;
   }
 }

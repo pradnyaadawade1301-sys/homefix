@@ -400,6 +400,26 @@ class TechnicianKycService {
   /// PATCH /technicians/:id/working-hours. Display-only on the customer side
   /// (does not gate matching/booking). [workingHours] is the wire shape:
   /// `{"mon":{"open":"09:00","close":"18:00"}, ..., "sun":null}`.
+  /// GET /technicians/me/settings — radius, pricing, payout details, certificate URLs.
+  Future<Map<String, dynamic>> getMySettings() async {
+    try {
+      final response = await _httpClient.get(ApiConfig.technicianMeSettings);
+      final data = ApiEnvelope.unwrap(response);
+      return data is Map<String, dynamic> ? data : <String, dynamic>{};
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
+  /// PATCH /technicians/me/settings — partial update.
+  Future<void> updateMySettings(Map<String, dynamic> patch) async {
+    try {
+      await _httpClient.patch(ApiConfig.technicianMeSettings, data: patch);
+    } catch (e) {
+      throw Exception(ApiEnvelope.errorMessage(e));
+    }
+  }
+
   Future<void> setWorkingHours(String technicianId, Map<String, dynamic> workingHours) async {
     try {
       await _httpClient.patch(

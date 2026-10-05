@@ -93,6 +93,7 @@ class _UpcomingConsultationsScreenState extends State<UpcomingConsultationsScree
       ),
     );
     if (confirm != true) return;
+    if (!mounted) return;
     final reason = reasonController.text.trim();
     try {
       await context.read<ConsultationProvider>().declineScheduled(c.id, reason: reason.isEmpty ? null : reason);

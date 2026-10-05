@@ -7,20 +7,29 @@ package cache
 
 import (
 	"context"
+	"sync"
 	"time"
 )
 
-type Client struct{}
+type rlEntry struct {
+	count   int
+	resetAt time.Time
+}
+
+type Client struct {
+	mu      sync.Mutex
+	buckets map[string]*rlEntry
+}
 
 // New used to connect to Redis using redisURL. It no longer does anything —
 // Redis has been removed — and always returns the disabled no-op client.
 func New(redisURL string) *Client {
-	return &Client{}
+	return &Client{buckets: map[string]*rlEntry{}}
 }
 
 // Disabled returns a no-op client. Kept for existing callers (e.g. tests).
 func Disabled() *Client {
-	return &Client{}
+	return &Client{buckets: map[string]*rlEntry{}}
 }
 
 func (c *Client) Enabled() bool { return false }
@@ -33,8 +42,33 @@ func (c *Client) Set(ctx context.Context, key, value string, ttl time.Duration) 
 
 func (c *Client) Del(ctx context.Context, key string) {}
 
-// Allow always permits the request now that there's no Redis-backed counter.
-// Rate limiting is effectively disabled — see this file's doc comment.
+// Allow is an in-memory fixed-window rate limiter (per process). It works on a
+// single instance only; with multiple instances each keeps its own counters.
 func (c *Client) Allow(ctx context.Context, key string, limit int, window time.Duration) bool {
+	if c == nil {
+		return true
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.buckets == nil {
+		c.buckets = map[string]*rlEntry{}
+	}
+	now := time.Now()
+	if len(c.buckets) > 10000 {
+		for k, e := range c.buckets {
+			if now.After(e.resetAt) {
+				delete(c.buckets, k)
+			}
+		}
+	}
+	e, ok := c.buckets[key]
+	if !ok || now.After(e.resetAt) {
+		c.buckets[key] = &rlEntry{count: 1, resetAt: now.Add(window)}
+		return true
+	}
+	if e.count >= limit {
+		return false
+	}
+	e.count++
 	return true
 }

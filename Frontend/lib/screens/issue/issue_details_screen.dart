@@ -573,7 +573,7 @@ class _IssueDetailsScreenState extends State<IssueDetailsScreen> {
               title: const Text('This is an emergency', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
               subtitle: const Text('Marks the job Urgent for the technician', style: TextStyle(fontSize: 11.5)),
               value: _isEmergency,
-              activeColor: AppTheme.errorColor,
+              activeThumbColor: AppTheme.errorColor,
               onChanged: (v) => setState(() => _isEmergency = v),
             ),
             const SizedBox(height: 10),

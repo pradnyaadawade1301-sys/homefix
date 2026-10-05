@@ -2,6 +2,7 @@ package admin
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -25,7 +26,7 @@ func (d *Deps) requireAdminSession(c *gin.Context) {
 	}
 	claims, err := utils.ParseAccessToken(cookie, d.JWTSecret)
 	if err != nil || claims.Role != "admin" {
-		c.SetCookie(sessionCookieName, "", -1, "/admin", "", false, true)
+		c.SetCookie(sessionCookieName, "", -1, "/admin", "", isSecureRequest(c), true)
 		c.Redirect(http.StatusFound, "/admin/login")
 		c.Abort()
 		return
@@ -77,13 +78,21 @@ func (d *Deps) handleLoginSubmit(c *gin.Context) {
 	// CSRF from any cross-site navigation), Secure should be true behind HTTPS in
 	// production (see PUBLIC_BASE_URL / reverse proxy config).
 	c.SetSameSite(http.SameSiteStrictMode)
-	c.SetCookie(sessionCookieName, token, sessionTTLMinutes*60, "/admin", "", false, true)
+	c.SetCookie(sessionCookieName, token, sessionTTLMinutes*60, "/admin", "", isSecureRequest(c), true)
 	d.audit(c, "admin.login", "user", user.ID, "")
 	c.Redirect(http.StatusFound, "/admin")
 }
 
 func (d *Deps) handleLogout(c *gin.Context) {
 	d.audit(c, "admin.logout", "user", d.currentAdminID(c), "")
-	c.SetCookie(sessionCookieName, "", -1, "/admin", "", false, true)
+	c.SetCookie(sessionCookieName, "", -1, "/admin", "", isSecureRequest(c), true)
 	c.Redirect(http.StatusFound, "/admin/login")
+}
+
+// isSecureRequest reports whether the request arrived over HTTPS (directly or via a proxy).
+func isSecureRequest(c *gin.Context) bool {
+	if c.Request.TLS != nil {
+		return true
+	}
+	return strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https")
 }

@@ -162,8 +162,11 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     if (picked == null || _isUploadingAttachment) return;
 
     setState(() => _isUploadingAttachment = true);
+    if (!mounted) return;
+    final uploadService = context.read<UploadService>();
     try {
-      final url = await context.read<UploadService>().uploadFile(File(picked.path));
+      final url = await uploadService.uploadFile(File(picked.path));
+      if (!mounted) return;
       final sent = await context.read<SupportService>().sendMessage(
             attachmentUrl: url,
             attachmentType: choice.isVideo ? 'video' : 'image',

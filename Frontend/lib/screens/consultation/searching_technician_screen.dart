@@ -107,10 +107,12 @@ class _SearchingTechnicianScreenState extends State<SearchingTechnicianScreen> {
     setState(() => _joining = true);
     try {
       final provider = context.read<ConsultationProvider>();
+      final authProvider = context.read<AuthProvider>();
       final withCallInfo = await provider.getCallInfo(consultation.id);
       // Fresh, not cached-from-login token — see AuthProvider.getValidAccessToken.
-      final token = await context.read<AuthProvider>().getValidAccessToken();
-      final myId = context.read<AuthProvider>().currentUser?.id ?? '';
+      final token = await authProvider.getValidAccessToken();
+      if (!mounted) return;
+      final myId = authProvider.currentUser?.id ?? '';
 
       if (token == null || withCallInfo.roomId == null) {
         throw Exception('Could not start the call. Please try again.');

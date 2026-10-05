@@ -26,7 +26,9 @@ class ApiConfig {
   //   4. (Recommended) Restrict the key to Android/iOS app + the 2 APIs above.
   // Billing must be enabled on the project (Google gives $200/month free credit,
   // more than enough for an address-autocomplete feature).
-  static const String googlePlacesApiKey = 'PASTE_YOUR_GOOGLE_PLACES_API_KEY_HERE';
+  // Supply the real key at build time: flutter run --dart-define=GOOGLE_PLACES_API_KEY=your_key
+  static const String googlePlacesApiKey =
+      String.fromEnvironment('GOOGLE_PLACES_API_KEY', defaultValue: 'PASTE_YOUR_GOOGLE_PLACES_API_KEY_HERE');
 
   // Backend Base URL - matches homefix_backend router (internal/router/router.go)
   // NOTE: backend is mapped to host port 8090 (see docker-compose.yml), not 8080,
@@ -61,6 +63,7 @@ class ApiConfig {
   static const String technicianRegister = '/technicians';
   static const String technicianMe = '/technicians/me';
   static const String technicianMeCategories = '/technicians/me/categories';
+  static const String technicianMeSettings = '/technicians/me/settings'; // GET / PATCH (technician) - radius, pricing, payout, certificates
   static const String technicianAvailable = '/technicians/available';
   static const String technicianBookings = '/technicians'; // + /:id/bookings
   static const String technicianReviews = '/technicians'; // + /:id/reviews
@@ -125,7 +128,7 @@ class ApiConfig {
   static const String consultationMine = '/consultations/mine';
     static const String consultationConfirmScheduled = '/consultations'; // + /:id/confirm-scheduled
   static const String consultationDeclineScheduled = '/consultations'; // + /:id/decline-scheduled
-  static const String consultationUpcoming = '/consultations/upcoming'; // GET (customer) - own call history
+  static const String consultationUpcoming = '/consultations/upcoming'; // GET (technician only - backend restricts this route to role=technician)
 
   // Real audio-call history (who called, when, missed/received) — shared by
   // customer Consult>Call tab and technician History>Call tab.

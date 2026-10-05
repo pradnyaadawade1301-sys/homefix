@@ -74,7 +74,7 @@ func (h *UploadHandler) Upload(c *gin.Context) {
 		return
 	}
 	if fileHeader.Size > maxUploadBytes {
-		utils.Error(c, http.StatusBadRequest, "file too large (max 10MB)")
+		utils.Error(c, http.StatusBadRequest, "file too large (max 150MB)")
 		return
 	}
 

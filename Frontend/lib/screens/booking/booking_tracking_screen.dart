@@ -498,7 +498,7 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
     if (!mounted) return;
 
     final ok = await provider.cancelBooking(bookingId, reason);
-    if (!mounted) return;
+    if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(ok ? 'Booking cancelled' : (provider.error ?? 'Could not cancel booking')),
@@ -532,7 +532,7 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
 
   Future<void> _respond(BuildContext context, BookingProvider provider, String bookingId, String estimateId, String action, {String? note}) async {
     final ok = await provider.respondToEstimate(bookingId: bookingId, estimateId: estimateId, action: action, note: note);
-    if (!mounted) return;
+    if (!context.mounted) return;
     if (ok) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(action == 'approve' ? 'Estimate approved' : 'Estimate declined')),
@@ -570,7 +570,7 @@ class _BookingTrackingScreenState extends State<BookingTrackingScreen> {
       ),
     );
     if (reason == null) return; // cancelled
-    if (!mounted) return;
+    if (!context.mounted) return;
     await _respond(context, provider, bookingId, estimateId, 'decline', note: reason.isEmpty ? null : reason);
   }
 

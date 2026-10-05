@@ -190,8 +190,30 @@ func (h *ConsultationHandler) Upcoming(c *gin.Context) {
 	utils.Success(c, http.StatusOK, result)
 }
 
+// requireParticipant writes the error response and returns false unless the
+// caller is the consultation's customer or its assigned technician.
+func (h *ConsultationHandler) requireParticipant(c *gin.Context) bool {
+	exists, ok, err := h.consultSvc.IsParticipant(c.Request.Context(), c.Param("id"), c.GetString("user_id"))
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, err.Error())
+		return false
+	}
+	if !exists {
+		utils.Error(c, http.StatusNotFound, "consultation not found")
+		return false
+	}
+	if !ok {
+		utils.Error(c, http.StatusForbidden, "you are not a participant of this consultation")
+		return false
+	}
+	return true
+}
+
 // Start - POST /consultations/:id/start.
 func (h *ConsultationHandler) Start(c *gin.Context) {
+	if !h.requireParticipant(c) {
+		return
+	}
 	if err := h.consultSvc.MarkStarted(c.Request.Context(), c.Param("id")); err != nil {
 		utils.Error(c, http.StatusInternalServerError, err.Error())
 		return
@@ -201,6 +223,9 @@ func (h *ConsultationHandler) Start(c *gin.Context) {
 
 // End - POST /consultations/:id/end.
 func (h *ConsultationHandler) End(c *gin.Context) {
+	if !h.requireParticipant(c) {
+		return
+	}
 	var body struct {
 		ReconnectCount    int    `json:"reconnect_count"`
 		ConnectionQuality string `json:"connection_quality"`
@@ -287,8 +312,8 @@ func (h *ConsultationHandler) Rating(c *gin.Context) {
 
 // Pay - POST /consultations/:id/payment.
 func (h *ConsultationHandler) Pay(c *gin.Context) {
-	if err := h.consultSvc.MarkPaid(c.Request.Context(), c.Param("id")); err != nil {
-		utils.Error(c, http.StatusInternalServerError, err.Error())
+	if err := h.consultSvc.MarkPaid(c.Request.Context(), c.Param("id"), c.GetString("user_id")); err != nil {
+		utils.Error(c, http.StatusForbidden, err.Error())
 		return
 	}
 	utils.Success(c, http.StatusOK, gin.H{"payment_status": "paid"})

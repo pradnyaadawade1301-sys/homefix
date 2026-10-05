@@ -211,6 +211,30 @@ class TechnicianKycProvider extends ChangeNotifier {
     }
   }
 
+  /// Loads the technician's saved settings (empty map on failure; see [error]).
+  Future<Map<String, dynamic>> loadSettings() async {
+    try {
+      _error = null;
+      return await _kycService.getMySettings();
+    } catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+      return <String, dynamic>{};
+    }
+  }
+
+  /// Partial settings update; returns true on success, otherwise sets [error].
+  Future<bool> saveSettings(Map<String, dynamic> patch) async {
+    try {
+      _error = null;
+      await _kycService.updateMySettings(patch);
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<String?> uploadFile(File file) async {
     _isUploading = true;
     _error = null;

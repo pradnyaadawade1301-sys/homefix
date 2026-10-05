@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../core/technician_theme.dart';
+import '../providers/category_provider.dart';
 
 /// Lets the technician set how far they're willing to travel for jobs.
-/// UI-only for now; wire the save action to your technician profile API.
+/// Saved via PATCH /technicians/me/settings.
 class ServiceRadiusScreen extends StatefulWidget {
   const ServiceRadiusScreen({Key? key}) : super(key: key);
 
@@ -14,14 +16,29 @@ class _ServiceRadiusScreenState extends State<ServiceRadiusScreen> {
   double _radiusKm = 8;
   bool _isSaving = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final s = await context.read<TechnicianKycProvider>().loadSettings();
+    if (!mounted) return;
+    final v = s['service_radius_km'];
+    if (v is num) setState(() => _radiusKm = v.toDouble());
+  }
+
   Future<void> _save() async {
     setState(() => _isSaving = true);
-    // TODO: PATCH technician profile with new service radius.
-    await Future.delayed(const Duration(milliseconds: 500));
+    final provider = context.read<TechnicianKycProvider>();
+    final ok = await provider.saveSettings({'service_radius_km': _radiusKm});
     if (!mounted) return;
     setState(() => _isSaving = false);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Service radius updated to ${_radiusKm.toStringAsFixed(0)} km')),
+      SnackBar(content: Text(ok
+          ? 'Service radius updated to ${_radiusKm.toStringAsFixed(0)} km'
+          : (provider.error ?? 'Could not save service radius'))),
     );
   }
 

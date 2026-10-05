@@ -199,29 +199,6 @@ class TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
     } catch (_) {}
   }
 
-  Future<void> _confirmLogout() async {
-    final l10n = AppLocalizations.of(context);
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.techJobsLogoutTitle),
-        content: Text(l10n.techJobsLogoutContent),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.techJobsCancel)),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.techJobsLogout, style: const TextStyle(color: AppTheme.errorColor)),
-          ),
-        ],
-      ),
-    );
-    if (confirm != true) return;
-    if (!mounted) return;
-    await context.read<AuthProvider>().logout();
-    if (!mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-  }
-
   /// Back-button handling for the technician shell:
   /// - on any non-Jobs tab, back returns to the Jobs tab instead of leaving;
   /// - on the Jobs tab, back must be pressed twice within 2s to exit —
@@ -1331,7 +1308,7 @@ class JobActionRow extends StatelessWidget {
         ],
       ),
     );
-    if (confirmed == true) {
+    if (confirmed == true && context.mounted) {
       await _runAction(context, () => provider.declineBooking(bookingId, technicianId));
     }
   }
@@ -1353,6 +1330,7 @@ Future<void> _showInvoiceDialog(BuildContext context, BookingProvider provider, 
   // combination was crashing on some devices), and not required to finish
   // the job, but the natural moment to ask for it.
   if (completed == true) {
+    if (!navigator.mounted) return;
     await showModalBottomSheet(
       context: navigator.context,
       isScrollControlled: true,
@@ -1364,6 +1342,7 @@ Future<void> _showInvoiceDialog(BuildContext context, BookingProvider provider, 
     // received" button (which only appears once the after-photo exists) is
     // visible immediately, instead of leaving the technician on the jobs
     // list to find and re-open the job themselves.
+    if (!navigator.mounted) return;
     navigator.push(
       MaterialPageRoute(builder: (_) => TechnicianJobDetailScreen(booking: booking)),
     );
@@ -1579,7 +1558,7 @@ class _InvoiceDialogState extends State<_InvoiceDialog> {
                     warrantyDescription: _warrantyEnabled ? _warrantyDescriptionController.text.trim() : null,
                   );
 
-                  if (!mounted) return;
+                  if (!context.mounted) return;
 
                   if (widget.provider.error != null) {
                     // Keep the dialog open so the technician can fix the

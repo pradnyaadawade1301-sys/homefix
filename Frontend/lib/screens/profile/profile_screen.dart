@@ -242,6 +242,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // refresh picks up an admin approval/rejection that happened
               // since this screen last loaded (see the Government ID row's
               // "Pending" vs "Verified" status below).
+              if (!context.mounted) return;
               if (user.isTechnician && !widget.forceCustomerView) {
                 await context.read<TechnicianKycProvider>().loadMyProfile();
               }
@@ -1154,33 +1155,6 @@ class _ActionTile extends StatelessWidget {
       title: Text(label, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
       trailing: const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
       onTap: onTap,
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _InfoRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 13.5)),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

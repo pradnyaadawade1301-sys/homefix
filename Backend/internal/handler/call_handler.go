@@ -33,6 +33,19 @@ type CallHandler struct {
 
 	mu    sync.Mutex
 	rooms map[string]map[*websocket.Conn]string // roomID -> {conn: userID}
+
+	// writeLocks holds one mutex per connection: gorilla/websocket allows only
+	// one concurrent writer, and pinger/join/leave/relay all write.
+	writeLocks sync.Map // *websocket.Conn -> *sync.Mutex
+}
+
+// safeWrite serializes writes to a single connection.
+func (h *CallHandler) safeWrite(conn *websocket.Conn, messageType int, data []byte) error {
+	m, _ := h.writeLocks.LoadOrStore(conn, &sync.Mutex{})
+	mu := m.(*sync.Mutex)
+	mu.Lock()
+	defer mu.Unlock()
+	return conn.WriteMessage(messageType, data)
 }
 
 func NewCallHandler(bookingRepo *repository.BookingRepository, technicianRepo *repository.TechnicianRepository, consultRepo *repository.ConsultationRepository, callLogRepo *repository.CallLogRepository, accessSecret string) *CallHandler {
@@ -83,7 +96,7 @@ func (h *CallHandler) Signal(c *gin.Context) {
 	defer conn.Close()
 
 	if !h.join(roomID, conn, claims.UserID) {
-		_ = conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"room-full"}`))
+		_ = h.safeWrite(conn, websocket.TextMessage, []byte(`{"type":"room-full"}`))
 		return
 	}
 	defer h.leave(roomID, conn)
@@ -115,7 +128,7 @@ func (h *CallHandler) pinger(conn *websocket.Conn, stop <-chan struct{}) {
 	for {
 		select {
 		case <-ticker.C:
-			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+			if err := h.safeWrite(conn, websocket.PingMessage, nil); err != nil {
 				return
 			}
 		case <-stop:
@@ -202,7 +215,7 @@ func (h *CallHandler) join(roomID string, conn *websocket.Conn, userID string) b
 	}
 
 	for _, peer := range peers {
-		_ = peer.WriteMessage(websocket.TextMessage, []byte(`{"type":"peer-joined"}`))
+		_ = h.safeWrite(peer, websocket.TextMessage, []byte(`{"type":"peer-joined"}`))
 	}
 	return true
 }
@@ -214,6 +227,7 @@ func (h *CallHandler) join(roomID string, conn *websocket.Conn, userID string) b
 // over" — close out its call_logs row. If it was never answered this settles
 // as 'missed'; if it was answered, it becomes 'received' with a duration.
 func (h *CallHandler) leave(roomID string, conn *websocket.Conn) {
+	defer h.writeLocks.Delete(conn)
 	h.mu.Lock()
 	room := h.rooms[roomID]
 	if room != nil {
@@ -238,7 +252,7 @@ func (h *CallHandler) leave(roomID string, conn *websocket.Conn) {
 	}
 
 	for _, peer := range peers {
-		_ = peer.WriteMessage(websocket.TextMessage, []byte(`{"type":"peer-left"}`))
+		_ = h.safeWrite(peer, websocket.TextMessage, []byte(`{"type":"peer-left"}`))
 	}
 }
 
@@ -257,7 +271,7 @@ func (h *CallHandler) relay(roomID string, from *websocket.Conn, messageType int
 	h.mu.Unlock()
 
 	for _, peer := range peers {
-		if err := peer.WriteMessage(messageType, payload); err != nil {
+		if err := h.safeWrite(peer, messageType, payload); err != nil {
 			log.Printf("call signaling: relay failed: %v", err)
 		}
 	}

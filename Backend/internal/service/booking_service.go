@@ -109,8 +109,8 @@ func (s *BookingService) TechnicianOwnedByUser(ctx context.Context, technicianID
 
 // ListForCustomerDetailed powers the customer's "My Bookings" screen — each booking
 // carries the assigned technician's name/phone/rating once one is assigned.
-func (s *BookingService) ListForCustomerDetailed(ctx context.Context, customerID string) ([]models.BookingDetail, error) {
-	list, err := s.bookingRepo.ListByCustomerDetailed(ctx, customerID)
+func (s *BookingService) ListForCustomerDetailed(ctx context.Context, customerID string, status string) ([]models.BookingDetail, error) {
+	list, err := s.bookingRepo.ListByCustomerDetailed(ctx, customerID, status)
 	if err != nil {
 		return nil, err
 	}
@@ -245,6 +245,9 @@ func (s *BookingService) Reject(ctx context.Context, bookingID, technicianID str
 // jumping straight to "completed" — silently corrupting the booking's
 // lifecycle and status history. Terminal states (completed, cancelled) have
 // no outgoing transitions at all.
+// ErrNotBookingParticipant is returned when the caller isn't allowed to act on a booking.
+var ErrNotBookingParticipant = errors.New("you are not allowed to modify this booking")
+
 var validBookingTransitions = map[string]map[string]bool{
 	models.BookingRequested: {
 		models.BookingPendingTechnician: true,
@@ -314,7 +317,7 @@ func (s *BookingService) UpdateStatus(ctx context.Context, bookingID, status, no
 			return err
 		}
 	}
-    if s.fcm != nil && b.TechnicianID != nil {
+	if s.fcm != nil {
 		techName := ""
 		if b.TechnicianID != nil {
 			if n, err := s.techRepo.GetNameByID(ctx, *b.TechnicianID); err == nil {
@@ -339,6 +342,14 @@ func (s *BookingService) Complete(ctx context.Context, bookingID string, finalPr
 	}
 	if b == nil {
 		return errors.New("booking not found")
+	}
+	switch b.Status {
+	case models.BookingInspecting, models.BookingInProgress, models.BookingRepairInProgress:
+	default:
+		return fmt.Errorf("cannot complete a booking that is %q", b.Status)
+	}
+	if finalPrice <= 0 {
+		return errors.New("final price must be greater than zero")
 	}
 
 	if warrantyEnabled {
@@ -377,6 +388,31 @@ func (s *BookingService) Complete(ctx context.Context, bookingID string, finalPr
 			map[string]string{"booking_id": bookingID, "type": "invoice_ready", "final_price": fmt.Sprintf("%.2f", finalPrice)})
 	}
 	return nil
+}
+
+// AuthorizeBookingActor checks that the caller may act on the booking: an admin,
+// the booking's assigned technician, or (when allowCustomer) its own customer.
+func (s *BookingService) AuthorizeBookingActor(ctx context.Context, userID, role, bookingID string, allowCustomer bool) error {
+	b, err := s.bookingRepo.GetByID(ctx, bookingID)
+	if err != nil {
+		return err
+	}
+	if b == nil {
+		return errors.New("booking not found")
+	}
+	if role == "admin" {
+		return nil
+	}
+	if allowCustomer && userID != "" && b.CustomerID == userID {
+		return nil
+	}
+	if b.TechnicianID != nil && userID != "" {
+		owned, err := s.TechnicianOwnedByUser(ctx, *b.TechnicianID, userID)
+		if err == nil && owned {
+			return nil
+		}
+	}
+	return ErrNotBookingParticipant
 }
 
 func (s *BookingService) AuthorizeCallParticipant(ctx context.Context, userID, bookingID string) (*models.BookingDetail, error) {
@@ -552,11 +588,7 @@ func (s *BookingService) RaiseWarrantyClaim(ctx context.Context, customerID, ori
 	}
 
 	if original.TechnicianID != nil {
-        if err := s.bookingRepo.AssignTechnician(ctx, created.ID, *original.TechnicianID); err != nil {
-            // Don't swallow this: the claim stays in the open "requested" pool
-            // (still visible to technicians) but we must at least leave a trace.
-            log.Printf("warning: warranty claim %s created but auto-assign to technician %s failed: %v", created.ID, *original.TechnicianID, err)
-        } else {
+		if err := s.bookingRepo.AssignTechnician(ctx, created.ID, *original.TechnicianID); err == nil {
 			created.TechnicianID = original.TechnicianID
 			created.Status = models.BookingAccepted
 			if s.fcm != nil {
@@ -809,38 +841,13 @@ func (s *BookingService) RespondToEstimate(ctx context.Context, bookingID, decis
 	default:
 		return errors.New("decision must be 'approve' or 'decline'")
 	}
-    // Only a PENDING estimate on a live booking can be responded to; otherwise
-    // a repeated/late call would overwrite the decision and duplicate history rows.
-    est, err := s.bookingRepo.GetEstimate(ctx, bookingID)
-    if err != nil {
-        return err
-    }
-    if est == nil {
-        return errors.New("no estimate found for this booking")
-    }
-    if est.Status != models.EstimatePending {
-        return fmt.Errorf("estimate has already been %s", est.Status)
-    }
-    b, err := s.bookingRepo.GetByID(ctx, bookingID)
-    if err != nil {
-        return err
-    }
-    if b == nil {
-        return errors.New("booking not found")
-    }
-    if b.Status == models.BookingCancelled || b.Status == models.BookingCompleted {
-        return fmt.Errorf("cannot respond to an estimate on a %s booking", b.Status)
-    }
 	if err := s.bookingRepo.SetEstimateStatus(ctx, bookingID, status); err != nil {
 		return err
 	}
 	if status == models.EstimateApproved {
 		return s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingInProgress, "Customer approved estimate")
 	}
-    // Declined: don't cancel the job. Send it back to inspecting so the
-    // technician can revise the estimate and resubmit (UpsertEstimate resets
-    // the estimate to pending).
-    return s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingInspecting, "Customer declined estimate")
+	return s.bookingRepo.UpdateStatus(ctx, bookingID, models.BookingCancelled, "Customer declined estimate")
 }
 
 func (s *BookingService) AddServicePhoto(ctx context.Context, bookingID, photoURL, photoType string) (*models.BookingServicePhoto, error) {

@@ -496,3 +496,15 @@ func (s *GroqService) Chat(ctx context.Context, system string, turns []ChatTurn)
 	}
 	return "", lastErr
 }
+
+// SessionOwnedBy reports whether the diagnosis session exists and belongs to userID.
+func (g *GroqService) SessionOwnedBy(ctx context.Context, sessionID, userID string) (exists bool, owned bool, err error) {
+	s, err := g.aiRepo.GetSession(ctx, sessionID)
+	if err != nil {
+		return false, false, err
+	}
+	if s == nil {
+		return false, false, nil
+	}
+	return true, s.UserID == userID, nil
+}

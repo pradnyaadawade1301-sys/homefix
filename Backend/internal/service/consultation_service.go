@@ -421,7 +421,43 @@ func (s *ConsultationService) End(ctx context.Context, consultationID string) (*
 	return s.getDetails(ctx, consultationID)
 }
 
-func (s *ConsultationService) MarkPaid(ctx context.Context, consultationID string) error {
+// IsParticipant reports whether userID is the consultation's customer or its assigned technician.
+func (s *ConsultationService) IsParticipant(ctx context.Context, consultationID, userID string) (exists bool, ok bool, err error) {
+	c, err := s.consultRepo.GetByID(ctx, consultationID)
+	if err != nil {
+		return false, false, err
+	}
+	if c == nil {
+		return false, false, nil
+	}
+	if c.CustomerID == userID {
+		return true, true, nil
+	}
+	if c.TechnicianID != nil {
+		tech, err := s.techRepo.GetByUserID(ctx, userID)
+		if err == nil && tech != nil && tech.ID == *c.TechnicianID {
+			return true, true, nil
+		}
+	}
+	return true, false, nil
+}
+
+// MarkPaid is only callable by the consultation's own customer, and never marks
+// a fee-bearing consultation as paid without gateway verification.
+func (s *ConsultationService) MarkPaid(ctx context.Context, consultationID, userID string) error {
+	c, err := s.consultRepo.GetByID(ctx, consultationID)
+	if err != nil {
+		return err
+	}
+	if c == nil {
+		return errors.New("consultation not found")
+	}
+	if c.CustomerID != userID {
+		return errors.New("only the customer of this consultation can pay for it")
+	}
+	if c.Fee > 0 {
+		return errors.New("payment for this consultation must be verified through the payment gateway")
+	}
 	return s.consultRepo.SetPaymentStatus(ctx, consultationID, "paid")
 }
 

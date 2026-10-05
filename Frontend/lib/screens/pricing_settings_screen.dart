@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../core/technician_theme.dart';
+import '../providers/category_provider.dart';
 
 /// Combined pricing settings for a technician: hourly/visit charge, travel
-/// fee, emergency service fee, and minimum service charge. UI-only for now;
-/// wire the save action to your technician profile/pricing API.
+/// fee, emergency service fee, and minimum service charge. Saved via
+/// PATCH /technicians/me/settings.
 class PricingSettingsScreen extends StatefulWidget {
   final String initialField;
 
@@ -21,6 +23,24 @@ class _PricingSettingsScreenState extends State<PricingSettingsScreen> {
   bool _isSaving = false;
 
   @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final s = await context.read<TechnicianKycProvider>().loadSettings();
+    if (!mounted) return;
+    String? txt(String k) => s[k] is num ? (s[k] as num).toStringAsFixed(0) : null;
+    setState(() {
+      _hourlyController.text = txt('hourly_rate') ?? _hourlyController.text;
+      _travelController.text = txt('travel_fee') ?? _travelController.text;
+      _emergencyController.text = txt('emergency_fee') ?? _emergencyController.text;
+      _minimumController.text = txt('minimum_charge') ?? _minimumController.text;
+    });
+  }
+
+  @override
   void dispose() {
     _hourlyController.dispose();
     _travelController.dispose();
@@ -30,13 +50,25 @@ class _PricingSettingsScreenState extends State<PricingSettingsScreen> {
   }
 
   Future<void> _save() async {
+    final values = {
+      'hourly_rate': double.tryParse(_hourlyController.text.trim()),
+      'travel_fee': double.tryParse(_travelController.text.trim()),
+      'emergency_fee': double.tryParse(_emergencyController.text.trim()),
+      'minimum_charge': double.tryParse(_minimumController.text.trim()),
+    };
+    if (values.values.any((v) => v == null || v < 0)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter valid amounts (0 or more) in every field')),
+      );
+      return;
+    }
     setState(() => _isSaving = true);
-    // TODO: PATCH technician pricing fields to your backend.
-    await Future.delayed(const Duration(milliseconds: 600));
+    final provider = context.read<TechnicianKycProvider>();
+    final ok = await provider.saveSettings(values.map((k, v) => MapEntry(k, v!)));
     if (!mounted) return;
     setState(() => _isSaving = false);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Pricing updated')),
+      SnackBar(content: Text(ok ? 'Pricing updated' : (provider.error ?? 'Could not save pricing'))),
     );
   }
 

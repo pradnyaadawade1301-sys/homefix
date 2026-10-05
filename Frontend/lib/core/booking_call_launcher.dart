@@ -76,6 +76,7 @@ Future<void> _startBookingCall(
     builder: (_) => const Center(child: CircularProgressIndicator()),
   );
 
+  var spinnerOpen = true;
   try {
     final callInfo = await bookingProvider.initiateCall(bookingId, isVideo: isVideo);
     final token = await authProvider.getValidAccessToken();
@@ -83,6 +84,7 @@ Future<void> _startBookingCall(
 
     if (!context.mounted) return;
     Navigator.of(context, rootNavigator: true).pop(); // close the spinner
+    spinnerOpen = false;
 
     if (token == null) {
       _showError(context, 'Could not start the call — please sign in again.');
@@ -109,7 +111,9 @@ Future<void> _startBookingCall(
     ));
   } catch (e) {
     if (!context.mounted) return;
-    Navigator.of(context, rootNavigator: true).pop(); // close the spinner
+    // Only close the spinner if it's still open — otherwise this would pop the
+    // underlying screen.
+    if (spinnerOpen) Navigator.of(context, rootNavigator: true).pop();
     _showError(context, e.toString().replaceFirst('Exception: ', ''));
   }
 }

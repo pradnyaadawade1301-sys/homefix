@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
@@ -15,6 +16,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late final AnimationController _controller;
   late final Animation<double> _scale;
   late final Animation<double> _fade;
+  Timer? _startTimer;
 
   @override
   void initState() {
@@ -26,11 +28,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _scale = CurvedAnimation(parent: _controller, curve: Curves.easeOutBack);
     _fade = CurvedAnimation(parent: _controller, curve: const Interval(0.3, 1.0, curve: Curves.easeIn));
     _controller.forward();
-    _checkLoginStatus();
+    // Cancellable (unlike Future.delayed) so it never outlives this widget.
+    _startTimer = Timer(const Duration(milliseconds: 3000), _checkLoginStatus);
   }
 
   Future<void> _checkLoginStatus() async {
-    await Future.delayed(const Duration(milliseconds: 3000));
     if (!mounted) return;
 
     final authProvider = context.read<AuthProvider>();
@@ -54,6 +56,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     // from this profile fetch.
     if (userProvider.user != null) {
       authProvider.setCurrentUser(userProvider.user!);
+    }
+
+    // Profile fetch failed (network down / invalid token): don't fall through to
+    // the customer home as if we were logged in — send to login instead.
+    if (userProvider.user == null) {
+      Navigator.of(context).pushReplacementNamed('/login');
+      return;
     }
 
     if (userProvider.user?.role != 'technician') {
@@ -80,6 +89,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   void dispose() {
+    _startTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }

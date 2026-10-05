@@ -47,9 +47,10 @@ class _TechnicianStatusScreenState extends State<TechnicianStatusScreen> {
             icon: const Icon(Icons.logout_rounded),
             tooltip: 'Logout',
             onPressed: () async {
+              final navigator = Navigator.of(context);
               await context.read<AuthProvider>().logout();
-              if (!mounted) return;
-              Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+              if (!navigator.mounted) return;
+              navigator.pushNamedAndRemoveUntil('/login', (route) => false);
             },
           ),
         ],
