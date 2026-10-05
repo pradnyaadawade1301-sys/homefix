@@ -7,3 +7,4 @@ build/
 .dart_tool/
 .idea/
 *.log
+*.exe
